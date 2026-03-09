@@ -1,11 +1,70 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
+import AuthProfileService from '#services/auth_profile_service'
 import { loginValidator } from '#validators/login_validator'
+import { authRegisterValidator } from '#validators/auth_register_validator'
 
 /**
- * Controller xử lý đăng nhập, đăng xuất và lấy thông tin user hiện tại.
+ * Controller xử lý đăng nhập, đăng ký, đăng xuất và lấy thông tin user hiện tại.
  */
 export default class AuthController {
+  /**
+   * POST /api/auth/register
+   * Đăng ký tài khoản mới bằng email + password. Tự động cấp token sau khi đăng ký.
+   */
+  async register({ request, response, auth }: HttpContext) {
+    const { email, password } = await request.validateUsing(authRegisterValidator)
+
+    try {
+      const existing = await User.findBy('email', email)
+      if (existing) {
+        return response.badRequest({
+          success: false,
+          message: 'Email đã tồn tại.',
+        })
+      }
+
+      // Tạo fullName từ phần trước @ của email (hoặc "User" nếu rỗng)
+      const fullName = email.split('@')[0]?.trim() || 'User'
+
+      const user = await User.create({
+        email,
+        password,
+        fullName,
+        role: 'NCV',
+        roleLabel: 'Nhà khoa học',
+        isActive: true,
+      })
+
+      const token = await auth.use('api').createToken(user, ['*'], {
+        expiresIn: '30 days',
+        name: 'auth',
+      })
+
+      const tokenJson = token.toJSON()
+
+      return response.created({
+        success: true,
+        data: {
+          user: this.serializeUser(user),
+          token: {
+            type: 'bearer',
+            token: tokenJson.token,
+            expiresAt: tokenJson.expiresAt,
+          },
+        },
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Lỗi đăng ký.'
+      const stack = err instanceof Error ? err.stack : undefined
+      return response.internalServerError({
+        success: false,
+        message: 'Lỗi máy chủ khi đăng ký.',
+        ...(process.env.NODE_ENV !== 'production' && { debug: message, stack }),
+      })
+    }
+  }
+
   /**
    * POST /api/auth/login
    * Xác thực email/password và trả về user + access token.
@@ -66,17 +125,18 @@ export default class AuthController {
 
   /**
    * GET /api/auth/me
-   * Trả về thông tin user đang đăng nhập.
+   * Trả về thông tin user đang đăng nhập kèm roles, permissions, department cho access control.
    */
   async me({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
+    const data = await AuthProfileService.getMeData(user)
     return response.ok({
       success: true,
-      data: this.serializeUser(user),
+      data,
     })
   }
 
-  /** Chuẩn hóa user để trả về API (không có password, đúng camelCase) */
+  /** Chuẩn hóa user để trả về API (dùng cho login/register) */
   private serializeUser(user: User) {
     return {
       id: user.id,

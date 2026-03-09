@@ -25,7 +25,7 @@ export default class ProfileController {
       .preload('publications')
       .first()
     if (!profile) {
-      return response.notFound({ success: false, message: 'Chưa có hồ sơ. Gọi POST /api/profile/me để tạo.' })
+      return response.ok({ success: true, data: null })
     }
     return response.ok({ success: true, data: this.serializeProfile(profile) })
   }

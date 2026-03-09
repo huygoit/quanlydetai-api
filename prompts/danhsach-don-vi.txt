@@ -1,0 +1,23 @@
+D2504000,Trường Đại học Sư phạm - Đại học Đà Nẵng
+D2504010,Ban Giám hiệu
+D2504020,Phòng Tổ chức
+D2504030,Phòng Đào tạo
+D2504040,Phòng Kế hoạch - Tài chính
+D2504060,Phòng Quản lý người học - Thư viện
+D2504050,Phòng Khoa học - Công nghệ thông tin - Hợp tác quốc tế
+D2504070,Phòng Khảo thí - Bảo đảm chất lượng
+D2504080,Phòng Hành chính
+D2504090,Phòng Cơ sở vật chất
+D2504200,Khoa Toán - Tin
+D2504210,Khoa Lý - Hóa
+D2504220,Khoa Giáo dục Nghệ thuật - Thể chất
+D2504230,Khoa Sinh - Nông nghiệp - Môi trường
+D2504240,Khoa Ngữ văn - Truyền thông
+D2504250,Khoa Giáo dục Tiểu học - Mầm non
+D2504260,Khoa Tâm lý - Giáo dục - Công tác Xã hội
+D2504270,Khoa Sử - Địa - Chính trị
+D2504310,Trung tâm Hỗ trợ sinh viên và Quan hệ doanh nghiệp
+D2504311,Trung tâm Tiếng việt và Văn hoá Việt
+D2504312,Trung tâm Tin học
+D2504313,Trung tâm Nghiên cứu Phát triển chương trình
+D2504314,Hội đồng trường

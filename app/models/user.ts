@@ -1,7 +1,10 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany, belongsTo } from '@adonisjs/lucid/orm'
+import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
+import UserRoleAssignment from '#models/user_role_assignment'
+import Department from '#models/department'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 import type { UserRole } from '#types/user'
@@ -38,9 +41,21 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare phone: string | null
 
-  /** Đơn vị công tác */
+  /** Đơn vị công tác (legacy - text) */
   @column()
   declare unit: string | null
+
+  /** FK tới departments - đơn vị mới */
+  @column()
+  declare departmentId: number | null
+
+  /** Ghi chú */
+  @column()
+  declare note: string | null
+
+  /** Lần đăng nhập cuối */
+  @column.dateTime()
+  declare lastLoginAt: DateTime | null
 
   @column()
   declare isActive: boolean
@@ -50,6 +65,12 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
+
+  @belongsTo(() => Department)
+  declare department: BelongsTo<typeof Department>
+
+  @hasMany(() => UserRoleAssignment)
+  declare roleAssignments: HasMany<typeof UserRoleAssignment>
 
   static accessTokens = DbAccessTokensProvider.forModel(User)
 }

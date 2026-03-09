@@ -30,9 +30,14 @@ import HomeController from '#controllers/home_controller'
 import KpisController from '#controllers/kpis_controller'
 import AdminResearchOutputTypesController from '#controllers/admin/research_output_types_controller'
 import AdminResearchOutputRulesController from '#controllers/admin/research_output_rules_controller'
+import AdminDepartmentsController from '#controllers/admin/departments_controller'
+import AdminRolesController from '#controllers/admin/roles_controller'
+import AdminPermissionsController from '#controllers/admin/permissions_controller'
+import AdminIamUsersController from '#controllers/admin/iam_users_controller'
 
-// --- Auth (login không cần token)
+// --- Auth (login, register không cần token)
 router.post('/api/auth/login', [AuthController, 'login'])
+router.post('/api/auth/register', [AuthController, 'register'])
 
 // --- Auth (cần Bearer token)
 router
@@ -65,6 +70,109 @@ router
   })
   .prefix('/api/admin')
   .middleware([middleware.auth(), middleware.role('ADMIN')])
+
+// --- Admin: departments CRUD (permission-based)
+router
+  .group(() => {
+    router
+      .get('/', [AdminDepartmentsController, 'index'])
+      .use(middleware.permission('department.view'))
+    router
+      .get('/:id', [AdminDepartmentsController, 'show'])
+      .use(middleware.permission('department.view'))
+    router
+      .post('/', [AdminDepartmentsController, 'store'])
+      .use(middleware.permission('department.create'))
+    router
+      .put('/:id', [AdminDepartmentsController, 'update'])
+      .use(middleware.permission('department.update'))
+    router
+      .patch('/:id/status', [AdminDepartmentsController, 'changeStatus'])
+      .use(middleware.permission('department.change_status'))
+  })
+  .prefix('/api/admin/departments')
+  .use([middleware.auth()])
+
+// --- Admin: IAM Roles (permission-based)
+router
+  .group(() => {
+    router
+      .get('/', [AdminRolesController, 'index'])
+      .use(middleware.permission('role.view'))
+    router
+      .get('/:id', [AdminRolesController, 'show'])
+      .use(middleware.permission('role.view'))
+    router
+      .post('/', [AdminRolesController, 'store'])
+      .use(middleware.permission('role.create'))
+    router
+      .put('/:id', [AdminRolesController, 'update'])
+      .use(middleware.permission('role.update'))
+    router
+      .patch('/:id/status', [AdminRolesController, 'changeStatus'])
+      .use(middleware.permission('role.update'))
+    router
+      .get('/:id/permissions', [AdminRolesController, 'permissions'])
+      .use(middleware.permission('role.view'))
+    router
+      .put('/:id/permissions', [AdminRolesController, 'syncPermissions'])
+      .use(middleware.permission('role.assign_permission'))
+  })
+  .prefix('/api/admin/roles')
+  .use([middleware.auth()])
+
+// --- Admin: IAM Permissions (permission-based)
+router
+  .group(() => {
+    router
+      .get('/', [AdminPermissionsController, 'index'])
+      .use(middleware.permission('permission.view'))
+    router
+      .get('/:id', [AdminPermissionsController, 'show'])
+      .use(middleware.permission('permission.view'))
+    router
+      .post('/', [AdminPermissionsController, 'store'])
+      .use(middleware.permission('permission.view'))
+    router
+      .put('/:id', [AdminPermissionsController, 'update'])
+      .use(middleware.permission('permission.view'))
+    router
+      .patch('/:id/status', [AdminPermissionsController, 'changeStatus'])
+      .use(middleware.permission('permission.view'))
+  })
+  .prefix('/api/admin/permissions')
+  .use([middleware.auth()])
+
+// --- Admin: IAM User management (permission-based)
+router
+  .group(() => {
+    router
+      .get('/', [AdminIamUsersController, 'index'])
+      .use(middleware.permission('user.view'))
+    router
+      .get('/:id', [AdminIamUsersController, 'show'])
+      .use(middleware.permission('user.view'))
+    router
+      .post('/', [AdminIamUsersController, 'store'])
+      .use(middleware.permission('user.create'))
+    router
+      .put('/:id', [AdminIamUsersController, 'update'])
+      .use(middleware.permission('user.update'))
+    router
+      .patch('/:id/status', [AdminIamUsersController, 'changeStatus'])
+      .use(middleware.permission('user.change_status'))
+    router
+      .patch('/:id/reset-password', [AdminIamUsersController, 'resetPassword'])
+      .use(middleware.permission('user.reset_password'))
+    router
+      .get('/:id/roles', [AdminIamUsersController, 'roles'])
+      .use(middleware.permission('user.assign_role'))
+    router
+      .put('/:id/roles', [AdminIamUsersController, 'assignRoles'])
+      .use(middleware.permission('user.assign_role'))
+  })
+  .prefix('/api/admin/users')
+  .use([middleware.auth()])
 
 // --- Admin: catalogs CRUD (chỉ ADMIN)
 router
@@ -151,6 +259,7 @@ router
 router
   .group(() => {
     router.get('/', [IdeasController, 'index'])
+    router.get('/my', [IdeasController, 'myIndex'])
     router.get('/:id', [IdeasController, 'show'])
     router.post('/', [IdeasController, 'store'])
     router.put('/:id', [IdeasController, 'update'])

@@ -107,6 +107,18 @@ export default class NotificationService {
   }
 
   /**
+   * Khi NCV submit ý tưởng (DRAFT → SUBMITTED) → thông báo PHONG_KH
+   */
+  static async notifyIdeaSubmitted(ideaCode: string, ideaTitle: string, ideaId: number, ownerName: string) {
+    await this.pushToRole('PHONG_KH', {
+      type: 'IDEA_SUBMITTED',
+      title: 'Ý tưởng mới cần sơ loại',
+      message: `${ownerName} đã gửi ý tưởng ${ideaCode}: ${ideaTitle}. Vui lòng xem xét sơ loại.`,
+      link: `/ideas/review`,
+    })
+  }
+
+  /**
    * Khi ý tưởng thay đổi trạng thái → thông báo owner
    */
   static async notifyIdeaStatusChanged(

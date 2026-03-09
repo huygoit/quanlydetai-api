@@ -52,6 +52,10 @@ export default class IdeasController {
     }
   }
 
+  private isOwner(idea: Idea, userId: number): boolean {
+    return Number(idea.ownerId) === Number(userId)
+  }
+
   private serializeListItem(idea: Idea) {
     return {
       id: idea.id,
@@ -68,6 +72,42 @@ export default class IdeasController {
       createdAt: idea.createdAt.toISO(),
       updatedAt: idea.updatedAt.toISO(),
     }
+  }
+
+  /**
+   * GET /api/ideas/my - Chỉ lấy ý tưởng của user đang đăng nhập (dùng cho trang "Ý tưởng của tôi")
+   */
+  async myIndex({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const page = request.input('page', 1)
+    const perPage = Math.min(request.input('perPage', 10), 100)
+    const keyword = request.input('keyword', '')
+    const field = request.input('field', '')
+    const status = request.input('status', '')
+    const suitableLevels = request.input('suitableLevels') ?? request.input('suitableLevels[]')
+    const priority = request.input('priority', '')
+
+    const q = Idea.query().where('owner_id', user.id).orderBy('updated_at', 'desc')
+    if (keyword) {
+      q.where((b) => {
+        b.whereILike('code', `%${keyword}%`)
+          .orWhereILike('title', `%${keyword}%`)
+          .orWhereILike('summary', `%${keyword}%`)
+      })
+    }
+    if (field) q.where('field', field)
+    if (status) q.where('status', status)
+    if (priority) q.where('priority', priority)
+    const levels = Array.isArray(suitableLevels) ? suitableLevels : suitableLevels ? [suitableLevels] : []
+    if (levels.length > 0) q.whereRaw('suitable_levels ?| ?::text[]', [levels])
+
+    const paginated = await q.paginate(page, perPage)
+    const data = paginated.all().map((i) => this.serializeListItem(i))
+    return response.ok({
+      success: true,
+      data,
+      meta: { total: paginated.total, currentPage: paginated.currentPage, perPage: paginated.perPage, lastPage: paginated.lastPage },
+    })
   }
 
   async index({ request, response }: HttpContext) {
@@ -134,7 +174,7 @@ export default class IdeasController {
     const user = auth.use('api').user!
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
-    if (idea.ownerId !== user.id) return response.forbidden({ success: false, message: 'Chỉ chủ sở hữu mới được sửa.' })
+    if (!this.isOwner(idea, user.id)) return response.forbidden({ success: false, message: 'Chỉ chủ sở hữu mới được sửa.' })
     if (idea.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ được sửa khi trạng thái DRAFT.' })
     const payload = await request.validateUsing(updateIdeaValidator)
     if (payload.title !== undefined) idea.title = payload.title
@@ -149,7 +189,7 @@ export default class IdeasController {
     const user = auth.use('api').user!
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
-    if (idea.ownerId !== user.id) return response.forbidden({ success: false, message: 'Chỉ chủ sở hữu mới được xóa.' })
+    if (!this.isOwner(idea, user.id)) return response.forbidden({ success: false, message: 'Chỉ chủ sở hữu mới được xóa.' })
     if (idea.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ được xóa khi trạng thái DRAFT.' })
     await idea.delete()
     return response.ok({ success: true, message: 'Đã xóa ý tưởng.' })
@@ -160,11 +200,12 @@ export default class IdeasController {
     const user = auth.use('api').user!
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
-    if (idea.ownerId !== user.id) return response.forbidden({ success: false, message: 'Chỉ chủ sở hữu mới được gửi.' })
+    if (!this.isOwner(idea, user.id)) return response.forbidden({ success: false, message: 'Chỉ chủ sở hữu mới được gửi.' })
     if (idea.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ gửi được khi trạng thái DRAFT.' })
     idea.status = 'SUBMITTED'
     await idea.save()
     await AuditLogService.log({ userId: user.id, userName: user.fullName, action: 'SUBMIT', entityType: 'IDEA', entityId: String(idea.id), newData: this.serializeIdea(idea), ctx })
+    await NotificationService.notifyIdeaSubmitted(idea.code, idea.title, idea.id, idea.ownerName)
     return response.ok({ success: true, message: 'Đã gửi ý tưởng.', data: this.serializeIdea(idea) })
   }
 
