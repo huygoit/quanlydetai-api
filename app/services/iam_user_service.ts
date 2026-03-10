@@ -24,11 +24,7 @@ export default class IamUserService {
     const sortBy = filters.sortBy ?? 'id'
     const order = filters.order ?? 'desc'
 
-    const q = User.query()
-      .preload('department')
-      .preload('roleAssignments', (aq) => {
-        aq.preload('role').where('is_active', true)
-      })
+    const q = User.query().preload('department')
 
     if (filters.keyword) {
       q.where((b) => {
@@ -159,5 +155,26 @@ export default class IamUserService {
 
   static async assignRoles(userId: number, roleIds: number[]) {
     return UserRoleAssignmentService.syncUserRoles(userId, roleIds)
+  }
+
+  static async addRole(
+    userId: number,
+    payload: { roleId: number; isActive?: boolean; startAt?: unknown; endAt?: unknown }
+  ) {
+    return UserRoleAssignmentService.assignRole(userId, payload)
+  }
+
+  static async updateAssignmentStatus(userId: number, assignmentId: number, isActive: boolean) {
+    return UserRoleAssignmentService.updateAssignmentStatus(userId, assignmentId, isActive)
+  }
+
+  static async removeRole(userId: number, assignmentId: number) {
+    const assignment = await UserRoleAssignment.query()
+      .where('user_id', userId)
+      .where('id', assignmentId)
+      .first()
+    if (!assignment) throw new Error('ASSIGNMENT_NOT_FOUND')
+    await assignment.delete()
+    return UserRoleAssignmentService.getUserRoles(userId)
   }
 }

@@ -34,6 +34,7 @@ import AdminDepartmentsController from '#controllers/admin/departments_controlle
 import AdminRolesController from '#controllers/admin/roles_controller'
 import AdminPermissionsController from '#controllers/admin/permissions_controller'
 import AdminIamUsersController from '#controllers/admin/iam_users_controller'
+import AdminPersonalProfilesController from '#controllers/admin/personal_profiles_controller'
 
 // --- Auth (login, register không cần token)
 router.post('/api/auth/login', [AuthController, 'login'])
@@ -168,11 +169,33 @@ router
       .get('/:id/roles', [AdminIamUsersController, 'roles'])
       .use(middleware.permission('user.assign_role'))
     router
+      .post('/:id/roles', [AdminIamUsersController, 'addRole'])
+      .use(middleware.permission('user.assign_role'))
+    router
       .put('/:id/roles', [AdminIamUsersController, 'assignRoles'])
+      .use(middleware.permission('user.assign_role'))
+    router
+      .patch('/:id/roles/:assignmentId/status', [AdminIamUsersController, 'updateAssignmentStatus'])
+      .use(middleware.permission('user.assign_role'))
+    router
+      .delete('/:id/roles/:assignmentId', [AdminIamUsersController, 'removeRole'])
       .use(middleware.permission('user.assign_role'))
   })
   .prefix('/api/admin/users')
   .use([middleware.auth()])
+
+// --- Admin: personal profiles CRUD (chỉ ADMIN)
+router
+  .group(() => {
+    router.get('/', [AdminPersonalProfilesController, 'index'])
+    router.get('/user/:userId', [AdminPersonalProfilesController, 'showByUserId'])
+    router.get('/:id', [AdminPersonalProfilesController, 'show'])
+    router.post('/', [AdminPersonalProfilesController, 'store'])
+    router.put('/:id', [AdminPersonalProfilesController, 'update'])
+    router.patch('/:id/status', [AdminPersonalProfilesController, 'changeStatus'])
+  })
+  .prefix('/api/admin/personal-profiles')
+  .use([middleware.auth(), middleware.role('ADMIN')])
 
 // --- Admin: catalogs CRUD (chỉ ADMIN)
 router

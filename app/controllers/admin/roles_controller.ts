@@ -7,7 +7,7 @@ import { updateRoleStatusValidator } from '#validators/update_role_status_valida
 import { syncRolePermissionsValidator } from '#validators/sync_role_permissions_validator'
 
 /**
- * Admin: CRUD roles + gán permissions.
+ * Admin: CRUD roles, gán permissions cho role.
  */
 export default class AdminRolesController {
   private serializeRole(r: Role) {
@@ -28,8 +28,8 @@ export default class AdminRolesController {
       perPage: request.input('perPage', 10),
       keyword: request.input('keyword', ''),
       status: request.input('status', ''),
-      sortBy: request.input('sortBy', ''),
-      order: request.input('order', 'asc') as 'asc' | 'desc',
+      sortBy: request.input('sortBy', 'code'),
+      order: (request.input('order', 'asc') as 'asc' | 'desc') || 'asc',
     })
     const data = paginated.all().map((r) => this.serializeRole(r))
     return response.ok({
@@ -170,7 +170,7 @@ export default class AdminRolesController {
       return response.badRequest({ success: false, message: 'ID không hợp lệ.' })
     }
     const payload = await request.validateUsing(syncRolePermissionsValidator)
-    const permissionIds = payload.permissionIds ?? []
+    const permissionIds = payload.permissionIds ?? payload.permission_ids ?? []
     try {
       const result = await RoleService.syncPermissions(id, permissionIds)
       return response.ok({

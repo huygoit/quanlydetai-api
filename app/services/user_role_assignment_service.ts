@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon'
+import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
 import Role from '#models/role'
 import UserRoleAssignment from '#models/user_role_assignment'
@@ -17,6 +18,35 @@ export interface UserRoleDto {
  * Service gán role cho user.
  */
 export default class UserRoleAssignmentService {
+  /** Lấy roles theo danh sách userId (dùng cho list) - dùng JOIN trực tiếp, không preload */
+  static async getRolesByUserIds(userIds: number[]): Promise<Map<number, { id: number; code: string; name: string }[]>> {
+    if (userIds.length === 0) return new Map()
+    const rows = await db
+      .from('user_role_assignments')
+      .join('roles', 'user_role_assignments.role_id', 'roles.id')
+      .whereIn('user_role_assignments.user_id', userIds)
+      .select(
+        'user_role_assignments.user_id as user_id',
+        'roles.id as role_id',
+        'roles.code as role_code',
+        'roles.name as role_name'
+      )
+      .orderBy('user_role_assignments.user_id')
+      .orderBy('user_role_assignments.id')
+    const map = new Map<number, { id: number; code: string; name: string }[]>()
+    for (const row of rows) {
+      const uid = Number(row.user_id)
+      const list = map.get(uid) ?? []
+      list.push({
+        id: Number(row.role_id),
+        code: String(row.role_code),
+        name: String(row.role_name),
+      })
+      map.set(uid, list)
+    }
+    return map
+  }
+
   static async getUserRoles(userId: number): Promise<UserRoleDto[]> {
     const user = await User.find(userId)
     if (!user) throw new Error('USER_NOT_FOUND')
@@ -27,13 +57,19 @@ export default class UserRoleAssignmentService {
       .orderBy('id', 'asc')
 
     return assignments.map((a) => ({
+      id: a.id,
       assignmentId: a.id,
       roleId: a.roleId,
+      role_id: a.roleId,
+      role: { id: a.role.id, code: a.role.code, name: a.role.name },
       roleCode: a.role.code,
       roleName: a.role.name,
       isActive: a.isActive,
+      is_active: a.isActive,
       startAt: a.startAt?.toISO() ?? null,
+      start_at: a.startAt?.toISO() ?? null,
       endAt: a.endAt?.toISO() ?? null,
+      end_at: a.endAt?.toISO() ?? null,
     }))
   }
 
