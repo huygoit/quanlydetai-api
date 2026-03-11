@@ -101,7 +101,17 @@ export default class AuthController {
         },
       })
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Lỗi đăng nhập.'
+      const message = err instanceof Error ? err.message : ''
+      const isInvalidCredentials =
+        message === 'Invalid user credentials' ||
+        message.toLowerCase().includes('invalid') ||
+        (err as { code?: string })?.code === 'E_INVALID_CREDENTIALS'
+      if (isInvalidCredentials) {
+        return response.unauthorized({
+          success: false,
+          message: 'Email hoặc mật khẩu không đúng.',
+        })
+      }
       const stack = err instanceof Error ? err.stack : undefined
       return response.internalServerError({
         success: false,

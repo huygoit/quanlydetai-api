@@ -73,10 +73,11 @@ export default class AdminIamUsersController {
       isActive = isActiveRaw === 'true' || isActiveRaw === '1'
     }
 
+    const keyword = request.input('keyword', '')
     const paginated = await IamUserService.paginate({
       page: request.input('page', 1),
       perPage: request.input('perPage') ?? request.input('per_page', 10),
-      keyword: request.input('keyword', ''),
+      keyword,
       departmentId: departmentId ? Number(departmentId) : undefined,
       roleId: roleId ? Number(roleId) : undefined,
       isActive,

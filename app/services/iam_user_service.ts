@@ -1,5 +1,6 @@
 import User from '#models/user'
 import Department from '#models/department'
+import UserRoleAssignment from '#models/user_role_assignment'
 import UserRoleAssignmentService from '#services/user_role_assignment_service'
 import type { ModelPaginatorContract } from '@adonisjs/lucid/types/model'
 
