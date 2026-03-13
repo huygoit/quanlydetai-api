@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import AuthProfileService from '#services/auth_profile_service'
+import BasicRoleService from '#services/basic_role_service'
 import { loginValidator } from '#validators/login_validator'
 import { authRegisterValidator } from '#validators/auth_register_validator'
 
@@ -35,6 +36,8 @@ export default class AuthController {
         roleLabel: 'Nhà khoa học',
         isActive: true,
       })
+
+      await BasicRoleService.assignBasicRoleToUser(user.id)
 
       const token = await auth.use('api').createToken(user, ['*'], {
         expiresIn: '30 days',

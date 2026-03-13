@@ -49,7 +49,7 @@ router
   .prefix('/api/auth')
   .middleware([middleware.auth()])
 
-// --- Users (chỉ ADMIN)
+// --- Users (permission: user.view)
 router
   .group(() => {
     router.get('/', [UsersController, 'index'])
@@ -59,9 +59,9 @@ router
     router.delete('/:id', [UsersController, 'destroy'])
   })
   .prefix('/api/users')
-  .middleware([middleware.auth(), middleware.role('ADMIN')])
+  .middleware([middleware.auth(), middleware.permission('user.view')])
 
-// --- Admin: configs & audit-logs (chỉ ADMIN)
+// --- Admin: configs & audit-logs (permission: user.view)
 router
   .group(() => {
     router.get('/configs', [AdminController, 'configsIndex'])
@@ -70,7 +70,7 @@ router
     router.get('/audit-logs', [AdminController, 'auditLogsIndex'])
   })
   .prefix('/api/admin')
-  .middleware([middleware.auth(), middleware.role('ADMIN')])
+  .middleware([middleware.auth(), middleware.permission('user.view')])
 
 // --- Admin: departments CRUD (permission-based)
 router
@@ -125,6 +125,9 @@ router
 // --- Admin: IAM Permissions (permission-based)
 router
   .group(() => {
+    router
+      .post('/sync-missing', [AdminPermissionsController, 'syncMissing'])
+      .use(middleware.permission('permission.view'))
     router
       .get('/', [AdminPermissionsController, 'index'])
       .use(middleware.permission('permission.view'))
@@ -207,9 +210,9 @@ router
     router.delete('/:id', [CatalogsController, 'destroy'])
   })
   .prefix('/api/admin/catalogs')
-  .middleware([middleware.auth(), middleware.role('ADMIN')])
+  .middleware([middleware.auth(), middleware.permission('department.view')])
 
-// --- Admin: loại kết quả NCKH (cây 2–3 cấp) + rule (ADMIN, PHONG_KH)
+// --- Admin: loại kết quả NCKH (permission: department.view)
 router
   .group(() => {
     router.get('/research-output-types/tree', [AdminResearchOutputTypesController, 'tree'])
@@ -221,7 +224,7 @@ router
     router.put('/research-output-types/:id', [AdminResearchOutputTypesController, 'update'])
   })
   .prefix('/api/admin')
-  .middleware([middleware.auth(), middleware.role('PHONG_KH,ADMIN')])
+  .middleware([middleware.auth(), middleware.permission('department.view')])
 
 // --- Catalogs public: lấy theo type (không cần auth)
 router.get('/api/catalogs/by-type/:type', [CatalogsController, 'byType'])
@@ -264,7 +267,7 @@ router
   .prefix('/api/profile/me')
   .middleware([middleware.auth()])
 
-// --- Danh sách hồ sơ + verify (PHONG_KH, ADMIN)
+// --- Danh sách hồ sơ + verify (permission: profile.view_all, profile.verify)
 router
   .group(() => {
     router.get('/', [ProfilesController, 'index'])
@@ -276,7 +279,7 @@ router
     router.get('/:id/verify-logs', [ProfilesController, 'verifyLogs'])
   })
   .prefix('/api/profiles')
-  .middleware([middleware.auth(), middleware.role('PHONG_KH,ADMIN')])
+  .middleware([middleware.auth(), middleware.permission('profile.view_all,profile.verify')])
 
 // --- Ngân hàng ý tưởng (Ideas)
 router

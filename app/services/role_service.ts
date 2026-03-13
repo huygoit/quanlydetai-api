@@ -1,6 +1,7 @@
 import Role from '#models/role'
 import Permission from '#models/permission'
 import RolePermission from '#models/role_permission'
+import BasicRoleService from '#services/basic_role_service'
 import type { ModelPaginatorContract } from '@adonisjs/lucid/types/model'
 import type { RoleStatus } from '#models/role'
 
@@ -66,6 +67,12 @@ export default class RoleService {
     payload: { code?: string; name?: string; description?: string | null; status?: RoleStatus }
   ): Promise<Role> {
     const role = await this.findById(id)
+    if (BasicRoleService.isBasicRole(role)) {
+      if (payload.code !== undefined && payload.code !== role.code)
+        throw new Error('BASIC_ROLE_CODE_READONLY')
+      if (payload.name !== undefined && payload.name !== role.name)
+        throw new Error('BASIC_ROLE_NAME_READONLY')
+    }
     if (payload.code !== undefined) {
       if (await this.isCodeExists(payload.code, id)) throw new Error('CODE_EXISTS')
       role.code = payload.code

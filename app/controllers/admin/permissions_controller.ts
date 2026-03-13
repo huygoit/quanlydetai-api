@@ -124,6 +124,23 @@ export default class AdminPermissionsController {
     }
   }
 
+  /**
+   * POST /api/admin/permissions/sync-missing
+   * Bổ sung các quyền chuẩn còn thiếu (profile.view_own, idea.view, ...) để admin có thể gán cho role.
+   */
+  async syncMissing({ response }: HttpContext) {
+    const result = await PermissionService.syncMissingStandardPermissions()
+    return response.ok({
+      message: result.added > 0
+        ? `Đã bổ sung ${result.added} quyền chuẩn.`
+        : 'Không có quyền nào cần bổ sung.',
+      data: {
+        added: result.added,
+        permissions: result.permissions.map((p) => this.serializePermission(p)),
+      },
+    })
+  }
+
   async changeStatus({ params, request, response }: HttpContext) {
     const id = Number(params.id)
     if (!Number.isFinite(id)) {

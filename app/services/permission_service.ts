@@ -1,4 +1,6 @@
 import Permission from '#models/permission'
+import User from '#models/user'
+import Role from '#models/role'
 import UserRoleAssignment from '#models/user_role_assignment'
 import RolePermission from '#models/role_permission'
 import type { ModelPaginatorContract } from '@adonisjs/lucid/types/model'
@@ -97,6 +99,39 @@ export default class PermissionService {
     return perm
   }
 
+  /**
+   * Bổ sung các quyền chuẩn còn thiếu (profile, idea cơ bản).
+   * Chỉ tạo nếu chưa tồn tại. Trả về số quyền đã thêm.
+   */
+  static readonly STANDARD_MISSING: Array<{ code: string; name: string; module: string; action: string }> = [
+    { code: 'profile.view_own', name: 'Xem hồ sơ của mình', module: 'profile', action: 'view_own' },
+    { code: 'profile.update_own', name: 'Cập nhật hồ sơ của mình', module: 'profile', action: 'update_own' },
+    { code: 'idea.view', name: 'Xem ý tưởng', module: 'idea', action: 'view' },
+    { code: 'idea.create', name: 'Tạo ý tưởng', module: 'idea', action: 'create' },
+    { code: 'idea.update', name: 'Cập nhật ý tưởng', module: 'idea', action: 'update' },
+    { code: 'idea.submit', name: 'Gửi ý tưởng', module: 'idea', action: 'submit' },
+    { code: 'idea.delete', name: 'Xóa ý tưởng', module: 'idea', action: 'delete' },
+  ]
+
+  static async syncMissingStandardPermissions(): Promise<{ added: number; permissions: Permission[] }> {
+    const added: Permission[] = []
+    for (const p of this.STANDARD_MISSING) {
+      const exists = await Permission.query().where('code', p.code).first()
+      if (!exists) {
+        const perm = await Permission.create({
+          code: p.code,
+          name: p.name,
+          module: p.module,
+          action: p.action,
+          description: null,
+          status: 'ACTIVE',
+        })
+        added.push(perm)
+      }
+    }
+    return { added: added.length, permissions: added }
+  }
+
   static async updateStatus(id: number, status: PermissionStatus): Promise<Permission> {
     const perm = await this.findById(id)
     perm.status = status
@@ -152,5 +187,28 @@ export default class PermissionService {
     const [module] = permissionCode.split('.')
     if (perms.includes(`${module}.*`)) return true
     return false
+  }
+
+  /**
+   * Lấy danh sách userId có permission (dùng cho thông báo theo quyền).
+   */
+  static async getUserIdsWithPermission(permissionCode: string): Promise<number[]> {
+    const perm = await Permission.query().where('code', permissionCode).first()
+    if (!perm) return []
+
+    const rolePermRows = await RolePermission.query().where('permission_id', perm.id)
+    let rids = [...new Set(rolePermRows.map((r) => r.roleId))]
+
+    const superAdminRole = await Role.query().where('code', 'SUPER_ADMIN').first()
+    if (superAdminRole) rids = [...new Set([...rids, superAdminRole.id])]
+
+    const assignments = await UserRoleAssignment.query()
+      .whereIn('role_id', rids)
+      .where('is_active', true)
+      .select('user_id')
+    const userIds = [...new Set(assignments.map((a) => a.userId))]
+
+    const activeUsers = await User.query().whereIn('id', userIds).where('is_active', true).select('id')
+    return activeUsers.map((u) => u.id)
   }
 }

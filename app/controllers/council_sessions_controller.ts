@@ -6,6 +6,7 @@ import SessionIdea from '#models/session_idea'
 import IdeaCouncilScore from '#models/idea_council_score'
 import Idea from '#models/idea'
 import NotificationService from '#services/notification_service'
+import CouncilPermissionService from '#services/council_permission_service'
 import { createCouncilSessionValidator } from '#validators/council_validator'
 import { updateCouncilSessionValidator } from '#validators/council_validator'
 
@@ -85,7 +86,8 @@ export default class CouncilSessionsController {
 
   async store({ auth, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được tạo phiên.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được tạo phiên.' })
     const payload = await request.validateUsing(createCouncilSessionValidator)
     const code = await CouncilSession.generateCode()
     const session = await CouncilSession.create({
@@ -106,7 +108,8 @@ export default class CouncilSessionsController {
 
   async update({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được sửa.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được sửa.' })
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     if (session.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ sửa được khi trạng thái DRAFT.' })
@@ -122,7 +125,8 @@ export default class CouncilSessionsController {
 
   async open({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được mở phiên.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được mở phiên.' })
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     if (session.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ mở được khi trạng thái DRAFT.' })
@@ -135,7 +139,8 @@ export default class CouncilSessionsController {
 
   async close({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được đóng phiên.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được đóng phiên.' })
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     if (session.status !== 'OPEN') return response.badRequest({ success: false, message: 'Chỉ đóng được khi trạng thái OPEN.' })
@@ -193,7 +198,8 @@ export default class CouncilSessionsController {
 
   async publish({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được công bố.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được công bố.' })
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     if (session.status !== 'CLOSED') return response.badRequest({ success: false, message: 'Chỉ công bố được khi trạng thái CLOSED.' })

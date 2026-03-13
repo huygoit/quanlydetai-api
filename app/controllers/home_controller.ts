@@ -4,6 +4,7 @@ import ProjectProposal from '#models/project_proposal'
 import Notification from '#models/notification'
 import User from '#models/user'
 import CouncilSession from '#models/council_session'
+import PermissionService from '#services/permission_service'
 
 /** Nhãn trạng thái ý tưởng cho dashboard */
 const IDEA_STATUS_LABELS: Record<string, string> = {
@@ -64,7 +65,11 @@ export default class HomeController {
    */
   async summary({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    const role = user.role
+    const hasPhongKH = await PermissionService.userHasPermission(user.id, 'idea.review') ||
+      await PermissionService.userHasPermission(user.id, 'project.review') ||
+      await PermissionService.userHasPermission(user.id, 'council.view')
+    const hasLanhDao = await PermissionService.userHasPermission(user.id, 'idea.approve') ||
+      await PermissionService.userHasPermission(user.id, 'project.approve')
 
     let data: Array<{
       key: string
@@ -78,7 +83,7 @@ export default class HomeController {
       color?: string
     }> = []
 
-    if (role === 'PHONG_KH' || role === 'ADMIN') {
+    if (hasPhongKH) {
       const [proposalsPendingRow, ideasPendingRow, projectsManagingRow, registrationRow] =
         await Promise.all([
           ProjectProposal.query().where('status', 'SUBMITTED').count('*', 'total').first(),
@@ -124,7 +129,7 @@ export default class HomeController {
           color: '#722ed1',
         },
       ]
-    } else if (role === 'LANH_DAO') {
+    } else if (hasLanhDao) {
       const currentYear = new Date().getFullYear()
       const [totalProjectsRow, budgetRow] = await Promise.all([
         ProjectProposal.query()
@@ -249,7 +254,11 @@ export default class HomeController {
    */
   async tasks({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    const role = user.role
+    const hasPhongKH = await PermissionService.userHasPermission(user.id, 'idea.review') ||
+      await PermissionService.userHasPermission(user.id, 'project.review') ||
+      await PermissionService.userHasPermission(user.id, 'council.view')
+    const hasLanhDao = await PermissionService.userHasPermission(user.id, 'idea.approve') ||
+      await PermissionService.userHasPermission(user.id, 'project.approve')
 
     type TaskItem = {
       id: string
@@ -265,7 +274,7 @@ export default class HomeController {
 
     let data: TaskItem[] = []
 
-    if (role === 'PHONG_KH' || role === 'ADMIN') {
+    if (hasPhongKH) {
       const ideasPending = await Idea.query().where('status', 'SUBMITTED').limit(5)
       const proposalsPending = await ProjectProposal.query()
         .whereIn('status', ['SUBMITTED', 'UNIT_REVIEWED'])
@@ -330,7 +339,7 @@ export default class HomeController {
           },
         ]
       }
-    } else if (role === 'LANH_DAO') {
+    } else if (hasLanhDao) {
       data = [
         {
           id: 'task1',
@@ -517,8 +526,11 @@ export default class HomeController {
    */
   async workflowSteps({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH' && user.role !== 'ADMIN') {
-      return response.forbidden({ success: false, message: 'Chỉ Phòng KH được xem.' })
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'idea.review') ||
+      await PermissionService.userHasPermission(user.id, 'project.review') ||
+      await PermissionService.userHasPermission(user.id, 'council.view')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền sơ loại/duyệt được xem.' })
     }
 
     const [ideasSubmittedRow, proposalsUnitRow, councilOpenRow, approvedRow, approvedCountRow] =
@@ -586,8 +598,10 @@ export default class HomeController {
    */
   async pendingProposals({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH' && user.role !== 'ADMIN') {
-      return response.forbidden({ success: false, message: 'Chỉ Phòng KH được xem.' })
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'idea.review') ||
+      await PermissionService.userHasPermission(user.id, 'project.review')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền duyệt được xem.' })
     }
     const list = await ProjectProposal.query()
       .whereIn('status', ['SUBMITTED', 'UNIT_REVIEWED'])
@@ -613,8 +627,10 @@ export default class HomeController {
    */
   async delayedProjects({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH' && user.role !== 'ADMIN') {
-      return response.forbidden({ success: false, message: 'Chỉ Phòng KH được xem.' })
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'project.review') ||
+      await PermissionService.userHasPermission(user.id, 'project.view')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền quản lý đề tài được xem.' })
     }
     const list = await ProjectProposal.query()
       .where('status', 'APPROVED')
@@ -638,8 +654,11 @@ export default class HomeController {
    */
   async charts({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'LANH_DAO' && user.role !== 'ADMIN') {
-      return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được xem.' })
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'idea.approve') ||
+      await PermissionService.userHasPermission(user.id, 'project.approve') ||
+      await PermissionService.userHasPermission(user.id, 'dashboard.view_all')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền phê duyệt/xem dashboard được xem.' })
     }
     const allApproved = await ProjectProposal.query()
       .where('status', 'APPROVED')
@@ -689,8 +708,10 @@ export default class HomeController {
    */
   async topProjects({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'LANH_DAO' && user.role !== 'ADMIN') {
-      return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được xem.' })
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'idea.approve') ||
+      await PermissionService.userHasPermission(user.id, 'dashboard.view_all')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền xem dashboard được xem.' })
     }
     const list = await ProjectProposal.query()
       .where('status', 'APPROVED')
@@ -712,8 +733,9 @@ export default class HomeController {
    */
   async topResearchers({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'LANH_DAO' && user.role !== 'ADMIN') {
-      return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được xem.' })
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'dashboard.view_all')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền xem dashboard được xem.' })
     }
     const ideas = await Idea.query().select('owner_id')
     const proposals = await ProjectProposal.query()
@@ -748,8 +770,9 @@ export default class HomeController {
    */
   async warnings({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'LANH_DAO' && user.role !== 'ADMIN') {
-      return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được xem.' })
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'dashboard.view_all')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền xem dashboard được xem.' })
     }
     const delayed = await ProjectProposal.query()
       .where('status', 'APPROVED')

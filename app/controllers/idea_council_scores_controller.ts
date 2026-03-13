@@ -4,6 +4,7 @@ import CouncilSession from '#models/council_session'
 import SessionMember from '#models/session_member'
 import SessionIdea from '#models/session_idea'
 import IdeaCouncilScore from '#models/idea_council_score'
+import CouncilPermissionService from '#services/council_permission_service'
 import { saveScoreValidator } from '#validators/council_validator'
 import { calculateWeightedScore, THRESHOLD_SCORE } from '#services/council_score_service'
 
@@ -131,7 +132,8 @@ export default class IdeaCouncilScoresController {
 
   async listScores({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH' && user.role !== 'ADMIN') return response.forbidden({ success: false, message: 'Chỉ PHONG_KH hoặc ADMIN xem được danh sách phiếu.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ người có quyền council.view/council.create xem được danh sách phiếu.' })
     const session = await CouncilSession.find(params.sessionId)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     const list = await IdeaCouncilScore.query()

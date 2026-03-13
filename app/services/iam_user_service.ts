@@ -2,6 +2,7 @@ import User from '#models/user'
 import Department from '#models/department'
 import UserRoleAssignment from '#models/user_role_assignment'
 import UserRoleAssignmentService from '#services/user_role_assignment_service'
+import BasicRoleService from '#services/basic_role_service'
 import type { ModelPaginatorContract } from '@adonisjs/lucid/types/model'
 
 export interface IamUserFilters {
@@ -98,6 +99,8 @@ export default class IamUserService {
     const roleIds = payload.roleIds ?? []
     if (roleIds.length > 0) {
       await UserRoleAssignmentService.syncUserRoles(user.id, roleIds)
+    } else {
+      await BasicRoleService.assignBasicRoleToUser(user.id)
     }
 
     return this.findById(user.id)

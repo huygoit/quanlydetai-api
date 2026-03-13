@@ -17,6 +17,7 @@ export default class AdminRolesController {
       name: r.name,
       description: r.description ?? null,
       status: r.status,
+      isSystem: r.code === 'BASIC',
       createdAt: r.createdAt.toISO(),
       updatedAt: r.updatedAt?.toISO() ?? null,
     }
@@ -112,6 +113,15 @@ export default class AdminRolesController {
         return response.unprocessableEntity({
           success: false,
           message: 'Mã role đã tồn tại.',
+        })
+      }
+      if (
+        (err as Error).message === 'BASIC_ROLE_CODE_READONLY' ||
+        (err as Error).message === 'BASIC_ROLE_NAME_READONLY'
+      ) {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Không được đổi mã hoặc tên vai trò hệ thống Basic.',
         })
       }
       throw err

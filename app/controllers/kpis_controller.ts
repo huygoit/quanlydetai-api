@@ -3,6 +3,7 @@ import Publication from '#models/publication'
 import ScientificProfile from '#models/scientific_profile'
 import KpiResult from '#models/kpi_result'
 import KpiEngineService from '#services/kpi_engine_service'
+import PermissionService from '#services/permission_service'
 
 /**
  * API KPI: xem KPI giảng viên, breakdown publication, recalculate theo năm học.
@@ -118,10 +119,12 @@ export default class KpisController {
    */
   async recalculate({ request, response, auth }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH' && user.role !== 'ADMIN') {
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'profile.verify') ||
+      await PermissionService.userHasPermission(user.id, 'profile.view_all')
+    if (!hasPerm) {
       return response.forbidden({
         success: false,
-        message: 'Chỉ Phòng KH hoặc Admin được gọi recalculate.',
+        message: 'Chỉ người có quyền quản lý hồ sơ được gọi recalculate.',
       })
     }
 

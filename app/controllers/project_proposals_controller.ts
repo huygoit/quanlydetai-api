@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ProjectProposal from '#models/project_proposal'
 import AuditLogService from '#services/audit_log_service'
 import NotificationService from '#services/notification_service'
+import PermissionService from '#services/permission_service'
 import {
   createProjectProposalValidator,
   updateProjectProposalValidator,
@@ -100,10 +101,15 @@ export default class ProjectProposalsController {
 
     if (ownerOnly) {
       q.where('owner_id', user.id)
-    } else if (user.role === 'TRUONG_DON_VI' && user.unit) {
-      q.where('owner_unit', user.unit)
+    } else {
+      const hasViewAll = await PermissionService.userHasPermission(user.id, 'project.view')
+      const hasUnitReview = await PermissionService.userHasPermission(user.id, 'project.assign_reviewer')
+      if (hasUnitReview && user.unit) {
+        q.where('owner_unit', user.unit)
+      } else if (!hasViewAll) {
+        q.where('owner_id', user.id)
+      }
     }
-    // PHONG_KH, ADMIN: xem tất cả (không thêm điều kiện)
 
     const paginated = await q.paginate(page, perPage)
     const data = paginated.all().map((p) => this.serializeListItem(p))
@@ -270,10 +276,11 @@ export default class ProjectProposalsController {
     return response.ok({ success: true, data: this.serialize(proposal) })
   }
 
-  /** POST /api/project-proposals/:id/unit-review - TRUONG_DON_VI, SUBMITTED → UNIT_REVIEWED */
+  /** POST /api/project-proposals/:id/unit-review - project.assign_reviewer, SUBMITTED → UNIT_REVIEWED */
   async unitReview({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'TRUONG_DON_VI' && user.role !== 'ADMIN') {
+    const canReview = await PermissionService.userHasPermission(user.id, 'project.assign_reviewer')
+    if (!canReview) {
       return response.forbidden({
         success: false,
         message: 'Chỉ Trưởng đơn vị được cho ý kiến đề xuất.',
@@ -313,10 +320,11 @@ export default class ProjectProposalsController {
     return response.ok({ success: true, data: this.serialize(proposal) })
   }
 
-  /** POST /api/project-proposals/:id/sci-dept-review - PHONG_KH, UNIT_REVIEWED → APPROVED | REJECTED */
+  /** POST /api/project-proposals/:id/sci-dept-review - project.review, UNIT_REVIEWED → APPROVED | REJECTED */
   async sciDeptReview({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH' && user.role !== 'ADMIN') {
+    const canReview = await PermissionService.userHasPermission(user.id, 'project.review')
+    if (!canReview) {
       return response.forbidden({
         success: false,
         message: 'Chỉ Phòng Khoa học được phê duyệt đề xuất.',

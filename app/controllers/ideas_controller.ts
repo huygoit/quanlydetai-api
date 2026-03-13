@@ -3,6 +3,7 @@ import { DateTime } from 'luxon'
 import Idea from '#models/idea'
 import AuditLogService from '#services/audit_log_service'
 import NotificationService from '#services/notification_service'
+import IdeaPermissionService from '#services/idea_permission_service'
 import {
   createIdeaValidator,
   updateIdeaValidator,
@@ -211,7 +212,8 @@ export default class IdeasController {
 
   async receive({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được nhận sơ loại.' })
+    const canReceive = await IdeaPermissionService.canReceiveIdea(user)
+    if (!canReceive) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được nhận sơ loại.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
     if (idea.status !== 'SUBMITTED') return response.badRequest({ success: false, message: 'Chỉ nhận khi trạng thái SUBMITTED.' })
@@ -223,7 +225,8 @@ export default class IdeasController {
 
   async approveInternal({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được duyệt sơ loại.' })
+    const canApprove = await IdeaPermissionService.canApproveInternalIdea(user)
+    if (!canApprove) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được duyệt sơ loại.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
     if (idea.status !== 'REVIEWING') return response.badRequest({ success: false, message: 'Chỉ duyệt sơ loại khi trạng thái REVIEWING.' })
@@ -238,7 +241,8 @@ export default class IdeasController {
 
   async proposeOrder({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'HOI_DONG') return response.forbidden({ success: false, message: 'Chỉ Hội đồng được đề xuất đặt hàng.' })
+    const canPropose = await IdeaPermissionService.canProposeOrder(user)
+    if (!canPropose) return response.forbidden({ success: false, message: 'Chỉ Hội đồng được đề xuất đặt hàng.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
     if (idea.status !== 'APPROVED_INTERNAL') return response.badRequest({ success: false, message: 'Chỉ đề xuất đặt hàng khi trạng thái APPROVED_INTERNAL.' })
@@ -253,7 +257,8 @@ export default class IdeasController {
 
   async approveOrder({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'LANH_DAO') return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được phê duyệt đặt hàng.' })
+    const canApprove = await IdeaPermissionService.canApproveOrder(user)
+    if (!canApprove) return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được phê duyệt đặt hàng.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
     if (idea.status !== 'PROPOSED_FOR_ORDER') return response.badRequest({ success: false, message: 'Chỉ phê duyệt đặt hàng khi trạng thái PROPOSED_FOR_ORDER.' })
@@ -267,8 +272,8 @@ export default class IdeasController {
 
   async reject({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    const allowed = ['PHONG_KH', 'HOI_DONG', 'LANH_DAO']
-    if (!allowed.includes(user.role)) return response.forbidden({ success: false, message: 'Bạn không có quyền từ chối ý tưởng.' })
+    const canReject = await IdeaPermissionService.canRejectIdea(user)
+    if (!canReject) return response.forbidden({ success: false, message: 'Bạn không có quyền từ chối ý tưởng.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
     if (idea.status === 'REJECTED') return response.badRequest({ success: false, message: 'Ý tưởng đã bị từ chối.' })
@@ -293,7 +298,8 @@ export default class IdeasController {
 
   async createProject({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH' && user.role !== 'ADMIN') return response.forbidden({ success: false, message: 'Chỉ Phòng KH hoặc Admin được tạo đề tài từ ý tưởng.' })
+    const canCreate = await IdeaPermissionService.canCreateProjectFromIdea(user)
+    if (!canCreate) return response.forbidden({ success: false, message: 'Chỉ Phòng KH hoặc Admin được tạo đề tài từ ý tưởng.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
     if (idea.status !== 'APPROVED_FOR_ORDER') return response.badRequest({ success: false, message: 'Chỉ tạo đề tài khi trạng thái APPROVED_FOR_ORDER.' })

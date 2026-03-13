@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import CouncilSession from '#models/council_session'
 import SessionMember from '#models/session_member'
+import CouncilPermissionService from '#services/council_permission_service'
 import { addSessionMemberValidator } from '#validators/council_validator'
 
 /**
@@ -24,7 +25,8 @@ export default class SessionMembersController {
 
   async store({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được thêm thành viên.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được thêm thành viên.' })
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     if (session.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ thêm được khi phiên DRAFT.' })
@@ -48,7 +50,8 @@ export default class SessionMembersController {
 
   async destroy({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    if (user.role !== 'PHONG_KH') return response.forbidden({ success: false, message: 'Chỉ Phòng KH được xóa thành viên.' })
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được xóa thành viên.' })
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     if (session.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ xóa được khi phiên DRAFT.' })

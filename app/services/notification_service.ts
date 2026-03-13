@@ -1,5 +1,6 @@
 import Notification from '#models/notification'
 import User from '#models/user'
+import PermissionService from '#services/permission_service'
 
 /**
  * Service gửi thông báo để các module khác gọi (push, pushMany, pushToRole, các trigger).
@@ -71,10 +72,12 @@ export default class NotificationService {
   // ============ TRIGGER FUNCTIONS ============
 
   /**
-   * Khi NCV submit cập nhật hồ sơ → thông báo PHONG_KH
+   * Khi NCV submit cập nhật hồ sơ → thông báo users có permission profile.verify
    */
   static async notifyProfileSubmitted(profileId: number, profileName: string) {
-    await this.pushToRole('PHONG_KH', {
+    const userIds = await PermissionService.getUserIdsWithPermission('profile.verify')
+    if (userIds.length === 0) return
+    await this.pushMany(userIds, {
       type: 'PROFILE_SUBMITTED',
       title: 'Hồ sơ mới cập nhật',
       message: `Hồ sơ khoa học của ${profileName} đã gửi cập nhật. Vui lòng xem xét.`,
@@ -107,15 +110,17 @@ export default class NotificationService {
   }
 
   /**
-   * Khi NCV submit ý tưởng (DRAFT → SUBMITTED) → thông báo PHONG_KH
+   * Khi NCV submit ý tưởng (DRAFT → SUBMITTED) → thông báo users có permission idea.review
    */
   static async notifyIdeaSubmitted(ideaCode: string, ideaTitle: string, ideaId: number, ownerName: string) {
-    await this.pushToRole('PHONG_KH', {
+    const data = {
       type: 'IDEA_SUBMITTED',
       title: 'Ý tưởng mới cần sơ loại',
       message: `${ownerName} đã gửi ý tưởng ${ideaCode}: ${ideaTitle}. Vui lòng xem xét sơ loại.`,
       link: `/ideas/review`,
-    })
+    }
+    const userIds = await PermissionService.getUserIdsWithPermission('idea.review')
+    if (userIds.length > 0) await this.pushMany(userIds, data)
   }
 
   /**
