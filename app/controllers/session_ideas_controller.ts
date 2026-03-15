@@ -9,6 +9,35 @@ import { addSessionIdeasValidator } from '#validators/council_validator'
  * Ý tưởng trong phiên: GET list, POST add (batch), DELETE remove.
  */
 export default class SessionIdeasController {
+  /**
+   * GET /api/council-sessions/:id/available-ideas
+   * Lấy ý tưởng APPROVED_INTERNAL (và REVIEWING để hiển thị) chưa có trong phiên.
+   * Chỉ thêm được ý tưởng APPROVED_INTERNAL.
+   */
+  async availableIdeas({ params, response }: HttpContext) {
+    const session = await CouncilSession.find(params.id)
+    if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
+    const existingIds = (
+      await SessionIdea.query().where('session_id', params.id).select('idea_id')
+    ).map((si) => si.ideaId)
+    const ideas = await Idea.query()
+      .whereIn('status', ['APPROVED_INTERNAL', 'REVIEWING'])
+      .whereNotIn('id', existingIds.length > 0 ? existingIds : [0])
+      .orderBy('updated_at', 'desc')
+      .limit(500)
+    const data = ideas.map((i) => ({
+      id: i.id,
+      code: i.code,
+      title: i.title,
+      summary: i.summary,
+      field: i.field,
+      ownerName: i.ownerName,
+      ownerUnit: i.ownerUnit,
+      status: i.status,
+    }))
+    return response.ok({ success: true, data })
+  }
+
   async index({ params, response }: HttpContext) {
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })

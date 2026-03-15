@@ -134,6 +134,11 @@ export default class CouncilSessionsController {
     if (session.ideaCount < 1) return response.badRequest({ success: false, message: 'Cần ít nhất 1 ý tưởng.' })
     session.status = 'OPEN'
     await session.save()
+
+    const members = await SessionMember.query().where('session_id', session.id).select('member_id')
+    const memberIds = [...new Set(members.map((m) => m.memberId))]
+    await NotificationService.notifyCouncilSessionOpened(session.id, session.title, memberIds)
+
     return response.ok({ success: true, message: 'Đã mở phiên.', data: this.serializeSession(session) })
   }
 

@@ -174,6 +174,21 @@ export default class NotificationService {
   }
 
   /**
+   * Khi mở phiên hội đồng → thông báo tất cả thành viên hội đồng của phiên đó
+   * Link dẫn thẳng đến trang chi tiết phiên: /ideas/council/:sessionId
+   */
+  static async notifyCouncilSessionOpened(sessionId: number, sessionTitle: string, userIds: number[]) {
+    if (userIds.length === 0) return
+    const message = `${sessionTitle} đã mở. Xin vui lòng chấm điểm các ý tưởng!`
+    await this.pushMany(userIds, {
+      type: 'COUNCIL_SESSION_OPENED',
+      title: 'Phiên hội đồng đã mở',
+      message,
+      link: `/ideas/council/${sessionId}`,
+    })
+  }
+
+  /**
    * Thông báo hệ thống đến tất cả users
    */
   static async notifySystem(title: string, message: string) {

@@ -1,6 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import CouncilSession from '#models/council_session'
 import SessionMember from '#models/session_member'
+import ScientificProfile from '#models/scientific_profile'
 import CouncilPermissionService from '#services/council_permission_service'
 import { addSessionMemberValidator } from '#validators/council_validator'
 
@@ -8,6 +9,53 @@ import { addSessionMemberValidator } from '#validators/council_validator'
  * Thành viên phiên hội đồng: GET list, POST add, DELETE remove.
  */
 export default class SessionMembersController {
+  /**
+   * GET /api/council-sessions/:id/available-members
+   * Danh sách hồ sơ khoa học chưa có trong phiên - để chọn thêm thành viên.
+   */
+  async availableMembers({ params, request, response }: HttpContext) {
+    const session = await CouncilSession.find(params.id)
+    if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
+    const existingIds = (await SessionMember.query().where('session_id', params.id).select('member_id')).map((m) => m.memberId)
+    const keyword = request.input('keyword', '')
+
+    const q = ScientificProfile.query()
+      .select('id', 'user_id', 'full_name', 'work_email', 'degree', 'academic_title', 'organization', 'faculty', 'department', 'current_title', 'main_research_area', 'phone')
+      .whereNotIn('user_id', existingIds.length > 0 ? existingIds : [0])
+      .orderBy('full_name', 'asc')
+      .limit(100)
+
+    if (keyword && keyword.trim()) {
+      q.where((b) => {
+        b.whereILike('full_name', `%${keyword}%`)
+          .orWhereILike('work_email', `%${keyword}%`)
+          .orWhereILike('organization', `%${keyword}%`)
+          .orWhereILike('faculty', `%${keyword}%`)
+          .orWhereILike('department', `%${keyword}%`)
+      })
+    }
+
+    const profiles = await q
+    const data = profiles.map((p) => {
+      const unit = [p.department, p.faculty, p.organization].filter(Boolean).join(' – ') || null
+      return {
+        userId: p.userId,
+        fullName: p.fullName,
+        workEmail: p.workEmail,
+        degree: p.degree ?? null,
+        academicTitle: p.academicTitle ?? null,
+        organization: p.organization ?? null,
+        faculty: p.faculty ?? null,
+        department: p.department ?? null,
+        unit,
+        currentTitle: p.currentTitle ?? null,
+        mainResearchArea: p.mainResearchArea ?? null,
+        phone: p.phone ?? null,
+      }
+    })
+    return response.ok({ success: true, data })
+  }
+
   async index({ params, response }: HttpContext) {
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })

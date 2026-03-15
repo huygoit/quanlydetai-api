@@ -217,10 +217,10 @@ export default class IdeasController {
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
     if (idea.status !== 'SUBMITTED') return response.badRequest({ success: false, message: 'Chỉ nhận khi trạng thái SUBMITTED.' })
-    idea.status = 'REVIEWING'
+    idea.status = 'APPROVED_INTERNAL'
     await idea.save()
-    await NotificationService.notifyIdeaStatusChanged(idea.ownerId, idea.code, 'REVIEWING', idea.id)
-    return response.ok({ success: true, message: 'Đã nhận sơ loại.', data: this.serializeIdea(idea) })
+    await NotificationService.notifyIdeaStatusChanged(idea.ownerId, idea.code, 'APPROVED_INTERNAL', idea.id)
+    return response.ok({ success: true, message: 'Đã tiếp nhận (sơ loại đạt).', data: this.serializeIdea(idea) })
   }
 
   async approveInternal({ auth, params, request, response }: HttpContext) {

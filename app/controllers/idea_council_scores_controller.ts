@@ -112,6 +112,25 @@ export default class IdeaCouncilScoresController {
     return response.ok({ success: true, data: this.serializeScore(score) })
   }
 
+  /** POST /:sessionId/ideas/:ideaId/submit - Nộp phiếu chấm của tôi cho ý tưởng (frontend gọi theo ideaId) */
+  async submitMyScore({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const session = await CouncilSession.find(params.sessionId)
+    if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
+    if (session.status !== 'OPEN') return response.badRequest({ success: false, message: 'Chỉ nộp phiếu khi phiên OPEN.' })
+    const score = await IdeaCouncilScore.query()
+      .where('session_id', params.sessionId)
+      .where('idea_id', params.ideaId)
+      .where('council_member_id', user.id)
+      .first()
+    if (!score) return response.notFound({ success: false, message: 'Chưa có phiếu chấm. Vui lòng lưu nháp trước.' })
+    if (score.submitted) return response.badRequest({ success: false, message: 'Phiếu đã nộp.' })
+    score.submitted = true
+    score.submittedAt = DateTime.now()
+    await score.save()
+    return response.ok({ success: true, message: 'Đã nộp phiếu.', data: this.serializeScore(score) })
+  }
+
   async submitScore({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
     const session = await CouncilSession.find(params.sessionId)
