@@ -33,14 +33,25 @@ export default class CouncilSessionsController {
     }
   }
 
-  async index({ request, response }: HttpContext) {
+  async index({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
     const page = request.input('page', 1)
     const perPage = Math.min(request.input('perPage', 10), 100)
     const year = request.input('year', '')
     const status = request.input('status', '')
     const keyword = request.input('keyword', '')
 
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+
     const q = CouncilSession.query().orderBy('updated_at', 'desc')
+    // Nếu KH/ADMIN thì thấy tất cả; nếu là thành viên HĐ thường thì chỉ thấy các phiên mình thuộc về
+    if (!canManage) {
+      q.whereExists((sub) => {
+        sub.from('session_members')
+          .whereColumn('session_members.session_id', 'council_sessions.id')
+          .where('session_members.member_id', user.id)
+      })
+    }
     if (year) q.where('year', year)
     if (status) q.where('status', status)
     if (keyword) q.where((b) => b.whereILike('title', `%${keyword}%`).orWhereILike('code', `%${keyword}%`))

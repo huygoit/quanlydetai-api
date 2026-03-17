@@ -363,6 +363,7 @@ router
     router.get('/top-projects', [HomeController, 'topProjects'])
     router.get('/top-researchers', [HomeController, 'topResearchers'])
     router.get('/warnings', [HomeController, 'warnings'])
+    router.get('/overview', [HomeController, 'overview'])
   })
   .prefix('/api/home')
   .middleware([middleware.auth()])

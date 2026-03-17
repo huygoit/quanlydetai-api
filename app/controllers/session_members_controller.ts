@@ -2,7 +2,10 @@ import type { HttpContext } from '@adonisjs/core/http'
 import CouncilSession from '#models/council_session'
 import SessionMember from '#models/session_member'
 import ScientificProfile from '#models/scientific_profile'
+import Role from '#models/role'
 import CouncilPermissionService from '#services/council_permission_service'
+import PermissionService from '#services/permission_service'
+import UserRoleAssignmentService from '#services/user_role_assignment_service'
 import { addSessionMemberValidator } from '#validators/council_validator'
 
 /**
@@ -91,6 +94,22 @@ export default class SessionMembersController {
     })
     session.memberCount = session.memberCount + 1
     await session.save()
+
+    // Tự động cấp quyền council.score cho thành viên hội đồng nếu chưa có (thông qua role IAM chuyên dụng).
+    // Lưu ý: hệ thống IAM hiện tại chỉ tính quyền qua role → ở đây gán role có code 'COUNCIL_MEMBER' nếu tồn tại.
+    try {
+      const targetUserId = payload.memberId
+      const hasScore = await PermissionService.userHasPermission(targetUserId, 'council.score')
+      if (!hasScore) {
+        const councilRole = await Role.query().where('code', 'COUNCIL_MEMBER').first()
+        if (councilRole) {
+          await UserRoleAssignmentService.assignRole(targetUserId, { roleId: councilRole.id })
+        }
+      }
+    } catch (e) {
+      // Không chặn luồng chính nếu việc auto-assign role thất bại
+      console.error('Auto-assign COUNCIL_MEMBER role failed:', e)
+    }
     const list = await SessionMember.query().where('session_id', params.id).orderBy('id', 'asc')
     const data = list.map((m) => ({ id: m.id, memberId: m.memberId, memberName: m.memberName, memberEmail: m.memberEmail, roleInCouncil: m.roleInCouncil, unit: m.unit }))
     return response.ok({ success: true, data })

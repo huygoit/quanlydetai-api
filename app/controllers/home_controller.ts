@@ -4,7 +4,11 @@ import ProjectProposal from '#models/project_proposal'
 import Notification from '#models/notification'
 import User from '#models/user'
 import CouncilSession from '#models/council_session'
+import Student from '#models/student'
+import ScientificProfile from '#models/scientific_profile'
 import PermissionService from '#services/permission_service'
+import DashboardOverviewService from '#services/dashboard_overview_service'
+import db from '@adonisjs/lucid/services/db'
 
 /** Nhãn trạng thái ý tưởng cho dashboard */
 const IDEA_STATUS_LABELS: Record<string, string> = {
@@ -49,9 +53,14 @@ function notificationTypeForDashboard(type: string): string {
   return map[type] ?? 'INFO'
 }
 
-/** Helper đếm từ query count */
-function getCount(row: { $extras?: { total?: string } } | null): number {
-  return Number((row?.$extras as { total?: string } | undefined)?.total ?? 0)
+/** Helper đếm từ query count (hỗ trợ cả Lucid model query và db query builder) */
+function getCount(
+  row: { $extras?: { total?: string | number }; total?: string | number } | null
+): number {
+  if (!row) return 0
+  const direct = (row as { total?: string | number }).total
+  if (direct !== undefined && direct !== null) return Number(direct) || 0
+  return Number((row.$extras as { total?: string | number } | undefined)?.total ?? 0)
 }
 
 /**
@@ -763,6 +772,248 @@ export default class HomeController {
     combined.sort((a, b) => b.projectCount * 2 + b.ideaCount - (a.projectCount * 2 + a.ideaCount))
     const data = combined.slice(0, 5)
     return response.ok({ success: true, data })
+  }
+
+  /**
+   * GET /api/home/overview
+   * Dashboard tổng quát cho nghiên cứu giảng viên/sinh viên và khởi nghiệp sinh viên.
+   */
+  async overview({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const hasPerm = await PermissionService.userHasPermission(user.id, 'dashboard.view_all')
+    if (!hasPerm) {
+      return response.forbidden({ success: false, message: 'Chỉ người có quyền xem dashboard được xem.' })
+    }
+
+    const currentYear = new Date().getFullYear()
+    const yearInput = Number(request.input('year', 0))
+    const filterYear = Number.isFinite(yearInput) && yearInput > 0 ? yearInput : null
+    const departmentIdInput = Number(request.input('departmentId', 0))
+    const filterDepartmentId = Number.isFinite(departmentIdInput) && departmentIdInput > 0 ? departmentIdInput : null
+    const filterField = String(request.input('field', '') || '').trim()
+
+    const years = DashboardOverviewService.buildRecentYears(currentYear, 5)
+
+    const projectBase = db.from('projects as p').whereNull('p.deleted_at')
+    if (filterYear) projectBase.where('p.year', filterYear)
+    if (filterDepartmentId) projectBase.where('p.department_id', filterDepartmentId)
+    if (filterField) projectBase.whereILike('p.field', `%${filterField}%`)
+
+    const startupBase = db
+      .from('startup_projects as sp')
+      .leftJoin('research_startup_fields as rsf', 'sp.research_startup_field_id', 'rsf.id')
+      .whereNull('sp.deleted_at')
+    if (filterYear) startupBase.whereRaw('EXTRACT(YEAR FROM sp.created_at) = ?', [filterYear])
+    if (filterDepartmentId) startupBase.where('sp.department_id', filterDepartmentId)
+    if (filterField) {
+      startupBase.where((q) => {
+        q.whereILike('rsf.name', `%${filterField}%`).orWhereILike('rsf.code', `%${filterField}%`)
+      })
+    }
+
+    const studentsQ = Student.query()
+    if (filterDepartmentId) studentsQ.where('department_id', filterDepartmentId)
+
+    const usersQ = User.query().where('is_active', true)
+    if (filterDepartmentId) usersQ.where('department_id', filterDepartmentId)
+
+    const verifiedProfilesQ = ScientificProfile.query()
+      .join('users', 'scientific_profiles.user_id', 'users.id')
+      .where('scientific_profiles.status', 'VERIFIED')
+      .where('users.is_active', true)
+    if (filterDepartmentId) verifiedProfilesQ.where('users.department_id', filterDepartmentId)
+
+    const [
+      studentsCountRow,
+      lecturersCountRow,
+      profilesVerifiedRow,
+      researchProjectCountRow,
+      studentResearchCountRow,
+      startupCountRow,
+      activeUnitsRow,
+      activeFieldsProjectRow,
+      activeFieldsStartupRow,
+    ] = await Promise.all([
+      studentsQ.count('*', 'total').first(),
+      usersQ.count('*', 'total').first(),
+      verifiedProfilesQ.count('*', 'total').first(),
+      projectBase
+        .clone()
+        .whereIn('p.project_type', ['RESEARCH_PROJECT', 'LECTURER_RESEARCH'])
+        .count('*', 'total')
+        .first(),
+      projectBase
+        .clone()
+        .where('p.project_type', 'STUDENT_RESEARCH')
+        .count('*', 'total')
+        .first(),
+      startupBase.clone().count('*', 'total').first(),
+      projectBase.clone().whereNotNull('p.department_id').countDistinct('p.department_id as total').first(),
+      projectBase.clone().whereNotNull('p.field').countDistinct('p.field as total').first(),
+      startupBase.clone().whereNotNull('rsf.name').countDistinct('rsf.name as total').first(),
+    ])
+
+    const trendProjectQuery = db
+      .from('projects as p')
+      .whereNull('p.deleted_at')
+      .whereIn('p.year', years)
+      .select('p.year', 'p.project_type')
+      .count('* as total')
+      .groupBy('p.year', 'p.project_type')
+    if (filterDepartmentId) trendProjectQuery.where('p.department_id', filterDepartmentId)
+    if (filterField) trendProjectQuery.whereILike('p.field', `%${filterField}%`)
+    const trendProjectRows = await trendProjectQuery
+
+    const trendStartupQuery = db
+      .from('startup_projects as sp')
+      .leftJoin('research_startup_fields as rsf', 'sp.research_startup_field_id', 'rsf.id')
+      .whereNull('sp.deleted_at')
+      .whereRaw('EXTRACT(YEAR FROM sp.created_at) = ANY(?)', [years])
+      .select(db.raw('EXTRACT(YEAR FROM sp.created_at)::int as year'))
+      .count('* as total')
+      .groupByRaw('EXTRACT(YEAR FROM sp.created_at)')
+    if (filterDepartmentId) trendStartupQuery.where('sp.department_id', filterDepartmentId)
+    if (filterField) {
+      trendStartupQuery.where((b) => {
+        b.whereILike('rsf.name', `%${filterField}%`).orWhereILike('rsf.code', `%${filterField}%`)
+      })
+    }
+    const trendStartupRows = await trendStartupQuery
+
+    const trendMap = DashboardOverviewService.buildTrendMap(years)
+    for (const row of trendProjectRows as Array<{ year: number; project_type: string; total: string | number }>) {
+      const year = Number(row.year)
+      const point = trendMap.get(year)
+      if (!point) continue
+      const value = Number(row.total ?? 0)
+      if (row.project_type === 'STUDENT_RESEARCH') point.studentResearch += value
+      else point.researchProject += value
+    }
+    for (const row of trendStartupRows as Array<{ year: number; total: string | number }>) {
+      const point = trendMap.get(Number(row.year))
+      if (!point) continue
+      point.startup += Number(row.total ?? 0)
+    }
+    const trend = [...trendMap.values()]
+
+    const projectUnitQuery = db
+      .from('projects as p')
+      .leftJoin('departments as d', 'p.department_id', 'd.id')
+      .whereNull('p.deleted_at')
+      .select(db.raw(`COALESCE(d.name, p.leader_unit, 'Chưa phân đơn vị') as unit`))
+      .select(
+        db.raw(
+          `SUM(CASE WHEN p.project_type = 'STUDENT_RESEARCH' THEN 0 ELSE 1 END)::int as research_project`
+        )
+      )
+      .select(db.raw(`SUM(CASE WHEN p.project_type = 'STUDENT_RESEARCH' THEN 1 ELSE 0 END)::int as student_research`))
+      .groupByRaw(`COALESCE(d.name, p.leader_unit, 'Chưa phân đơn vị')`)
+    if (filterYear) projectUnitQuery.where('p.year', filterYear)
+    if (filterDepartmentId) projectUnitQuery.where('p.department_id', filterDepartmentId)
+    if (filterField) projectUnitQuery.whereILike('p.field', `%${filterField}%`)
+    const projectUnitRows = (await projectUnitQuery) as Array<{
+      unit: string
+      research_project: string | number
+      student_research: string | number
+    }>
+
+    const startupUnitQuery = db
+      .from('startup_projects as sp')
+      .leftJoin('departments as d', 'sp.department_id', 'd.id')
+      .leftJoin('research_startup_fields as rsf', 'sp.research_startup_field_id', 'rsf.id')
+      .whereNull('sp.deleted_at')
+      .select(db.raw(`COALESCE(d.name, 'Chưa phân đơn vị') as unit`))
+      .count('* as startup')
+      .groupByRaw(`COALESCE(d.name, 'Chưa phân đơn vị')`)
+    if (filterYear) startupUnitQuery.whereRaw('EXTRACT(YEAR FROM sp.created_at) = ?', [filterYear])
+    if (filterDepartmentId) startupUnitQuery.where('sp.department_id', filterDepartmentId)
+    if (filterField) {
+      startupUnitQuery.where((b) => {
+        b.whereILike('rsf.name', `%${filterField}%`).orWhereILike('rsf.code', `%${filterField}%`)
+      })
+    }
+    const startupUnitRows = (await startupUnitQuery) as Array<{ unit: string; startup: string | number }>
+
+    const unitStats = DashboardOverviewService.mergeUnitStats(projectUnitRows, startupUnitRows)
+
+    const projectFieldQuery = db
+      .from('projects as p')
+      .whereNull('p.deleted_at')
+      .whereNotNull('p.field')
+      .select(db.raw(`COALESCE(p.field, 'Chưa phân lĩnh vực') as field`))
+      .select(
+        db.raw(
+          `SUM(CASE WHEN p.project_type = 'STUDENT_RESEARCH' THEN 0 ELSE 1 END)::int as research_project`
+        )
+      )
+      .select(db.raw(`SUM(CASE WHEN p.project_type = 'STUDENT_RESEARCH' THEN 1 ELSE 0 END)::int as student_research`))
+      .groupByRaw(`COALESCE(p.field, 'Chưa phân lĩnh vực')`)
+    if (filterYear) projectFieldQuery.where('p.year', filterYear)
+    if (filterDepartmentId) projectFieldQuery.where('p.department_id', filterDepartmentId)
+    if (filterField) projectFieldQuery.whereILike('p.field', `%${filterField}%`)
+    const projectFieldRows = (await projectFieldQuery) as Array<{
+      field: string
+      research_project: string | number
+      student_research: string | number
+    }>
+
+    const startupFieldQuery = db
+      .from('startup_projects as sp')
+      .leftJoin('research_startup_fields as rsf', 'sp.research_startup_field_id', 'rsf.id')
+      .whereNull('sp.deleted_at')
+      .select(db.raw(`COALESCE(rsf.name, 'Chưa phân lĩnh vực') as field`))
+      .count('* as startup')
+      .groupByRaw(`COALESCE(rsf.name, 'Chưa phân lĩnh vực')`)
+    if (filterYear) startupFieldQuery.whereRaw('EXTRACT(YEAR FROM sp.created_at) = ?', [filterYear])
+    if (filterDepartmentId) startupFieldQuery.where('sp.department_id', filterDepartmentId)
+    if (filterField) {
+      startupFieldQuery.where((b) => {
+        b.whereILike('rsf.name', `%${filterField}%`).orWhereILike('rsf.code', `%${filterField}%`)
+      })
+    }
+    const startupFieldRows = (await startupFieldQuery) as Array<{ field: string; startup: string | number }>
+
+    const fieldStats = DashboardOverviewService.mergeFieldStats(projectFieldRows, startupFieldRows)
+    const alerts = DashboardOverviewService.buildAlerts(trend, unitStats, fieldStats)
+
+    const departments = await db
+      .from('departments')
+      .where('status', 'ACTIVE')
+      .select('id', 'name')
+      .orderBy('display_order', 'asc')
+      .orderBy('name', 'asc')
+
+    const fields = [...new Set(fieldStats.map((f) => f.field).filter((v) => !!v && v !== 'Chưa phân lĩnh vực'))]
+
+    return response.ok({
+      success: true,
+      data: {
+        filters: {
+          year: filterYear,
+          departmentId: filterDepartmentId,
+          field: filterField || null,
+          yearOptions: years,
+          departments,
+          fields,
+        },
+        kpis: {
+          totalLecturers: getCount(lecturersCountRow),
+          totalStudents: getCount(studentsCountRow),
+          verifiedProfiles: getCount(profilesVerifiedRow),
+          researchProjects: getCount(researchProjectCountRow),
+          studentResearchProjects: getCount(studentResearchCountRow),
+          startupProjects: getCount(startupCountRow),
+          activeUnits: getCount(activeUnitsRow),
+          activeFields: getCount(activeFieldsProjectRow) + getCount(activeFieldsStartupRow),
+        },
+        trend,
+        unitStats,
+        fieldStats,
+        topUnits: unitStats.slice(0, 8),
+        topFields: fieldStats.slice(0, 8),
+        alerts,
+      },
+    })
   }
 
   /**

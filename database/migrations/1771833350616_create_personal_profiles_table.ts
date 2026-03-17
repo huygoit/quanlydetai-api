@@ -7,6 +7,8 @@ export default class extends BaseSchema {
   protected tableName = 'personal_profiles'
 
   async up() {
+    const exists = await this.schema.hasTable(this.tableName)
+    if (exists) return
     this.schema.createTable(this.tableName, (table) => {
       table.bigIncrements('id').primary()
       table.bigInteger('user_id').notNullable().unique().unsigned().references('id').inTable('users').onDelete('CASCADE')
@@ -43,6 +45,8 @@ export default class extends BaseSchema {
   }
 
   async down() {
+    const exists = await this.schema.hasTable(this.tableName)
+    if (!exists) return
     this.schema.dropTable(this.tableName)
   }
 }
