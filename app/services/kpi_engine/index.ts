@@ -2,15 +2,15 @@ import type { IKpiCalculatorStrategy, KpiOutput } from '#types/kpi'
 import {
   publicationStrategySupports,
   publicationStrategyCalculate,
-} from './publication_strategy'
+} from './publication_strategy.js'
 import {
   projectStrategySupports,
   projectStrategyCalculate,
-} from './project_strategy'
+} from './project_strategy.js'
 import {
   simpleFixedStrategySupports,
   simpleFixedStrategyCalculate,
-} from './simple_fixed_strategy'
+} from './simple_fixed_strategy.js'
 
 const publicationStrategy: IKpiCalculatorStrategy = {
   supports: publicationStrategySupports,

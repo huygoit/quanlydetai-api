@@ -1,20 +1,20 @@
 /**
  * KPI Engine: tập hợp strategy và getStrategyForOutput.
- * Import tương đối với .ts để runtime (ts-node) tìm đúng file.
+ * Dùng đuôi .js để tương thích runtime sau khi build.
  */
 import type { IKpiCalculatorStrategy, KpiOutput } from '#types/kpi'
 import {
   publicationStrategySupports,
   publicationStrategyCalculate,
-} from './kpi_engine/publication_strategy.ts'
+} from './kpi_engine/publication_strategy.js'
 import {
   projectStrategySupports,
   projectStrategyCalculate,
-} from './kpi_engine/project_strategy.ts'
+} from './kpi_engine/project_strategy.js'
 import {
   simpleFixedStrategySupports,
   simpleFixedStrategyCalculate,
-} from './kpi_engine/simple_fixed_strategy.ts'
+} from './kpi_engine/simple_fixed_strategy.js'
 
 const publicationStrategy: IKpiCalculatorStrategy = {
   supports: publicationStrategySupports,
