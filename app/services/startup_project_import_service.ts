@@ -69,6 +69,12 @@ function makeRawMemberNote(rawName: string): string {
   return `RAW_MEMBER:${rawName}`
 }
 
+function inferDefaultYearFromSheetName(sheetName: string): string {
+  const m = String(sheetName || '').match(/(19|20)\d{2}/g)
+  if (!m || m.length === 0) return ''
+  return m[m.length - 1]
+}
+
 export default class StartupProjectImportService {
   static async import(options: ImportOptions): Promise<StartupProjectImportSummary> {
     const summary: StartupProjectImportSummary = {
@@ -107,6 +113,8 @@ export default class StartupProjectImportService {
 
     const resolver = new StartupProjectHeaderResolver(Object.keys(rows[0] || {}))
     let context = StartupProjectRowMapper.createEmptyContext()
+    const defaultYear = inferDefaultYearFromSheetName(sheetName)
+    if (defaultYear) context.year = defaultYear
     const normalizedRows: NormalizedStartupProjectRow[] = []
 
     for (let i = 0; i < rows.length; i++) {
@@ -189,6 +197,11 @@ export default class StartupProjectImportService {
         }
         if (field && field.$isNew === true) summary.createdFields++
 
+        const yearNum = (() => {
+          const y = parseInt(String(row.year || ''), 10)
+          return Number.isNaN(y) ? null : y
+        })()
+
         const cacheKey = `${normalizeText(row.projectTitle)}|${normalizeText(row.year)}|${normalizeText(row.unitCode)}`
         let project = projectCache.get(cacheKey)
         let isCreated = false
@@ -200,6 +213,7 @@ export default class StartupProjectImportService {
               code: await this.generateProjectCode(row.year),
               title: row.projectTitle,
               researchStartupFieldId: field?.id ?? null,
+              year: yearNum,
               facultyId,
               departmentId,
               status: 'APPROVED',
@@ -211,6 +225,10 @@ export default class StartupProjectImportService {
             })
           } else {
             let changed = false
+            if (project.year === null && yearNum !== null) {
+              project.year = yearNum
+              changed = true
+            }
             if (!project.researchStartupFieldId && field?.id) {
               project.researchStartupFieldId = field.id
               changed = true

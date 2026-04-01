@@ -58,6 +58,8 @@ export default class ImportStudentResearchProjects extends BaseCommand {
       dryRun: this.dryRun,
       createMissingUsers: this.createMissingUsers,
       verbose: this.verbose,
+      // Thành viên chỉ map bảng students; người hướng dẫn map bảng staffs
+      studentResearchMode: true,
     })
 
     this.logger.info(`total rows read: ${summary.totalRowsRead}`)
@@ -65,6 +67,8 @@ export default class ImportStudentResearchProjects extends BaseCommand {
     this.logger.info(`created projects: ${summary.createdProjects}`)
     this.logger.info(`updated projects: ${summary.updatedProjects}`)
     this.logger.info(`attached internal users: ${summary.attachedInternalUsers}`)
+    this.logger.info(`attached students (bảng students): ${summary.attachedStudents}`)
+    this.logger.info(`attached staff / GVHD (bảng staffs): ${summary.attachedStaffMembers}`)
     this.logger.info(`attached raw members: ${summary.attachedRawMembers}`)
     this.logger.info(`matched leaders: ${summary.matchedLeaders}`)
     this.logger.info(`unmatched users: ${summary.unmatchedUsers}`)
@@ -90,6 +94,8 @@ export default class ImportStudentResearchProjects extends BaseCommand {
               createdProjects: summary.createdProjects,
               updatedProjects: summary.updatedProjects,
               attachedInternalUsers: summary.attachedInternalUsers,
+              attachedStudents: summary.attachedStudents,
+              attachedStaffMembers: summary.attachedStaffMembers,
               attachedRawMembers: summary.attachedRawMembers,
               matchedLeaders: summary.matchedLeaders,
               unmatchedUsers: summary.unmatchedUsers,

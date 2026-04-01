@@ -14,17 +14,26 @@ export type StartupProjectHeaderKey =
 
 const HEADER_ALIASES: Record<StartupProjectHeaderKey, string[]> = {
   stt: ['STT', 'stt'],
-  project_title: ['Tên dự án', 'ten du an'],
-  member_name: ['Thành viên dự án', 'thanh vien du an'],
+  project_title: ['Tên dự án', 'ten du an', 'Tên đề tài', 'ten de tai'],
+  member_name: ['Thành viên dự án', 'thanh vien du an', 'Họ và tên', 'ho va ten', 'Thành viên', 'thanh vien'],
   faculty_name: ['Khoa', 'khoa'],
   unit_code: ['donvi_ma', 'đơn vị mã', 'don vi ma'],
   unit_name: ['donvi_ten', 'đơn vị tên', 'don vi ten'],
-  role: ['Vai trò', 'vai tro'],
-  advisor_name: ['Cố vấn (nếu có)', 'co van', 'cố vấn', 'co van (neu co)'],
-  field_name: ['Lĩnh vực', 'linh vuc'],
-  short_description: ['Mô tả ngắn gọn các dự án', 'mo ta ngan gon cac du an'],
+  role: ['Vai trò', 'vai tro', 'Vai trò ', 'vai tro '],
+  advisor_name: [
+    'Cố vấn (nếu có)',
+    'co van',
+    'cố vấn',
+    'co van (neu co)',
+    'HD',
+    'hd',
+    'Cố vấn đề tài (nếu có)',
+    'co van de tai (neu co)',
+  ],
+  field_name: ['Lĩnh vực', 'linh vuc', 'Lĩnh vực dự thi', 'linh vuc du thi'],
+  short_description: ['Mô tả ngắn gọn các dự án', 'mo ta ngan gon cac du an', 'Tóm Tắt', 'tom tat', 'Tóm tắt', 'tóm tắt'],
   member_list: ['Thành viên', 'thanh vien'],
-  year: ['Năm', 'nam'],
+  year: ['Năm', 'nam', 'Năm ', 'nam '],
 }
 
 function normalize(v: string): string {

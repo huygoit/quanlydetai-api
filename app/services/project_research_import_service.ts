@@ -80,8 +80,15 @@ function parseDate(v: string): string | null {
   return null
 }
 
+/** Bỏ dấu phẩy, hậu tố tiền tệ (đ, VND) và khoảng trắng — sheet GV_NCKH kiểu "1,150,000,000.00 đ" */
 function parseNumber(v: string): number | null {
-  const n = Number(String(v || '').replace(/,/g, '').trim())
+  let s = String(v || '')
+    .replace(/,/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s*đ\s*$/iu, '')
+    .replace(/\s*vnd\s*$/iu, '')
+    .trim()
+  const n = Number(s)
   return Number.isNaN(n) ? null : n
 }
 
@@ -411,11 +418,17 @@ export default class ProjectResearchImportService {
     const title = (row.title || '').trim()
 
     let found = null as any
+    const scopeLecturerResearch = (q: any) => {
+      if (columns.hasProjectType) return q.where('project_type', 'LECTURER_RESEARCH')
+      return q
+    }
     if (code) {
-      found = await trx.from('projects').where('code', code).first()
+      found = await scopeLecturerResearch(trx.from('projects').where('code', code)).first()
     }
     if (!found && title) {
-      found = await trx.from('projects').whereRaw('LOWER(title) = ?', [title.toLowerCase()]).first()
+      found = await scopeLecturerResearch(
+        trx.from('projects').whereRaw('LOWER(title) = ?', [title.toLowerCase()])
+      ).first()
     }
 
     const normalizedApprovalStatus = normalizeApprovalStatus(row.approvalStatus)

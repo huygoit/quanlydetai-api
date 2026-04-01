@@ -4,10 +4,16 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import ProjectResearchImportService from '#services/project_research_import_service'
 
-export default class ImportResearchProjects extends BaseCommand {
-  static commandName = 'import:research-projects'
-  static description =
-    'Import đề NCKH cán bộ (projects.project_type = LECTURER_RESEARCH), sheet kiểu BangNCKH / GV_NCKH2025'
+/** Tên sheet cố định — luồng import luôn ghi projects.project_type = LECTURER_RESEARCH (trong ProjectResearchImportService) */
+const SHEET_GV_NCKH2025 = 'GV_NCKH2025'
+
+/**
+ * Lệnh clone chuyên import sheet GV_NCKH2025 → bảng projects với project_type = LECTURER_RESEARCH.
+ * Logic xử lý dùng chung ProjectResearchImportService (map cột nckh_id, nckh_name, …).
+ */
+export default class ImportGvNckh2025LecturerProjects extends BaseCommand {
+  static commandName = 'import:gv-nckh2025-lecturer-projects'
+  static description = `Import chỉ sheet ${SHEET_GV_NCKH2025} — project_type luôn là LECTURER_RESEARCH`
 
   static options: CommandOptions = {
     startApp: true,
@@ -16,44 +22,34 @@ export default class ImportResearchProjects extends BaseCommand {
   @flags.string({
     flagName: 'file',
     alias: 'f',
-    description: 'Path to .xlsx/.csv file',
+    description: 'Đường dẫn .xlsx (mặc định: prompts/KH_CNTT_2025_2026.xlsx)',
   })
   declare file?: string
 
-  @flags.string({
-    flagName: 'sheet',
-    description: 'Tên sheet (mặc định: BangNCKH; ví dụ file tổng hợp: GV_NCKH2025)',
-  })
-  declare sheet?: string
-
   @flags.boolean({
     flagName: 'dry-run',
-    description: 'Parse/import without writing DB',
+    description: 'Parse/import không ghi DB',
   })
   declare dryRun: boolean
 
   @flags.boolean({
     flagName: 'verbose',
-    description: 'Print warning details',
+    description: 'In chi tiết cảnh báo',
   })
   declare verbose: boolean
 
   async run() {
-    if (!this.file) {
-      this.logger.error(
-        'Thiếu --file. Ví dụ: node ace import:research-projects --file=prompts/KH_CNTT_2025_2026.xlsx --sheet=GV_NCKH2025'
-      )
-      this.exitCode = 1
-      return
-    }
+    const filePath = this.file || 'prompts/KH_CNTT_2025_2026.xlsx'
 
     const summary = await ProjectResearchImportService.import({
-      file: this.file,
-      sheet: this.sheet || 'BangNCKH',
+      file: filePath,
+      sheet: SHEET_GV_NCKH2025,
       dryRun: this.dryRun,
       verbose: this.verbose,
     })
 
+    this.logger.info(`sheet cố định: ${SHEET_GV_NCKH2025} (project_type = LECTURER_RESEARCH)`)
+    this.logger.info(`file: ${filePath}`)
     this.logger.info(`total rows read: ${summary.totalRowsRead}`)
     this.logger.info(`created projects: ${summary.createdProjects}`)
     this.logger.info(`updated projects: ${summary.updatedProjects}`)
@@ -68,13 +64,14 @@ export default class ImportResearchProjects extends BaseCommand {
       const logsDir = path.join(process.cwd(), 'storage', 'import-logs')
       await fs.promises.mkdir(logsDir, { recursive: true })
       const runId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const logPath = path.join(logsDir, `bangnckh-import-${runId}.json`)
+      const logPath = path.join(logsDir, `gv-nckh2025-lecturer-import-${runId}.json`)
       await fs.promises.writeFile(
         logPath,
         JSON.stringify(
           {
-            file: this.file,
-            sheet: this.sheet || 'BangNCKH',
+            file: filePath,
+            sheet: SHEET_GV_NCKH2025,
+            projectType: 'LECTURER_RESEARCH',
             dryRun: this.dryRun,
             summary,
           },

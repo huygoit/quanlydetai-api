@@ -795,7 +795,11 @@ export default class HomeController {
     const years = DashboardOverviewService.buildRecentYears(currentYear, 5)
 
     const projectBase = db.from('projects as p').whereNull('p.deleted_at')
-    if (filterYear) projectBase.where('p.year', filterYear)
+    if (filterYear) {
+      projectBase.where((q) => {
+        q.where('p.year', filterYear).orWhereRaw('p.year IS NULL AND EXTRACT(YEAR FROM p.created_at) = ?', [filterYear])
+      })
+    }
     if (filterDepartmentId) projectBase.where('p.department_id', filterDepartmentId)
     if (filterField) projectBase.whereILike('p.field', `%${filterField}%`)
 
@@ -803,7 +807,7 @@ export default class HomeController {
       .from('startup_projects as sp')
       .leftJoin('research_startup_fields as rsf', 'sp.research_startup_field_id', 'rsf.id')
       .whereNull('sp.deleted_at')
-    if (filterYear) startupBase.whereRaw('EXTRACT(YEAR FROM sp.created_at) = ?', [filterYear])
+    if (filterYear) startupBase.where('sp.year', filterYear)
     if (filterDepartmentId) startupBase.where('sp.department_id', filterDepartmentId)
     if (filterField) {
       startupBase.where((q) => {
@@ -814,8 +818,9 @@ export default class HomeController {
     const studentsQ = Student.query()
     if (filterDepartmentId) studentsQ.where('department_id', filterDepartmentId)
 
-    const usersQ = User.query().where('is_active', true)
-    if (filterDepartmentId) usersQ.where('department_id', filterDepartmentId)
+    // Số chuyên viên/giảng viên: lấy từ danh mục nhân sự (staffs), không đếm users đăng nhập
+    const staffsCountQ = db.from('staffs')
+    if (filterDepartmentId) staffsCountQ.where('department_id', filterDepartmentId)
 
     const verifiedProfilesQ = ScientificProfile.query()
       .join('users', 'scientific_profiles.user_id', 'users.id')
@@ -835,7 +840,7 @@ export default class HomeController {
       activeFieldsStartupRow,
     ] = await Promise.all([
       studentsQ.count('*', 'total').first(),
-      usersQ.count('*', 'total').first(),
+      staffsCountQ.count('* as total').first(),
       verifiedProfilesQ.count('*', 'total').first(),
       projectBase
         .clone()
@@ -856,10 +861,10 @@ export default class HomeController {
     const trendProjectQuery = db
       .from('projects as p')
       .whereNull('p.deleted_at')
-      .whereIn('p.year', years)
-      .select('p.year', 'p.project_type')
+      .whereRaw('COALESCE(p.year, EXTRACT(YEAR FROM p.created_at)::int) = ANY(?)', [years])
+      .select(db.raw('COALESCE(p.year, EXTRACT(YEAR FROM p.created_at)::int) as year'), 'p.project_type')
       .count('* as total')
-      .groupBy('p.year', 'p.project_type')
+      .groupByRaw('COALESCE(p.year, EXTRACT(YEAR FROM p.created_at)::int), p.project_type')
     if (filterDepartmentId) trendProjectQuery.where('p.department_id', filterDepartmentId)
     if (filterField) trendProjectQuery.whereILike('p.field', `%${filterField}%`)
     const trendProjectRows = await trendProjectQuery
@@ -868,10 +873,10 @@ export default class HomeController {
       .from('startup_projects as sp')
       .leftJoin('research_startup_fields as rsf', 'sp.research_startup_field_id', 'rsf.id')
       .whereNull('sp.deleted_at')
-      .whereRaw('EXTRACT(YEAR FROM sp.created_at) = ANY(?)', [years])
-      .select(db.raw('EXTRACT(YEAR FROM sp.created_at)::int as year'))
+      .whereIn('sp.year', years)
+      .select('sp.year')
       .count('* as total')
-      .groupByRaw('EXTRACT(YEAR FROM sp.created_at)')
+      .groupBy('sp.year')
     if (filterDepartmentId) trendStartupQuery.where('sp.department_id', filterDepartmentId)
     if (filterField) {
       trendStartupQuery.where((b) => {
@@ -908,7 +913,11 @@ export default class HomeController {
       )
       .select(db.raw(`SUM(CASE WHEN p.project_type = 'STUDENT_RESEARCH' THEN 1 ELSE 0 END)::int as student_research`))
       .groupByRaw(`COALESCE(d.name, p.leader_unit, 'Chưa phân đơn vị')`)
-    if (filterYear) projectUnitQuery.where('p.year', filterYear)
+    if (filterYear) {
+      projectUnitQuery.where((q) => {
+        q.where('p.year', filterYear).orWhereRaw('p.year IS NULL AND EXTRACT(YEAR FROM p.created_at) = ?', [filterYear])
+      })
+    }
     if (filterDepartmentId) projectUnitQuery.where('p.department_id', filterDepartmentId)
     if (filterField) projectUnitQuery.whereILike('p.field', `%${filterField}%`)
     const projectUnitRows = (await projectUnitQuery) as Array<{
@@ -925,7 +934,7 @@ export default class HomeController {
       .select(db.raw(`COALESCE(d.name, 'Chưa phân đơn vị') as unit`))
       .count('* as startup')
       .groupByRaw(`COALESCE(d.name, 'Chưa phân đơn vị')`)
-    if (filterYear) startupUnitQuery.whereRaw('EXTRACT(YEAR FROM sp.created_at) = ?', [filterYear])
+    if (filterYear) startupUnitQuery.where('sp.year', filterYear)
     if (filterDepartmentId) startupUnitQuery.where('sp.department_id', filterDepartmentId)
     if (filterField) {
       startupUnitQuery.where((b) => {
@@ -948,7 +957,11 @@ export default class HomeController {
       )
       .select(db.raw(`SUM(CASE WHEN p.project_type = 'STUDENT_RESEARCH' THEN 1 ELSE 0 END)::int as student_research`))
       .groupByRaw(`COALESCE(p.field, 'Chưa phân lĩnh vực')`)
-    if (filterYear) projectFieldQuery.where('p.year', filterYear)
+    if (filterYear) {
+      projectFieldQuery.where((q) => {
+        q.where('p.year', filterYear).orWhereRaw('p.year IS NULL AND EXTRACT(YEAR FROM p.created_at) = ?', [filterYear])
+      })
+    }
     if (filterDepartmentId) projectFieldQuery.where('p.department_id', filterDepartmentId)
     if (filterField) projectFieldQuery.whereILike('p.field', `%${filterField}%`)
     const projectFieldRows = (await projectFieldQuery) as Array<{
@@ -964,7 +977,7 @@ export default class HomeController {
       .select(db.raw(`COALESCE(rsf.name, 'Chưa phân lĩnh vực') as field`))
       .count('* as startup')
       .groupByRaw(`COALESCE(rsf.name, 'Chưa phân lĩnh vực')`)
-    if (filterYear) startupFieldQuery.whereRaw('EXTRACT(YEAR FROM sp.created_at) = ?', [filterYear])
+    if (filterYear) startupFieldQuery.where('sp.year', filterYear)
     if (filterDepartmentId) startupFieldQuery.where('sp.department_id', filterDepartmentId)
     if (filterField) {
       startupFieldQuery.where((b) => {

@@ -53,6 +53,9 @@ export default class StartupProject extends BaseModel {
   declare academicYearId: number | null
 
   @column()
+  declare year: number | null
+
+  @column()
   declare facultyId: number | null
 
   @column()
