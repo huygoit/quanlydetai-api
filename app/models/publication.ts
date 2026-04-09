@@ -3,6 +3,7 @@ import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import ScientificProfile from '#models/scientific_profile'
 import PublicationAuthor from '#models/publication_author'
+import ResearchOutputType from '#models/research_output_type'
 
 export default class Publication extends BaseModel {
   @column({ isPrimary: true })
@@ -10,6 +11,10 @@ export default class Publication extends BaseModel {
 
   @column()
   declare profileId: number
+
+  /** Lá danh mục loại kết quả NCKH (quy đổi giờ theo research_output_rules) */
+  @column()
+  declare researchOutputTypeId: number
 
   @column()
   declare title: string
@@ -96,6 +101,9 @@ export default class Publication extends BaseModel {
 
   @belongsTo(() => ScientificProfile, { foreignKey: 'profileId' })
   declare profile: BelongsTo<typeof ScientificProfile>
+
+  @belongsTo(() => ResearchOutputType, { foreignKey: 'researchOutputTypeId' })
+  declare researchOutputType: BelongsTo<typeof ResearchOutputType>
 
   /** Danh sách tác giả (bảng publication_authors). Tránh trùng tên với cột authors (string). */
   @hasMany(() => PublicationAuthor, { foreignKey: 'publicationId' })

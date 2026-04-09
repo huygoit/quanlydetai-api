@@ -35,6 +35,7 @@ import AdminRolesController from '#controllers/admin/roles_controller'
 import AdminPermissionsController from '#controllers/admin/permissions_controller'
 import AdminIamUsersController from '#controllers/admin/iam_users_controller'
 import AdminPersonalProfilesController from '#controllers/admin/personal_profiles_controller'
+import AdminStaffsController from '#controllers/admin/staffs_controller'
 
 // --- Auth (login, register không cần token)
 router.post('/api/auth/login', [AuthController, 'login'])
@@ -200,6 +201,19 @@ router
   .prefix('/api/admin/personal-profiles')
   .use([middleware.auth(), middleware.role('ADMIN')])
 
+// --- Admin: danh mục nhân sự staffs (permission: department.view)
+router
+  .group(() => {
+    router
+      .get('/', [AdminStaffsController, 'index'])
+      .use(middleware.permission('department.view'))
+    router
+      .get('/:id', [AdminStaffsController, 'show'])
+      .use(middleware.permission('department.view'))
+  })
+  .prefix('/api/admin/staffs')
+  .use([middleware.auth()])
+
 // --- Admin: catalogs CRUD (chỉ ADMIN)
 router
   .group(() => {
@@ -247,6 +261,8 @@ router
   .group(() => {
     router.get('/', [ProfileController, 'me'])
     router.get('/suggestions', [ProfileController, 'suggestions'])
+    router.get('/author-profiles-lookup', [ProfileController, 'authorProfilesLookup'])
+    router.get('/research-output-types/tree', [ProfileController, 'researchOutputTypesTree'])
     router.post('/', [ProfileController, 'storeMe'])
     router.put('/', [ProfileController, 'updateMe'])
     router.post('/submit', [ProfileController, 'submitMe'])

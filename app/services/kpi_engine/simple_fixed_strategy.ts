@@ -23,5 +23,5 @@ export async function simpleFixedStrategyCalculate(
   const warnings: string[] = []
   const hours = 0
   warnings.push(`Loại ${output.type}: chưa có nguồn dữ liệu trong hệ thống`)
-  return { hours, warnings, details: { type: output.type } }
+  return { hours, points: 0, warnings, details: { type: output.type } }
 }

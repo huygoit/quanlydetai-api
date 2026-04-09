@@ -17,6 +17,7 @@ import type { ProjectProposalStatus } from '#models/project_proposal'
 export default class ProjectProposalsController {
   /** Serialize đầy đủ cho GET :id */
   private serialize(p: ProjectProposal) {
+    const rot = p.researchOutputType
     return {
       id: p.id,
       code: p.code,
@@ -45,6 +46,8 @@ export default class ProjectProposalsController {
       unitApproved: p.unitApproved,
       sciDeptComment: p.sciDeptComment,
       sciDeptPriority: p.sciDeptPriority,
+      researchOutputTypeId: p.researchOutputTypeId,
+      researchOutputType: rot ? { id: rot.id, code: rot.code, name: rot.name } : null,
     }
   }
 
@@ -63,6 +66,7 @@ export default class ProjectProposalsController {
       ownerUnit: p.ownerUnit,
       status: p.status,
       requestedBudgetTotal: p.requestedBudgetTotal,
+      researchOutputTypeId: p.researchOutputTypeId,
       createdAt: p.createdAt.toISO(),
       updatedAt: p.updatedAt.toISO(),
     }
@@ -127,7 +131,7 @@ export default class ProjectProposalsController {
 
   /** GET /api/project-proposals/:id */
   async show({ params, response }: HttpContext) {
-    const proposal = await ProjectProposal.find(params.id)
+    const proposal = await ProjectProposal.query().where('id', params.id).preload('researchOutputType').first()
     if (!proposal) {
       return response.notFound({ success: false, message: 'Không tìm thấy đề xuất.' })
     }
@@ -160,6 +164,7 @@ export default class ProjectProposalsController {
       applicationPotential: payload.applicationPotential ?? null,
       requestedBudgetTotal: payload.requestedBudgetTotal ?? null,
       requestedBudgetDetail: payload.requestedBudgetDetail ?? null,
+      researchOutputTypeId: payload.researchOutputTypeId ?? null,
       status: 'DRAFT',
     })
     return response.created({ success: true, data: this.serialize(proposal) })

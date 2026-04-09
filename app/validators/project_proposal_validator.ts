@@ -34,6 +34,8 @@ export const createProjectProposalValidator = vine.compile(
     applicationPotential: vine.string().trim().optional(),
     requestedBudgetTotal: vine.number().min(0).optional(),
     requestedBudgetDetail: vine.string().trim().optional(),
+    /** Lá danh mục loại kết quả NCKH (nullable) */
+    researchOutputTypeId: vine.number().positive().optional().nullable(),
   })
 )
 
@@ -53,6 +55,7 @@ export const updateProjectProposalValidator = vine.compile(
     applicationPotential: vine.string().trim().optional(),
     requestedBudgetTotal: vine.number().min(0).optional(),
     requestedBudgetDetail: vine.string().trim().optional(),
+    researchOutputTypeId: vine.number().positive().optional().nullable(),
   })
 )
 

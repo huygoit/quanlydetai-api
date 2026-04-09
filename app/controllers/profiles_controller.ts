@@ -75,18 +75,24 @@ export default class ProfilesController {
     if (!profile) return response.notFound({ success: false, message: 'Không tìm thấy hồ sơ.' })
     const publications = await Publication.query()
       .where('profile_id', profileId)
+      .preload('researchOutputType')
       .orderBy('year', 'desc')
       .orderBy('id', 'desc')
-    const data = publications.map((p) => ({
-      id: p.id,
-      title: p.title,
-      year: p.year,
-      rank: p.rank,
-      quartile: p.quartile,
-      academicYear: p.academicYear,
-      publicationType: p.publicationType,
-      publicationStatus: p.publicationStatus,
-    }))
+    const data = publications.map((p) => {
+      const rot = p.researchOutputType
+      return {
+        id: p.id,
+        title: p.title,
+        year: p.year,
+        rank: p.rank,
+        quartile: p.quartile,
+        academicYear: p.academicYear,
+        researchOutputTypeId: p.researchOutputTypeId,
+        researchOutputType: rot ? { id: rot.id, code: rot.code, name: rot.name } : null,
+        publicationType: p.publicationType,
+        publicationStatus: p.publicationStatus,
+      }
+    })
     return response.ok({ success: true, data })
   }
 
@@ -130,7 +136,7 @@ export default class ProfilesController {
       .where('id', params.id)
       .preload('languages')
       .preload('attachments')
-      .preload('publications')
+      .preload('publications', (q) => q.preload('researchOutputType'))
       .first()
     if (!profile) return response.notFound({ success: false, message: 'Không tìm thấy hồ sơ.' })
     return response.ok({ success: true, data: profileSerializer.serializeProfile(profile) })
@@ -158,7 +164,9 @@ export default class ProfilesController {
       actorName: user.fullName,
     })
     await NotificationService.notifyProfileVerified(profile.userId)
-    await profile.load((loader) => loader.load('languages').load('attachments').load('publications'))
+    await profile.load((loader) =>
+      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+    )
     return response.ok({ success: true, message: 'Đã xác thực hồ sơ.', data: profileSerializer.serializeProfile(profile) })
   }
 
@@ -183,7 +191,9 @@ export default class ProfilesController {
       actorName: user.fullName,
     })
     await NotificationService.notifyNeedMoreInfo(profile.userId, reason)
-    await profile.load((loader) => loader.load('languages').load('attachments').load('publications'))
+    await profile.load((loader) =>
+      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+    )
     return response.ok({ success: true, message: 'Đã gửi yêu cầu bổ sung.', data: profileSerializer.serializeProfile(profile) })
   }
 

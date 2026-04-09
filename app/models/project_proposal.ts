@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
+import ResearchOutputType from '#models/research_output_type'
 
 /** Trạng thái đề xuất đề tài */
 export type ProjectProposalStatus =
@@ -121,8 +122,15 @@ export default class ProjectProposal extends BaseModel {
   @column()
   declare sciDeptPriority: SciDeptPriority | null
 
+  /** Lá loại kết quả NCKH (KPI theo rule import). */
+  @column()
+  declare researchOutputTypeId: number | null
+
   @belongsTo(() => User, { foreignKey: 'ownerId' })
   declare owner: BelongsTo<typeof User>
+
+  @belongsTo(() => ResearchOutputType, { foreignKey: 'researchOutputTypeId' })
+  declare researchOutputType: BelongsTo<typeof ResearchOutputType>
 
   /**
    * Sinh mã đề xuất: ĐT-{year}-{sequence 3 chữ số}

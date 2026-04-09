@@ -1,0 +1,12 @@
+{
+  "file": "C:\\quanlydetai\\quanlydetai-api\\prompts\\quy_doi_gio_NCKH.xlsx",
+  "sheet": "Bang1_QuyDoi",
+  "dryRun": true,
+  "truncate": false,
+  "total": 73,
+  "typesCreated": 73,
+  "typesSkipped": 0,
+  "rulesCreated": 73,
+  "failed": 0,
+  "errors": []
+}

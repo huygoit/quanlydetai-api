@@ -4,6 +4,8 @@
 
 export interface CalculationResult {
   hours: number
+  /** Điểm quy đổi (theo danh mục KQNC / điểm HĐGSNN), phân bổ theo vai trò tác giả — không nhân hệ số giới */
+  points?: number
   warnings: string[]
   details?: Record<string, unknown>
 }
@@ -22,6 +24,8 @@ export interface KpiContext {
   profileId: number
   academicYear: string
   isFemale?: boolean
+  /** Họ tên hồ sơ — dùng khớp tác giả khi bảng tác giả chưa có profile_id */
+  profileFullName?: string | null
 }
 
 /** Output có thể là publication, project, book, ... */
@@ -30,13 +34,30 @@ export type KpiOutput =
       type: 'PUBLICATION'
       publication: {
         id: number
-        rank: string | null
-        quartile: string | null
-        domesticRuleType?: string | null
+        /** Chủ sở hữu bản ghi công bố (scientific_profiles.id) */
+        ownerProfileId: number
+        researchOutputTypeId: number | null
+        hdgsnnScore?: number | null
       }
-      authors: Array<{ profileId: number | null; isMainAuthor: boolean; affiliationType: string; isMultiAffiliationOutsideUdn: boolean }>
+      authors: Array<{
+        profileId: number | null
+        fullName: string
+        isMainAuthor: boolean
+        isCorresponding: boolean
+        affiliationType: string
+        isMultiAffiliationOutsideUdn: boolean
+      }>
     }
-  | { type: 'PROJECT'; project: { id: number; level: string; acceptanceGrade: string | null; cFactor: number | null } }
+  | {
+      type: 'PROJECT'
+      project: {
+        id: number
+        researchOutputTypeId: number | null
+        level: string
+        acceptanceGrade: string | null
+        cFactor: number | null
+      }
+    }
   | { type: 'BOOK'; payload: Record<string, unknown> }
   | { type: 'PATENT'; payload: Record<string, unknown> }
   | { type: 'TECHNOLOGY_TRANSFER'; payload: Record<string, unknown> }

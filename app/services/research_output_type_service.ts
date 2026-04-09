@@ -17,6 +17,8 @@ export default class ResearchOutputTypeService {
       sortOrder: number
       isActive: boolean
       hasRule: boolean
+      /** rule_kind của leaf (null nếu chưa có rule hoặc không phải lá) */
+      ruleKind: string | null
       children: Array<unknown>
     }>
   > {
@@ -37,9 +39,12 @@ export default class ResearchOutputTypeService {
     sortOrder: number
     isActive: boolean
     hasRule: boolean
+    ruleKind: string | null
     children: Array<unknown>
   }> {
-    const hasRule = await ResearchOutputRule.query().where('type_id', node.id).first().then((r) => !!r)
+    const rule = await ResearchOutputRule.query().where('type_id', node.id).first()
+    const hasRule = !!rule
+    const ruleKind = rule?.ruleKind ? String(rule.ruleKind).toUpperCase() : null
     const children = await ResearchOutputType.query()
       .where('parent_id', node.id)
       .orderBy('sort_order', 'asc')
@@ -53,6 +58,7 @@ export default class ResearchOutputTypeService {
       sortOrder: node.sortOrder,
       isActive: node.isActive,
       hasRule,
+      ruleKind,
       children: childNodes,
     }
   }

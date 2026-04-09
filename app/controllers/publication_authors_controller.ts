@@ -2,7 +2,13 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ScientificProfile from '#models/scientific_profile'
 import Publication from '#models/publication'
 import PublicationAuthor from '#models/publication_author'
-import { upsertPublicationAuthorsValidator, validateAuthorsListRules } from '#validators/publication_author_validator'
+import {
+  upsertPublicationAuthorsValidator,
+  validateAuthorsListRules,
+  dedupeOwnerAuthorRowsForProfile,
+  ensureOwnerProfileOnAuthorRows,
+  validateOwnerProfileLinked,
+} from '#validators/publication_author_validator'
 
 /**
  * Sub-resource: tác giả của publication (me).
@@ -55,8 +61,9 @@ export default class PublicationAuthorsController {
 
   /**
    * PUT /api/profile/me/publications/:id/authors
-   * Body: { authors: [{ id?, profileId?, fullName, authorOrder, isMainAuthor, isCorresponding, affiliationType, isMultiAffiliationOutsideUdn }] }
+   * Body (snake_case): { authors: [{ id?, profile_id?, full_name, author_order, is_main_author, is_corresponding, affiliation_type, is_multi_affiliation_outside_udn }] }
    * Upsert: cập nhật theo id (phải thuộc publication này), tạo mới nếu không có id, xóa các bản ghi không còn trong payload.
+   * Phải có ít nhất một tác giả gắn profile_id trùng chủ hồ sơ (sau khi server gộp trùng / gắn id); nếu không → 422.
    */
   async update({ auth, params, request, response }: HttpContext) {
     const profile = await this.getMyProfile(auth.use('api').user!.id)
@@ -76,7 +83,10 @@ export default class PublicationAuthorsController {
     }
 
     const payload = await request.validateUsing(upsertPublicationAuthorsValidator)
+    dedupeOwnerAuthorRowsForProfile(payload.authors, profile.id, profile.fullName ?? '')
+    ensureOwnerProfileOnAuthorRows(payload.authors, profile.id, profile.fullName ?? '')
     validateAuthorsListRules(payload.authors)
+    validateOwnerProfileLinked(payload.authors, profile.id)
     const incomingIds = new Set(
       payload.authors.map((a) => a.id).filter((id): id is number => id !== undefined && id !== null)
     )

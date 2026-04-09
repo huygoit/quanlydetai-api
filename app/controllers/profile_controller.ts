@@ -6,6 +6,7 @@ import ProfileAttachment from '#models/profile_attachment'
 import Publication from '#models/publication'
 import Catalog from '#models/catalog'
 import NotificationService from '#services/notification_service'
+import ResearchOutputTypeService from '#services/research_output_type_service'
 import { createProfileValidator } from '#validators/scientific_profile_validator'
 import { updateProfileValidator } from '#validators/scientific_profile_validator'
 
@@ -22,7 +23,7 @@ export default class ProfileController {
       .where('user_id', user.id)
       .preload('languages')
       .preload('attachments')
-      .preload('publications')
+      .preload('publications', (q) => q.preload('researchOutputType'))
       .first()
     if (!profile) {
       return response.ok({ success: true, data: null })
@@ -35,7 +36,12 @@ export default class ProfileController {
    */
   async storeMe({ auth, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    let profile = await ScientificProfile.findBy('user_id', user.id)
+    let profile = await ScientificProfile.query()
+      .where('user_id', user.id)
+      .preload('languages')
+      .preload('attachments')
+      .preload('publications', (q) => q.preload('researchOutputType'))
+      .first()
     if (profile) {
       return response.ok({ success: true, data: this.serializeProfile(profile) })
     }
@@ -52,7 +58,9 @@ export default class ProfileController {
         organization: payload.organization,
       }),
     })
-    await profile.load((loader) => loader.load('languages').load('attachments').load('publications'))
+    await profile.load((loader) =>
+      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+    )
     return response.created({ success: true, data: this.serializeProfile(profile) })
   }
 
@@ -65,7 +73,7 @@ export default class ProfileController {
       .where('user_id', user.id)
       .preload('languages')
       .preload('attachments')
-      .preload('publications')
+      .preload('publications', (q) => q.preload('researchOutputType'))
       .first()
     if (!profile) {
       return response.notFound({ success: false, message: 'Chưa có hồ sơ.' })
@@ -108,8 +116,72 @@ export default class ProfileController {
       publications: profile.publications,
     })
     await profile.save()
-    await profile.load((loader) => loader.load('languages').load('attachments').load('publications'))
+    await profile.load((loader) =>
+      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+    )
     return response.ok({ success: true, data: this.serializeProfile(profile) })
+  }
+
+  /**
+   * GET /api/profile/me/research-output-types/tree
+   * Cây loại kết quả NCKH (chỉ node đang bật) — phục vụ chọn lá khi khai báo công bố.
+   */
+  async researchOutputTypesTree({ response }: HttpContext) {
+    const raw = await ResearchOutputTypeService.getTree()
+    const data = this.filterActiveResearchOutputTree(
+      raw as Array<{
+        id: number
+        code: string
+        name: string
+        level: number
+        sortOrder: number
+        isActive: boolean
+        hasRule: boolean
+        ruleKind: string | null
+        children: unknown[]
+      }>
+    )
+    return response.ok({ success: true, data })
+  }
+
+  private filterActiveResearchOutputTree(
+    nodes: Array<{
+      id: number
+      code: string
+      name: string
+      level: number
+      sortOrder: number
+      isActive: boolean
+      hasRule: boolean
+      ruleKind: string | null
+      children: unknown[]
+    }>
+  ): Array<{
+    id: number
+    code: string
+    name: string
+    level: number
+    sortOrder: number
+    isActive: boolean
+    hasRule: boolean
+    ruleKind: string | null
+    children: ReturnType<ProfileController['filterActiveResearchOutputTree']>
+  }> {
+    return nodes
+      .filter((n) => n.isActive)
+      .map((n) => ({
+        id: n.id,
+        code: n.code,
+        name: n.name,
+        level: n.level,
+        sortOrder: n.sortOrder,
+        isActive: n.isActive,
+        hasRule: n.hasRule,
+        ruleKind: n.ruleKind,
+        children: this.filterActiveResearchOutputTree(
+          (n.children ?? []) as Parameters<ProfileController['filterActiveResearchOutputTree']>[0]
+        ),
+      }))
   }
 
   /**
@@ -131,6 +203,9 @@ export default class ProfileController {
     profile.needMoreInfoReason = null
     await profile.save()
     await NotificationService.notifyProfileSubmitted(profile.id, profile.fullName)
+    await profile.load((loader) =>
+      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+    )
     return response.ok({ success: true, message: 'Đã gửi hồ sơ để xác thực.', data: this.serializeProfile(profile) })
   }
 
@@ -161,6 +236,42 @@ export default class ProfileController {
       units: units.map((c) => ({ code: c.code, name: c.name })),
       languages: languages.map((c) => ({ code: c.code, name: c.name })),
     }
+    return response.ok({ success: true, data })
+  }
+
+  /**
+   * GET /api/profile/me/author-profiles-lookup?q=&limit=
+   * Gợi ý hồ sơ khoa học nội bộ để gắn profile_id khi khai báo tác giả công bố (không cần quyền profile.view_all).
+   */
+  async authorProfilesLookup({ request, response }: HttpContext) {
+    const q = String(request.input('q', '')).trim()
+    const limitRaw = Number(request.input('limit', 20))
+    const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 20, 1), 50)
+    if (q.length < 2) {
+      return response.ok({ success: true, data: [] })
+    }
+    const like = `%${q}%`
+    const rows = await ScientificProfile.query()
+      .where((b) => {
+        b.whereILike('full_name', like)
+          .orWhereILike('work_email', like)
+          .orWhereILike('organization', like)
+          .orWhereILike('faculty', like)
+          .orWhereILike('department', like)
+      })
+      .orderBy('full_name', 'asc')
+      .limit(limit)
+      .select('id', 'full_name', 'work_email', 'organization', 'faculty', 'department', 'status')
+
+    const data = rows.map((p) => ({
+      id: p.id,
+      fullName: p.fullName,
+      workEmail: p.workEmail,
+      organization: p.organization,
+      faculty: p.faculty,
+      department: p.department,
+      status: p.status,
+    }))
     return response.ok({ success: true, data })
   }
 
@@ -214,19 +325,26 @@ export default class ProfileController {
         url: a.url,
         uploadedAt: a.uploadedAt instanceof DateTime ? a.uploadedAt.toISO() : String(a.uploadedAt),
       })) ?? [],
-      publications: (p.publications as Publication[] | undefined)?.map((pub) => ({
+      publications: (p.publications as Publication[] | undefined)?.map((pub) => {
+        const rot = pub.researchOutputType
+        return {
         id: pub.id,
         title: pub.title,
         authors: pub.authors,
+        researchOutputTypeId: pub.researchOutputTypeId,
+        researchOutputType: rot ? { id: rot.id, code: rot.code, name: rot.name } : null,
         publicationType: pub.publicationType,
         journalOrConference: pub.journalOrConference,
         year: pub.year,
         publicationStatus: pub.publicationStatus,
         rank: pub.rank,
         quartile: pub.quartile,
+        academicYear: pub.academicYear,
+        hdgsnnScore: pub.hdgsnnScore != null ? Number(pub.hdgsnnScore) : null,
         doi: pub.doi,
         createdAt: pub.createdAt.toISO(),
-      })) ?? [],
+        }
+      }) ?? [],
       createdAt: p.createdAt.toISO(),
       updatedAt: p.updatedAt.toISO(),
     }

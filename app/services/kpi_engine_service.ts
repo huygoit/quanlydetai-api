@@ -1,5 +1,4 @@
 import Publication from '#models/publication'
-import PublicationAuthor from '#models/publication_author'
 import ProjectProposal from '#models/project_proposal'
 import ScientificProfile from '#models/scientific_profile'
 import KpiResult from '#models/kpi_result'
@@ -28,7 +27,8 @@ export default class KpiEngineService {
   }
 
   /**
-   * Tính toàn bộ KPI cho một giảng viên trong một năm học.
+   * Tính toàn bộ KPI cho một giảng viên: mọi công bố của hồ sơ + mọi đề tài đã duyệt của user (không lọc theo năm học).
+   * `academicYear` chỉ còn để trả về/ghi cache `kpi_results` theo khóa cũ của API.
    */
   static async calculateTeacherKpi(
     profileId: number,
@@ -37,9 +37,11 @@ export default class KpiEngineService {
     profileId: number
     academicYear: string
     totalHours: number
+    /** Tổng điểm quy đổi (KQNC / HĐGSNN) */
+    totalPoints: number
     metQuota: boolean
     quota: number
-    breakdown: Array<{ type: string; id: number; hours: number; warnings: string[] }>
+    breakdown: Array<{ type: string; id: number; hours: number; points: number; warnings: string[] }>
     allWarnings: string[]
   }> {
     const profile = await ScientificProfile.find(profileId)
@@ -48,6 +50,7 @@ export default class KpiEngineService {
         profileId,
         academicYear,
         totalHours: 0,
+        totalPoints: 0,
         metQuota: false,
         quota: DEFAULT_QUOTA,
         breakdown: [],
@@ -56,20 +59,26 @@ export default class KpiEngineService {
     }
 
     const isFemale = profile.gender?.toUpperCase() === 'NỮ'
-    const context: KpiContext = { profileId, academicYear, isFemale }
+    const context: KpiContext = {
+      profileId,
+      academicYear,
+      isFemale,
+      profileFullName: profile.fullName ?? null,
+    }
 
     const outputs: KpiOutput[] = []
 
     const publications = await Publication.query()
       .where('profile_id', profileId)
-      .where('academic_year', academicYear)
       .preload('publicationAuthors')
       .orderBy('id', 'asc')
 
     for (const pub of publications) {
       const authors = pub.publicationAuthors.map((a) => ({
         profileId: a.profileId,
+        fullName: a.fullName,
         isMainAuthor: a.isMainAuthor,
+        isCorresponding: a.isCorresponding,
         affiliationType: a.affiliationType,
         isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
       }))
@@ -77,9 +86,9 @@ export default class KpiEngineService {
         type: 'PUBLICATION',
         publication: {
           id: pub.id,
-          rank: pub.rank,
-          quartile: pub.quartile,
-          domesticRuleType: pub.domesticRuleType,
+          ownerProfileId: pub.profileId,
+          researchOutputTypeId: pub.researchOutputTypeId,
+          hdgsnnScore: pub.hdgsnnScore != null ? Number(pub.hdgsnnScore) : null,
         },
         authors,
       })
@@ -88,7 +97,6 @@ export default class KpiEngineService {
     const projects = await ProjectProposal.query()
       .where('owner_id', profile.userId)
       .where('status', 'APPROVED')
-      .where('academic_year', academicYear)
       .orderBy('id', 'asc')
 
     for (const proj of projects) {
@@ -96,6 +104,7 @@ export default class KpiEngineService {
         type: 'PROJECT',
         project: {
           id: proj.id,
+          researchOutputTypeId: proj.researchOutputTypeId,
           level: proj.level,
           acceptanceGrade: proj.acceptanceGrade,
           cFactor: proj.cFactor,
@@ -103,30 +112,42 @@ export default class KpiEngineService {
       })
     }
 
-    const breakdown: Array<{ type: string; id: number; hours: number; warnings: string[] }> = []
+    const breakdown: Array<{
+      type: string
+      id: number
+      hours: number
+      points: number
+      warnings: string[]
+    }> = []
     const allWarnings: string[] = []
     let totalHours = 0
+    let totalPoints = 0
 
     for (const output of outputs) {
       const result = await this.calculateOutputHours(output, context)
       totalHours += result.hours
+      const pts = result.points ?? 0
+      totalPoints += pts
       allWarnings.push(...result.warnings)
       const id = output.type === 'PUBLICATION' ? output.publication.id : output.type === 'PROJECT' ? output.project.id : 0
       breakdown.push({
         type: output.type,
         id,
         hours: result.hours,
+        points: Math.round(pts * 100) / 100,
         warnings: result.warnings,
       })
     }
 
     totalHours = Math.round(totalHours * 100) / 100
+    totalPoints = Math.round(totalPoints * 100) / 100
     const metQuota = totalHours >= DEFAULT_QUOTA
 
     return {
       profileId,
       academicYear,
       totalHours,
+      totalPoints,
       metQuota,
       quota: DEFAULT_QUOTA,
       breakdown,
@@ -135,15 +156,12 @@ export default class KpiEngineService {
   }
 
   /**
-   * Tính lại KPI cho toàn bộ profile có dữ liệu trong năm học và upsert vào kpi_results.
+   * Tính lại KPI và upsert `kpi_results` theo khóa `academicYear` (query param).
+   * Tổng giờ/điểm không phụ thuộc năm học — mọi profile có công bố hoặc đề tài duyệt đều được cập nhật.
    */
   static async recalcAcademicYear(academicYear: string): Promise<{ updated: number }> {
-    const profileIdsFromPubs = await Publication.query()
-      .where('academic_year', academicYear)
-      .distinct('profile_id')
-      .select('profile_id')
+    const profileIdsFromPubs = await Publication.query().distinct('profile_id').select('profile_id')
     const profileIdsFromProposals = await ProjectProposal.query()
-      .where('academic_year', academicYear)
       .where('status', 'APPROVED')
       .distinct('owner_id')
       .select('owner_id')
@@ -167,6 +185,7 @@ export default class KpiEngineService {
           metQuota: result.metQuota,
           detail: {
             quota: result.quota,
+            totalPoints: result.totalPoints,
             breakdown: result.breakdown,
             allWarnings: result.allWarnings,
           },

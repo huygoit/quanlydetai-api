@@ -18,13 +18,15 @@ export const createAttachmentValidator = vine.compile(
   })
 )
 
+/** Tạo công bố: bắt buộc lá danh mục NCKH; năm học chỉ là metadata để lọc/thống kê (không bắt buộc). */
 export const createPublicationValidator = vine.compile(
   vine.object({
+    researchOutputTypeId: vine.number().withoutDecimals().positive(),
     title: vine.string().trim().minLength(1).maxLength(500),
     authors: vine.string().trim().minLength(1),
     correspondingAuthor: vine.string().trim().maxLength(255).optional(),
     myRole: vine.enum(MY_ROLES).optional(),
-    publicationType: vine.enum(PUB_TYPES),
+    publicationType: vine.enum(PUB_TYPES).optional(),
     journalOrConference: vine.string().trim().minLength(1).maxLength(500),
     year: vine.number().optional(),
     volume: vine.string().trim().maxLength(20).optional(),
@@ -34,14 +36,7 @@ export const createPublicationValidator = vine.compile(
     quartile: vine.enum(QUARTILES).optional(),
     academicYear: vine.string().trim().regex(ACADEMIC_YEAR_REGEX).optional(),
     domesticRuleType: vine.enum(DOMESTIC_RULE_TYPES).optional(),
-    hdgsnnScore: vine
-      .number()
-      .optional()
-      .requiredWhen((field) => {
-        const rank = String(vine.helpers.getNestedValue('rank', field) ?? '').toUpperCase()
-        const domesticRuleType = vine.helpers.getNestedValue('domesticRuleType', field)
-        return (rank === 'DOMESTIC' || rank === 'OTHER') && domesticRuleType === 'HDGSNN_SCORE'
-      }),
+    hdgsnnScore: vine.number().optional(),
     doi: vine.string().trim().maxLength(100).optional(),
     issn: vine.string().trim().maxLength(20).optional(),
     isbn: vine.string().trim().maxLength(20).optional(),
@@ -53,6 +48,7 @@ export const createPublicationValidator = vine.compile(
 
 export const updatePublicationValidator = vine.compile(
   vine.object({
+    researchOutputTypeId: vine.number().withoutDecimals().positive().optional(),
     title: vine.string().trim().minLength(1).maxLength(500).optional(),
     authors: vine.string().trim().minLength(1).optional(),
     correspondingAuthor: vine.string().trim().maxLength(255).optional(),
@@ -67,14 +63,7 @@ export const updatePublicationValidator = vine.compile(
     quartile: vine.enum(QUARTILES).optional(),
     academicYear: vine.string().trim().regex(ACADEMIC_YEAR_REGEX).optional(),
     domesticRuleType: vine.enum(DOMESTIC_RULE_TYPES).optional(),
-    hdgsnnScore: vine
-      .number()
-      .optional()
-      .requiredWhen((field) => {
-        const rank = String(vine.helpers.getNestedValue('rank', field) ?? '').toUpperCase()
-        const domesticRuleType = vine.helpers.getNestedValue('domesticRuleType', field)
-        return (rank === 'DOMESTIC' || rank === 'OTHER') && domesticRuleType === 'HDGSNN_SCORE'
-      }),
+    hdgsnnScore: vine.number().optional(),
     doi: vine.string().trim().maxLength(100).optional(),
     issn: vine.string().trim().maxLength(20).optional(),
     isbn: vine.string().trim().maxLength(20).optional(),
