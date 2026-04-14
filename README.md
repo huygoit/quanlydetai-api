@@ -10,3 +10,8 @@ TRUONG_DON_VI (Trưởng đơn vị)	truongkhoa@university.edu.vn	password
 NCV (Nhà khoa học)	ncv@university.edu.vn	password
 CNDT (Chủ nhiệm đề tài)	cndt@university.edu.vn	password
 
+
+ncv.test.kpi@dhsudn.local
+ncv.test.kpi.female@dhsudn.local
+Mật khẩu: Test@123456
+

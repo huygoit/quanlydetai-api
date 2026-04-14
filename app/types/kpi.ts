@@ -4,7 +4,7 @@
 
 export interface CalculationResult {
   hours: number
-  /** Điểm quy đổi (theo danh mục KQNC / điểm HĐGSNN), phân bổ theo vai trò tác giả — không nhân hệ số giới */
+  /** Điểm quy đổi = giờ quy đổi / 600 (sau toàn bộ hệ số và điều kiện áp dụng). */
   points?: number
   warnings: string[]
   details?: Record<string, unknown>

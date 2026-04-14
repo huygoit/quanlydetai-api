@@ -95,6 +95,46 @@ export function compositeAffiliationFactorA(authors: Array<{ affiliationType: st
   return 1.5
 }
 
+type AExplanation = {
+  a: number
+  reason: string
+}
+
+function giaiThichHeSoATrenTapTacGia(
+  authors: Array<{ affiliationType: string }>,
+  useCorrespondingOnly: boolean
+): AExplanation {
+  if (!authors.length) {
+    return {
+      a: 1,
+      reason:
+        'Không có tác giả trong tập tính hệ số a, hệ thống dùng mặc định a = 1.',
+    }
+  }
+  const tatCaThuocDhDn = authors.every((a) => a.affiliationType === 'UDN_ONLY')
+  const tatCaNgoaiDhDn = authors.every((a) => a.affiliationType !== 'UDN_ONLY')
+  const moTaTapTacGia = useCorrespondingOnly
+    ? 'tập tác giả liên hệ'
+    : 'toàn bộ tác giả'
+
+  if (tatCaThuocDhDn) {
+    return {
+      a: 2,
+      reason: `Theo ${moTaTapTacGia}, tất cả đều thuộc đơn vị trong ĐHĐN nên a = 2.`,
+    }
+  }
+  if (tatCaNgoaiDhDn) {
+    return {
+      a: 1,
+      reason: `Theo ${moTaTapTacGia}, tất cả đều ngoài nhóm đơn vị ĐHĐN nên a = 1.`,
+    }
+  }
+  return {
+    a: 1.5,
+    reason: `Theo ${moTaTapTacGia}, có cả đơn vị trong và ngoài ĐHĐN nên a = 1.5.`,
+  }
+}
+
 /**
  * Bài báo mục 1,2: hệ số a nhìn **tất cả tác giả liên hệ** (cơ quan công tác thể hiện trên bài).
  * Chưa có tác giả liên hệ xác định → coi như mục 3: xét **toàn bộ** tác giả (1.1 áp trên cả nhóm).
@@ -102,9 +142,15 @@ export function compositeAffiliationFactorA(authors: Array<{ affiliationType: st
 export function heSoAQdCongBoMuc12(
   authors: Array<{ isCorresponding: boolean; affiliationType: string }>
 ): number {
+  return giaiThichHeSoAQdCongBoMuc12(authors).a
+}
+
+export function giaiThichHeSoAQdCongBoMuc12(
+  authors: Array<{ isCorresponding: boolean; affiliationType: string }>
+): AExplanation {
   const chiLienHe = authors.filter((a) => a.isCorresponding)
   const tapDeTinhA = chiLienHe.length > 0 ? chiLienHe : authors
-  return compositeAffiliationFactorA(tapDeTinhA)
+  return giaiThichHeSoATrenTapTacGia(tapDeTinhA, chiLienHe.length > 0)
 }
 
 function baseHoursFromRule(
@@ -154,54 +200,6 @@ function baseHoursFromRule(
 
   warnings.push(`Rule kind ${k} chưa hỗ trợ cho công bố`)
   return { B0: 0, warnings }
-}
-
-/**
- * Điểm quy đổi gốc (P0) theo cùng loại rule — ưu `points_value` trong danh mục, thiếu thì dùng `hours_value` làm điểm mặc định.
- * HĐGSNN: điểm = điểm nhập trên bài (đúng nghĩa điểm).
- */
-function basePointsFromRule(
-  kind: string,
-  rule: ResearchOutputRule,
-  _authors: Array<{ affiliationType: string }>,
-  hdgsnnScore: number | null,
-  _aQuyDinh: number
-): { P0: number; warnings: string[] } {
-  const warnings: string[] = []
-  const k = kind.toUpperCase()
-  const pv = rule.pointsValue != null ? Number(rule.pointsValue) : 0
-  const hv = rule.hoursValue != null ? Number(rule.hoursValue) : 0
-
-  if (k === 'HDGSNN_POINTS_TO_HOURS') {
-    const score = hdgsnnScore != null ? Number(hdgsnnScore) : 0
-    if (score <= 0) warnings.push('Thiếu điểm HĐGSNN hợp lệ')
-    return { P0: score, warnings }
-  }
-
-  if (k === 'MULTIPLY_A') {
-    const base = pv > 0 ? pv : hv
-    if (base <= 0) warnings.push('MULTIPLY_A: thiếu điểm quy đổi (points_value hoặc hours_value)')
-    // Theo phụ lục 1883: điểm quy đổi lấy theo cột điểm của loại kết quả, không nhân a.
-    return { P0: base, warnings }
-  }
-
-  if (k === 'FIXED' || k === 'MULTIPLY_C') {
-    const base = pv > 0 ? pv : hv
-    return { P0: base, warnings }
-  }
-
-  if (k === 'BONUS_ADD') {
-    const bonus = rule.hoursBonus != null ? Number(rule.hoursBonus) : 0
-    const base = pv > 0 ? pv : hv
-    return { P0: base + bonus, warnings }
-  }
-
-  if (k === 'RANGE_REVENUE') {
-    return { P0: 0, warnings }
-  }
-
-  warnings.push(`Rule kind ${k}: chưa suy điểm quy đổi`)
-  return { P0: 0, warnings }
 }
 
 export function publicationStrategySupports(output: KpiOutput): boolean {
@@ -266,7 +264,8 @@ export async function publicationStrategyCalculate(
     return { hours: 0, points: 0, warnings, details: { n, p, tongTacGia } }
   }
 
-  const aQd = heSoAQdCongBoMuc12(authors)
+  const aInfo = giaiThichHeSoAQdCongBoMuc12(authors)
+  const aQd = aInfo.a
 
   let rule: ResearchOutputRule
   try {
@@ -284,18 +283,9 @@ export async function publicationStrategyCalculate(
     publication.hdgsnnScore ?? null,
     aQd
   )
-  const { P0: rawP0, warnings: w2p } = basePointsFromRule(
-    kind,
-    rule,
-    authors,
-    publication.hdgsnnScore ?? null,
-    aQd
-  )
   warnings.push(...w2)
-  warnings.push(...w2p)
-  // Chỉ dừng khi cả giờ gốc và điểm gốc đều không hợp lệ (tránh mất điểm khi rule chỉ khai báo một trong hai).
-  if (rawB0 <= 0 && rawP0 <= 0) {
-    warnings.push('Rule không cho giờ hoặc điểm cơ sở hợp lệ (B0 và P0 đều ≤ 0).')
+  if (rawB0 <= 0) {
+    warnings.push('Rule không cho giờ cơ sở hợp lệ (B0 ≤ 0).')
     return { hours: 0, points: 0, warnings, details: { publicationId: publication.id, typeId, ruleKind: kind } }
   }
 
@@ -315,8 +305,10 @@ export async function publicationStrategyCalculate(
   const daNhanATrongB0 = kind === 'MULTIPLY_A' || kind === 'HDGSNN_POINTS_TO_HOURS'
   const heSoATrongCongThucB = daNhanATrongB0 ? 1 : aExcel
   const B = (rawB0 > 0 ? rawB0 : 0) * heSoATrongCongThucB
-  // Điểm quy đổi theo phụ lục: lấy theo cột điểm (hoặc điểm HĐGSNN), không chia n/p và không nhân a.
-  const P = rawP0 > 0 ? rawP0 : 0
+  // Điểm cơ sở cũng suy từ giờ cơ sở theo tỉ lệ 1 điểm = 600 giờ.
+  const rawP0 = rawB0 / 600
+  // Điểm quy đổi tổng công trình lấy trực tiếp từ tổng giờ: P = B / 600.
+  const P = B / 600
 
   if (authorForProfile.affiliationType === 'OUTSIDE') {
     warnings.push(
@@ -332,6 +324,7 @@ export async function publicationStrategyCalculate(
         B0: rawB0,
         P0: rawP0,
         aExcel,
+        aReason: aInfo.reason,
         aFactor,
         B,
         P,
@@ -352,7 +345,7 @@ export async function publicationStrategyCalculate(
     authorForProfile.isMainAuthor || authorForProfile.isCorresponding
   const isMain = trongNhomChinhTheoQD || tongTacGia === 1
   let hours = isMain ? B / (3 * n) + (2 * B) / (3 * p) : (2 * B) / (3 * p)
-  let points = P
+  let points = 0
 
   if (authorForProfile.isMultiAffiliationOutsideUdn) {
     hours /= 2
@@ -362,7 +355,7 @@ export async function publicationStrategyCalculate(
   }
 
   hours = Math.round(hours * 100) / 100
-  points = Math.round(points * 100) / 100
+  points = Math.round((hours / 600) * 100) / 100
 
   return {
     hours,
@@ -375,6 +368,8 @@ export async function publicationStrategyCalculate(
       P0: rawP0,
       /** Hệ số a theo QĐ (cả tập tác giả): cùng ĐHĐN = 2, … */
       aExcel,
+      /** Diễn giải vì sao a = 2/1.5/1 theo tập tác giả dùng để xét. */
+      aReason: aInfo.reason,
       /** Luôn 1: sau B = B0×a không nhân thêm theo dòng (theo bảng QĐ chỉ có ×a). */
       aFactor,
       B,

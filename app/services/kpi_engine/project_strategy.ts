@@ -38,10 +38,7 @@ export async function projectStrategyCalculate(
 
   const kind = (rule.ruleKind || '').toUpperCase()
   const baseHours = rule.hoursValue != null ? Number(rule.hoursValue) : 0
-  const basePoints =
-    rule.pointsValue != null && Number(rule.pointsValue) > 0
-      ? Number(rule.pointsValue)
-      : baseHours
+  const basePoints = Math.round((baseHours / 600) * 100) / 100
 
   if (kind === 'MULTIPLY_C') {
     if (baseHours <= 0) {
@@ -65,7 +62,7 @@ export async function projectStrategyCalculate(
     }
 
     const hours = Math.round(baseHours * cFactor * 100) / 100
-    const points = Math.round(basePoints * cFactor * 100) / 100
+    const points = Math.round((hours / 600) * 100) / 100
     return {
       hours,
       points,
@@ -79,7 +76,7 @@ export async function projectStrategyCalculate(
       warnings.push('FIXED: hours_value không hợp lệ')
       return { hours: 0, points: 0, warnings }
     }
-    const points = Math.round(basePoints * 100) / 100
+    const points = Math.round((baseHours / 600) * 100) / 100
     return {
       hours: Math.round(baseHours * 100) / 100,
       points,

@@ -1,15 +1,21 @@
 import Staff from '#models/staff'
 import ScientificProfile from '#models/scientific_profile'
-import type User from '#models/user'
+import User from '#models/user'
+import { DateTime } from 'luxon'
 
 const DEFAULT_ORGANIZATION = 'Trường Đại học Sư phạm - Đại học Đà Nẵng'
 
 export interface StaffProfileSyncOptions {
   dryRun?: boolean
+  autoLinkByEmail?: boolean
 }
 
 export interface StaffProfileSyncReport {
+  totalStaff: number
   totalStaffWithUser: number
+  normalizedStaffGender: number
+  autoLinkedByEmail: number
+  skippedUserAlreadyLinked: number
   created: number
   updated: number
   unchanged: number
@@ -19,7 +25,7 @@ export interface StaffProfileSyncReport {
 
 type BaseSyncPayload = {
   fullName: string
-  dateOfBirth: Date | null
+  dateOfBirth: DateTime | null
   gender: string | null
   workEmail: string
   phone: string | null
@@ -38,9 +44,15 @@ function normalizeGender(raw: string | null): string | null {
     .trim()
     .toLowerCase()
   if (!s) return null
-  if (s.includes('nu')) return 'NỮ'
-  if (s.includes('nam')) return 'NAM'
-  return raw.trim().toUpperCase()
+  if (s === 'f' || s.includes('nu') || s.includes('female')) return 'FEMALE'
+  if (s === 'm' || s.includes('nam') || s.includes('male')) return 'MALE'
+  return null
+}
+
+function fitText(raw: string | null | undefined, maxLength: number): string | null {
+  const s = (raw || '').trim()
+  if (!s) return null
+  return s.length > maxLength ? s.slice(0, maxLength) : s
 }
 
 function pickWorkEmail(staffEmail: string | null, user: User | null, staffCode: string): string {
@@ -51,11 +63,12 @@ function pickWorkEmail(staffEmail: string | null, user: User | null, staffCode: 
   return `${staffCode.toLowerCase()}@staff.local`
 }
 
-function toDate(v: unknown): Date | null {
+function toDate(v: unknown): DateTime | null {
   if (!v) return null
-  if (v instanceof Date) return v
+  if (DateTime.isDateTime(v)) return v
+  if (v instanceof Date) return DateTime.fromJSDate(v)
   const maybe: any = v as any
-  if (typeof maybe?.toJSDate === 'function') return maybe.toJSDate()
+  if (typeof maybe?.toJSDate === 'function') return DateTime.fromJSDate(maybe.toJSDate())
   return null
 }
 
@@ -68,16 +81,17 @@ function buildPayload(staff: Staff, user: User | null): BaseSyncPayload {
     phone: staff.phone?.trim() || null,
     organization: DEFAULT_ORGANIZATION,
     department: staff.departmentName?.trim() || null,
-    currentTitle: staff.positionTitle?.trim() || staff.currentJob?.trim() || null,
-    managementRole: staff.concurrentPosition?.trim() || null,
-    academicTitle: staff.academicTitle?.trim() || null,
+    currentTitle: fitText(staff.positionTitle || staff.currentJob, 100),
+    managementRole: fitText(staff.concurrentPosition, 100),
+    academicTitle: fitText(staff.academicTitle, 10),
   }
 }
 
 function toIsoDate(v: unknown): string | null {
   if (!v) return null
   const maybe: any = v as any
-  if (maybe instanceof Date) return maybe.toISOString().slice(0, 10)
+  if (DateTime.isDateTime(maybe)) return maybe.toISODate()
+  if (maybe instanceof Date) return DateTime.fromJSDate(maybe).toISODate()
   if (typeof maybe?.toISODate === 'function') return maybe.toISODate()
   return null
 }
@@ -103,8 +117,13 @@ function diffProfile(profile: ScientificProfile, payload: BaseSyncPayload): Part
 export default class StaffProfileSyncService {
   static async sync(options: StaffProfileSyncOptions = {}): Promise<StaffProfileSyncReport> {
     const dryRun = options.dryRun === true
+    const autoLinkByEmail = options.autoLinkByEmail !== false
     const report: StaffProfileSyncReport = {
+      totalStaff: 0,
       totalStaffWithUser: 0,
+      normalizedStaffGender: 0,
+      autoLinkedByEmail: 0,
+      skippedUserAlreadyLinked: 0,
       created: 0,
       updated: 0,
       unchanged: 0,
@@ -112,12 +131,90 @@ export default class StaffProfileSyncService {
       errors: [],
     }
 
-    const staffs = await Staff.query().whereNotNull('user_id').preload('user').orderBy('id', 'asc')
-    report.totalStaffWithUser = staffs.length
+    const users = await User.query().select('id', 'email')
+    const userById = new Map<number, User>()
+    const userByEmail = new Map<string, User>()
+    for (const user of users) {
+      userById.set(Number(user.id), user)
+      const email = (user.email || '').trim().toLowerCase()
+      if (email) userByEmail.set(email, user)
+    }
 
-    const userIds = Array.from(
-      new Set(staffs.map((s) => Number(s.userId)).filter((v) => Number.isFinite(v) && v > 0))
-    )
+    const staffs = await Staff.query().orderBy('id', 'asc')
+    report.totalStaff = staffs.length
+    const linkedUserToStaff = new Map<number, number>()
+    for (const staff of staffs) {
+      const uid = Number(staff.userId)
+      if (Number.isFinite(uid) && uid > 0 && !linkedUserToStaff.has(uid)) {
+        linkedUserToStaff.set(uid, Number(staff.id))
+      }
+    }
+
+    const resolvedUserIds: number[] = []
+    const resolvedUserByStaffId = new Map<number, User>()
+
+    for (const staff of staffs) {
+      const normalizedGender = normalizeGender(staff.gender)
+      const currentGender = (staff.gender || '').trim().toUpperCase()
+      if (normalizedGender && currentGender !== normalizedGender) {
+        if (!dryRun) {
+          staff.gender = normalizedGender
+          await staff.save()
+        }
+        staff.gender = normalizedGender
+        report.normalizedStaffGender += 1
+      }
+
+      let user: User | null = null
+      const currentUserId = Number(staff.userId)
+      if (Number.isFinite(currentUserId) && currentUserId > 0) {
+        user = userById.get(currentUserId) || null
+      }
+
+      if (!user && autoLinkByEmail) {
+        const email = (staff.email || '').trim().toLowerCase()
+        if (email) {
+          const matched = userByEmail.get(email) || null
+          if (matched) {
+            const matchedId = Number(matched.id)
+            const linkedStaffId = linkedUserToStaff.get(matchedId)
+            if (linkedStaffId && linkedStaffId !== Number(staff.id)) {
+              report.skippedUserAlreadyLinked += 1
+              continue
+            }
+            if (!dryRun) {
+              try {
+                staff.userId = matchedId
+                await staff.save()
+              } catch (error) {
+                report.errors.push({
+                  staffId: Number(staff.id),
+                  staffCode: staff.staffCode,
+                  reason: error instanceof Error ? error.message : 'Lỗi không xác định khi gán user_id',
+                })
+                continue
+              }
+            }
+            staff.userId = matchedId
+            linkedUserToStaff.set(matchedId, Number(staff.id))
+            user = matched
+            report.autoLinkedByEmail += 1
+          }
+        }
+      }
+
+      if (!user) continue
+      resolvedUserByStaffId.set(Number(staff.id), user)
+      resolvedUserIds.push(Number(user.id))
+    }
+
+    report.totalStaffWithUser = resolvedUserIds.length
+
+    if (resolvedUserIds.length === 0) {
+      return report
+    }
+
+    const userIds = Array.from(new Set(resolvedUserIds))
     const profiles = await ScientificProfile.query().whereIn('user_id', userIds)
     const profileByUserId = new Map<number, ScientificProfile>()
     for (const p of profiles) profileByUserId.set(Number(p.userId), p)
@@ -125,7 +222,7 @@ export default class StaffProfileSyncService {
     for (const staff of staffs) {
       try {
         const uid = Number(staff.userId)
-        const user = (staff as any).user ?? null
+        const user = resolvedUserByStaffId.get(Number(staff.id)) || null
         if (!user) {
           report.skippedMissingUser += 1
           continue

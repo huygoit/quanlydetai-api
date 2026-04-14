@@ -17,10 +17,23 @@ export default class SyncStaffProfiles extends BaseCommand {
   })
   declare dryRun: boolean
 
-  async run() {
-    const report = await StaffProfileSyncService.sync({ dryRun: this.dryRun })
+  @flags.boolean({
+    flagName: 'no-link-by-email',
+    description: 'Không tự gán user_id từ email staff',
+  })
+  declare noLinkByEmail: boolean
 
+  async run() {
+    const report = await StaffProfileSyncService.sync({
+      dryRun: this.dryRun,
+      autoLinkByEmail: !this.noLinkByEmail,
+    })
+
+    this.logger.info(`Tổng staff: ${report.totalStaff}`)
+    this.logger.info(`Chuẩn hóa gender ở staffs: ${report.normalizedStaffGender}`)
     this.logger.info(`Tổng staff có user_id: ${report.totalStaffWithUser}`)
+    this.logger.info(`Tự gán user_id theo email: ${report.autoLinkedByEmail}`)
+    this.logger.warning(`Bỏ qua do user đã gắn staff khác: ${report.skippedUserAlreadyLinked}`)
     this.logger.success(`Tạo mới hồ sơ khoa học: ${report.created}`)
     this.logger.success(`Cập nhật hồ sơ khoa học: ${report.updated}`)
     this.logger.info(`Không đổi: ${report.unchanged}`)

@@ -138,6 +138,18 @@ function parseNumber(val: unknown): number | null {
   return Number.isNaN(n) ? null : n
 }
 
+function normalizeGender(raw: string): string | null {
+  const s = raw
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .trim()
+    .toLowerCase()
+  if (!s) return null
+  if (s === 'f' || s.includes('nu') || s.includes('female')) return 'FEMALE'
+  if (s === 'm' || s.includes('nam') || s.includes('male')) return 'MALE'
+  return null
+}
+
 /**
  * Hệ số lương (nv_hsluong): số thập phân nhỏ (vd 4,65).
  * Nếu gặp số ~20k–70k thì thường là serial ngày Excel do ô sai định dạng — bỏ qua để tránh overflow DECIMAL.
@@ -273,7 +285,7 @@ export default class StaffImportService {
           full_name: fullName,
 
           date_of_birth: parseExcelDate(getCell(row, 'nv_ngaysinh')),
-          gender: getCell(row, 'nv_gioitinh') || null,
+          gender: normalizeGender(getCell(row, 'nv_gioitinh')),
           marital_status: getCell(row, 'nv_honnhan') || null,
           religion_or_ethnicity: getCell(row, 'nv_tongiao') || null,
           priority_group: getCell(row, 'nv_uutienGD') || null,

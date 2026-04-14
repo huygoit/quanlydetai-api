@@ -7,6 +7,11 @@ import type { CalculationResult, KpiContext, KpiOutput } from '#types/kpi'
 
 const DEFAULT_QUOTA = 600
 
+function isFemaleGender(gender: string | null | undefined): boolean {
+  const g = (gender || '').trim().toUpperCase()
+  return g === 'FEMALE' || g === 'NỮ'
+}
+
 /**
  * KPI Engine: tính giờ NCKH theo QĐ 1883, rule-driven (lookup theo type_id).
  * Strategy gọi ResearchOutputMapperService + ResearchOutputRule.firstOrFail().
@@ -58,7 +63,7 @@ export default class KpiEngineService {
       }
     }
 
-    const isFemale = profile.gender?.toUpperCase() === 'NỮ'
+    const isFemale = isFemaleGender(profile.gender)
     const context: KpiContext = {
       profileId,
       academicYear,

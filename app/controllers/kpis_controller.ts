@@ -23,6 +23,11 @@ function sameNumericId(a: unknown, b: unknown): boolean {
   return Number(a) === Number(b)
 }
 
+function isFemaleGender(gender: string | null | undefined): boolean {
+  const g = (gender || '').trim().toUpperCase()
+  return g === 'FEMALE' || g === 'NỮ'
+}
+
 /** QĐ mục 1.1: chỉ có hệ số a chung (theo tập tác giả liên hệ / toàn bài); không có hệ số nhân theo từng dòng — preview cột “Hệ số” = 1. */
 const HE_SO_DONG_TAC_GIA_HIEN_THI = 1
 
@@ -132,7 +137,7 @@ export default class KpisController {
     }
 
     const profile = await ScientificProfile.find(profileId)
-    const isFemale = profile?.gender?.toUpperCase() === 'NỮ'
+    const isFemale = isFemaleGender(profile?.gender)
 
     const output = {
       type: 'PUBLICATION' as const,
@@ -164,6 +169,7 @@ export default class KpisController {
     const n = typeof details.n === 'number' ? details.n : 0
     const p = typeof details.p === 'number' ? details.p : 0
     const aExcel = typeof details.aExcel === 'number' ? details.aExcel : 1
+    const aReason = String(details.aReason ?? '')
     const aFactor = typeof details.aFactor === 'number' ? details.aFactor : 1
     const matchedFullName = String(details.matchedFullName ?? '')
     const B = typeof details.B === 'number' ? details.B : 0
@@ -187,8 +193,8 @@ export default class KpisController {
           if (isViewerRow && isFemale) {
             h = Math.round(h * 1.2 * 100) / 100
           }
-          // Điểm quy đổi theo phụ lục: không chia theo n/p; hiển thị phần NCV đang xem.
-          pts = isViewerRow ? result.points ?? 0 : 0
+          // Điểm từng tác giả được suy trực tiếp từ giờ từng tác giả: 1 điểm = 600 giờ.
+          pts = Math.round((h / 600) * 100) / 100
         }
         return {
           authorName: a.fullName,
@@ -213,6 +219,7 @@ export default class KpisController {
         basePoints: P0,
         /** Hệ số a theo QĐ trên cả tập tác giả (VD cùng ĐHĐN = 2) — hiển thị “Hệ số a” trên modal */
         unitCoefficient: aExcel,
+        unitCoefficientReason: aReason || null,
         affiliationCompositeA: aExcel,
         authorUnitFactor: aFactor,
         n,
