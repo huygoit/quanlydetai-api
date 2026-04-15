@@ -27,5 +27,14 @@ export default await Env.create(new URL('../', import.meta.url), {
   DB_PORT: Env.schema.number(),
   DB_USER: Env.schema.string(),
   DB_PASSWORD: Env.schema.string.optional(),
-  DB_DATABASE: Env.schema.string()
+  DB_DATABASE: Env.schema.string(),
+
+  /*
+  |----------------------------------------------------------
+  | OpenAlex integration
+  |----------------------------------------------------------
+  */
+  OPENALEX_API_KEY: Env.schema.string.optional(),
+  OPENALEX_BASE_URL: Env.schema.string.optional(),
+  OPENALEX_MAILTO: Env.schema.string.optional(),
 })

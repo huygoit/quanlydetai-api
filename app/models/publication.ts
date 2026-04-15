@@ -77,6 +77,15 @@ export default class Publication extends BaseModel {
   declare sourceId: string | null
 
   @column()
+  declare needsIndexConfirmation: boolean
+
+  @column()
+  declare indexMappedCode: string | null
+
+  @column()
+  declare indexMappingReason: string | null
+
+  @column()
   declare verifiedByNcv: boolean
 
   @column()

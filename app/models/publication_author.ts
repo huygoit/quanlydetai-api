@@ -41,6 +41,23 @@ export default class PublicationAuthor extends BaseModel {
   @column()
   declare isMultiAffiliationOutsideUdn: boolean
 
+  @column({
+    prepare: (v: string[] | null) => (v == null ? '[]' : JSON.stringify(v)),
+    consume: (v: string | unknown) => {
+      if (Array.isArray(v)) return v
+      if (typeof v === 'string') {
+        try {
+          const parsed = JSON.parse(v)
+          return Array.isArray(parsed) ? parsed : []
+        } catch {
+          return []
+        }
+      }
+      return []
+    },
+  })
+  declare affiliationUnits: string[]
+
   @column()
   declare contributionPercent: number | null
 

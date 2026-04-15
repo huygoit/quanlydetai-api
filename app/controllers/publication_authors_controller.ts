@@ -10,6 +10,27 @@ import {
   validateOwnerProfileLinked,
 } from '#validators/publication_author_validator'
 
+const OTHER_UNIT_LABEL = 'Other Organization (Đơn vị khác)'
+const LEGACY_OTHER_UNIT_LABEL = 'Đơn vị khác'
+
+function deriveAffiliationTypeFromUnits(units: string[] | undefined): 'UDN_ONLY' | 'MIXED' | 'OUTSIDE' | null {
+  const picked = Array.isArray(units)
+    ? Array.from(
+        new Set(
+          units
+            .map((v) => String(v ?? '').trim())
+            .filter((v) => v.length > 0)
+        )
+      )
+    : []
+  if (picked.length === 0) return null
+  const hasOutside = picked.includes(OTHER_UNIT_LABEL) || picked.includes(LEGACY_OTHER_UNIT_LABEL)
+  const hasUdn = picked.some((v) => v !== OTHER_UNIT_LABEL && v !== LEGACY_OTHER_UNIT_LABEL)
+  if (hasOutside && hasUdn) return 'MIXED'
+  if (hasOutside) return 'OUTSIDE'
+  return 'UDN_ONLY'
+}
+
 /**
  * Sub-resource: tác giả của publication (me).
  * GET /api/profile/me/publications/:id/authors — danh sách tác giả.
@@ -49,6 +70,7 @@ export default class PublicationAuthorsController {
       id: a.id,
       profileId: a.profileId,
       fullName: a.fullName,
+      affiliationUnits: a.affiliationUnits ?? [],
       authorOrder: a.authorOrder,
       isMainAuthor: a.isMainAuthor,
       isCorresponding: a.isCorresponding,
@@ -100,6 +122,9 @@ export default class PublicationAuthorsController {
     }
 
     for (const a of payload.authors) {
+      const derivedAffType = deriveAffiliationTypeFromUnits(a.affiliation_units)
+      const effectiveAffType = derivedAffType ?? a.affiliation_type
+      const effectiveMulti = effectiveAffType === 'MIXED'
       if (a.id != null) {
         const author = await PublicationAuthor.query()
           .where('id', a.id)
@@ -107,11 +132,12 @@ export default class PublicationAuthorsController {
           .first()
         if (author) {
           author.fullName = a.full_name
+          author.affiliationUnits = a.affiliation_units ?? []
           author.authorOrder = a.author_order
           author.isMainAuthor = a.is_main_author
           author.isCorresponding = a.is_corresponding
-          author.affiliationType = a.affiliation_type
-          author.isMultiAffiliationOutsideUdn = a.is_multi_affiliation_outside_udn
+          author.affiliationType = effectiveAffType
+          author.isMultiAffiliationOutsideUdn = effectiveMulti
           author.profileId = a.profile_id ?? null
           await author.save()
           continue
@@ -121,11 +147,12 @@ export default class PublicationAuthorsController {
         publicationId: pubId,
         profileId: a.profile_id ?? null,
         fullName: a.full_name,
+        affiliationUnits: a.affiliation_units ?? [],
         authorOrder: a.author_order,
         isMainAuthor: a.is_main_author,
         isCorresponding: a.is_corresponding,
-        affiliationType: a.affiliation_type,
-        isMultiAffiliationOutsideUdn: a.is_multi_affiliation_outside_udn,
+        affiliationType: effectiveAffType,
+        isMultiAffiliationOutsideUdn: effectiveMulti,
       })
     }
 
@@ -136,6 +163,7 @@ export default class PublicationAuthorsController {
       id: a.id,
       profileId: a.profileId,
       fullName: a.fullName,
+      affiliationUnits: a.affiliationUnits ?? [],
       authorOrder: a.authorOrder,
       isMainAuthor: a.isMainAuthor,
       isCorresponding: a.isCorresponding,

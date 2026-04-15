@@ -33,6 +33,7 @@ const authorSchema = vine.object({
   id: vine.number().optional(),
   profile_id: vine.number().optional(),
   full_name: vine.string().trim().minLength(1).maxLength(255),
+  affiliation_units: vine.array(vine.string().trim().minLength(1).maxLength(255)).optional(),
   author_order: vine.number().min(1),
   is_main_author: vine.boolean(),
   is_corresponding: vine.boolean(),
@@ -83,6 +84,7 @@ export type AuthorPayloadRow = {
   id?: number
   profile_id?: number | null
   full_name: string
+  affiliation_units?: string[]
   author_order: number
   is_main_author: boolean
   is_corresponding: boolean

@@ -7,6 +7,8 @@ export interface StaffListFilters {
   perPage?: number
   /** Tìm theo họ tên, mã NV, email, SĐT, tên đơn vị (chứa, không phân biệt hoa thường) */
   keyword?: string
+  /** Tìm trực tiếp theo mã nhân viên */
+  staffCode?: string
   /** Lọc theo id bảng departments */
   departmentId?: number
   /** Lọc theo mã đơn vị (chứa) */
@@ -37,12 +39,34 @@ export default class StaffService {
     const kw = filters.keyword?.trim()
     if (kw) {
       const like = `%${kw}%`
+      const normalizedKw = kw.replace(/[^0-9a-zA-Z]/g, '')
       q.where((b) => {
         b.whereILike('fullName', like)
           .orWhereILike('staffCode', like)
           .orWhereILike('email', like)
           .orWhereILike('phone', like)
           .orWhereILike('departmentName', like)
+        if (normalizedKw) {
+          b.orWhereRaw(
+            "regexp_replace(coalesce(staff_code, ''), '[^0-9a-zA-Z]', '', 'g') ILIKE ?",
+            [`%${normalizedKw}%`]
+          )
+        }
+      })
+    }
+
+    const staffCode = filters.staffCode?.trim()
+    if (staffCode) {
+      const staffCodeLike = `%${staffCode}%`
+      const normalizedStaffCode = staffCode.replace(/[^0-9a-zA-Z]/g, '')
+      q.where((b) => {
+        b.whereILike('staffCode', staffCodeLike)
+        if (normalizedStaffCode) {
+          b.orWhereRaw(
+            "regexp_replace(coalesce(staff_code, ''), '[^0-9a-zA-Z]', '', 'g') ILIKE ?",
+            [`%${normalizedStaffCode}%`]
+          )
+        }
       })
     }
 

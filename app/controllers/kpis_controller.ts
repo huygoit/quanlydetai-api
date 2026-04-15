@@ -24,12 +24,28 @@ function sameNumericId(a: unknown, b: unknown): boolean {
 }
 
 function isFemaleGender(gender: string | null | undefined): boolean {
-  const g = (gender || '').trim().toUpperCase()
-  return g === 'FEMALE' || g === 'NỮ'
+  const raw = (gender || '').trim()
+  if (!raw) return false
+  const upper = raw.toUpperCase()
+  if (upper === 'FEMALE' || upper === 'NỮ' || upper === 'NU') return true
+  const folded = raw
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .trim()
+    .toUpperCase()
+  return folded === 'FEMALE' || folded === 'NU'
 }
 
-/** QĐ mục 1.1: chỉ có hệ số a chung (theo tập tác giả liên hệ / toàn bài); không có hệ số nhân theo từng dòng — preview cột “Hệ số” = 1. */
-const HE_SO_DONG_TAC_GIA_HIEN_THI = 1
+/** Hệ số điều chỉnh theo từng tác giả (nữ 1.2; kiêm nhiệm ngoài chia 2). */
+function heSoTacGiaTheoDieuChinh(row: {
+  isMultiAffiliationOutsideUdn: boolean
+  isFemale: boolean
+}): number {
+  let factor = 1
+  if (row.isMultiAffiliationOutsideUdn) factor *= 0.5
+  if (row.isFemale) factor *= 1.2
+  return Math.round(factor * 100) / 100
+}
 
 /**
  * Giờ lý thuyết một tác giả theo QĐ 1.3 (trước chia 2 kiêm nhiệm / ×1.2 nữ).
@@ -137,7 +153,15 @@ export default class KpisController {
     }
 
     const profile = await ScientificProfile.find(profileId)
-    const isFemale = isFemaleGender(profile?.gender)
+    let isFemale = isFemaleGender(profile?.gender)
+    if (!isFemale) {
+      const rowOfViewer = publication.publicationAuthors.find(
+        (a) => a.profileId != null && sameNumericId(a.profileId, profileId)
+      )
+      if (rowOfViewer?.profile) {
+        isFemale = isFemaleGender(rowOfViewer.profile.gender)
+      }
+    }
 
     const output = {
       type: 'PUBLICATION' as const,
@@ -183,6 +207,7 @@ export default class KpisController {
           (a.profileId != null && sameNumericId(a.profileId, profileId)) ||
           (matchedFullName.length > 0 &&
             a.fullName.trim().toLowerCase() === matchedFullName.trim().toLowerCase())
+        const rowIsFemale = isFemaleGender(a.profile?.gender)
         let h = 0
         let pts = 0
         if (duocTinhTheoMuc15(a.affiliationType)) {
@@ -190,7 +215,7 @@ export default class KpisController {
           if (a.isMultiAffiliationOutsideUdn) {
             h = Math.round((h / 2) * 100) / 100
           }
-          if (isViewerRow && isFemale) {
+          if (rowIsFemale) {
             h = Math.round(h * 1.2 * 100) / 100
           }
           // Điểm từng tác giả được suy trực tiếp từ giờ từng tác giả: 1 điểm = 600 giờ.
@@ -204,7 +229,10 @@ export default class KpisController {
           convertedHours: h,
           convertedPoints: pts,
           isViewerRow,
-          coefficient: HE_SO_DONG_TAC_GIA_HIEN_THI,
+          coefficient: heSoTacGiaTheoDieuChinh({
+            isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
+            isFemale: rowIsFemale,
+          }),
         }
       })
 

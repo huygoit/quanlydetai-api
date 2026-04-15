@@ -7,6 +7,7 @@ import Publication from '#models/publication'
 import Catalog from '#models/catalog'
 import NotificationService from '#services/notification_service'
 import ResearchOutputTypeService from '#services/research_output_type_service'
+import OpenAlexService from '#services/openalex_service'
 import { createProfileValidator } from '#validators/scientific_profile_validator'
 import { updateProfileValidator } from '#validators/scientific_profile_validator'
 
@@ -275,6 +276,46 @@ export default class ProfileController {
     return response.ok({ success: true, data })
   }
 
+  /**
+   * GET /api/profile/me/openalex/publication-drafts
+   * Lấy danh sách bài báo từ OpenAlex theo ORCID của user đăng nhập và map sang form tạo kết quả NCKH.
+   */
+  async openAlexPublicationDrafts({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const profile = await ScientificProfile.findBy('user_id', user.id)
+    if (!profile) {
+      return response.notFound({ success: false, message: 'Chưa có hồ sơ khoa học.' })
+    }
+    const orcid = String(profile.orcid ?? '').trim()
+    if (!orcid) {
+      return response.badRequest({
+        success: false,
+        message: 'Hồ sơ chưa có ORCID. Vui lòng cập nhật ORCID trước khi import từ OpenAlex.',
+      })
+    }
+
+    const yearRaw = Number(request.input('year'))
+    const year = Number.isFinite(yearRaw) ? yearRaw : undefined
+    const perPageRaw = Number(request.input('perPage', 20))
+    const perPage = Number.isFinite(perPageRaw) ? perPageRaw : 20
+
+    try {
+      const drafts = await OpenAlexService.fetchPublicationDraftsByOrcid({
+        orcid,
+        profileId: profile.id,
+        profileFullName: profile.fullName ?? '',
+        year,
+        perPage,
+      })
+      return response.ok({ success: true, data: drafts })
+    } catch (error) {
+      return response.badRequest({
+        success: false,
+        message: error instanceof Error ? error.message : 'Không lấy được dữ liệu từ OpenAlex.',
+      })
+    }
+  }
+
   /** Dùng chung cho response profile (có thể gọi từ ProfilesController). */
   serializeProfile(p: ScientificProfile) {
     return {
@@ -342,7 +383,19 @@ export default class ProfileController {
         academicYear: pub.academicYear,
         hdgsnnScore: pub.hdgsnnScore != null ? Number(pub.hdgsnnScore) : null,
         doi: pub.doi,
+        volume: pub.volume,
+        issue: pub.issue,
+        pages: pub.pages,
+        issn: pub.issn,
+        isbn: pub.isbn,
+        url: pub.url,
+        source: pub.source,
+        sourceId: pub.sourceId,
+        verifiedByNcv: pub.verifiedByNcv,
+        approvedInternal: pub.approvedInternal,
+        publicationStatus: pub.publicationStatus,
         createdAt: pub.createdAt.toISO(),
+        updatedAt: pub.updatedAt.toISO(),
         }
       }) ?? [],
       createdAt: p.createdAt.toISO(),

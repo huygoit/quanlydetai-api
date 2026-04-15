@@ -47,6 +47,7 @@ export default class AdminPersonalProfilesController {
     const page = request.input('page', 1)
     const perPage = request.input('perPage') ?? request.input('per_page', 10)
     const keyword = request.input('keyword', '')
+    const staffCode = request.input('staffCode', '')
     const departmentId = request.input('departmentId') ? Number(request.input('departmentId')) : undefined
     const status = request.input('status', '')
     const sortBy = request.input('sortBy', '')
@@ -56,6 +57,7 @@ export default class AdminPersonalProfilesController {
       page,
       perPage: Number(perPage),
       keyword: keyword || undefined,
+      staffCode: staffCode || undefined,
       departmentId,
       status: status || undefined,
       sortBy: sortBy || undefined,

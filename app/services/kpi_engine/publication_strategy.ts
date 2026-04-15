@@ -172,7 +172,8 @@ function baseHoursFromRule(
 
   if (k === 'MULTIPLY_A') {
     if (hv <= 0) warnings.push('MULTIPLY_A: hours_value không hợp lệ')
-    return { B0: hv * aQuyDinh, warnings }
+    // B0 luôn là giờ chuẩn trước khi nhân hệ số a (để UI hiển thị đúng B0).
+    return { B0: hv, warnings }
   }
 
   if (k === 'HDGSNN_POINTS_TO_HOURS') {
@@ -299,10 +300,10 @@ export async function publicationStrategyCalculate(
   /** Bảng QĐ: B = B0 × a (không nhân thêm hệ số theo dòng cơ quan; a đã phản ánh mục 1.1). */
   const aFactor = 1
   /**
-   * MULTIPLY_A / HĐGSNN: B0 (hoặc P0) đã nhân a trong base*FromRule — không nhân a lần hai.
-   * FIXED / MULTIPLY_C / …: B0 là giờ cột bảng (VD 1800), nhân a để được B.
+   * HĐGSNN: B0 đã quy đổi trực tiếp từ điểm HĐGSNN, không áp hệ số a.
+   * Các loại còn lại: B = B0 × a.
    */
-  const daNhanATrongB0 = kind === 'MULTIPLY_A' || kind === 'HDGSNN_POINTS_TO_HOURS'
+  const daNhanATrongB0 = kind === 'HDGSNN_POINTS_TO_HOURS'
   const heSoATrongCongThucB = daNhanATrongB0 ? 1 : aExcel
   const B = (rawB0 > 0 ? rawB0 : 0) * heSoATrongCongThucB
   // Điểm cơ sở cũng suy từ giờ cơ sở theo tỉ lệ 1 điểm = 600 giờ.

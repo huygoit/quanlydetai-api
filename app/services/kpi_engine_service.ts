@@ -8,8 +8,16 @@ import type { CalculationResult, KpiContext, KpiOutput } from '#types/kpi'
 const DEFAULT_QUOTA = 600
 
 function isFemaleGender(gender: string | null | undefined): boolean {
-  const g = (gender || '').trim().toUpperCase()
-  return g === 'FEMALE' || g === 'NỮ'
+  const raw = (gender || '').trim()
+  if (!raw) return false
+  const upper = raw.toUpperCase()
+  if (upper === 'FEMALE' || upper === 'NỮ' || upper === 'NU') return true
+  const folded = raw
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .trim()
+    .toUpperCase()
+  return folded === 'FEMALE' || folded === 'NU'
 }
 
 /**

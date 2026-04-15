@@ -29,7 +29,7 @@ export default class PublicationResearchTypeService {
         throw new Error('Với loại HĐGSNN, vui lòng nhập điểm quy đổi (điểm HĐGSNN) lớn hơn 0.')
       }
     }
-    if (type.code === 'PUB_CONF_ISBN') {
+    if (type.code === 'PUB_CONF_ISBN' || type.code === 'QD_R15') {
       const v = String(isbn ?? '').trim()
       if (!v) {
         throw new Error('Với loại Hội thảo có ISBN, vui lòng nhập ISBN hợp lệ.')

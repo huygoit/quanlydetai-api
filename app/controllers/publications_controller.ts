@@ -45,6 +45,11 @@ export default class PublicationsController {
       isbn: p.isbn,
       url: p.url,
       publicationStatus: p.publicationStatus,
+      source: p.source,
+      sourceId: p.sourceId,
+      needsIndexConfirmation: p.needsIndexConfirmation,
+      indexMappedCode: p.indexMappedCode,
+      indexMappingReason: p.indexMappingReason,
       attachmentUrl: p.attachmentUrl,
       createdAt: p.createdAt.toISO(),
     }
@@ -91,6 +96,22 @@ export default class PublicationsController {
       return response.badRequest({ success: false, message: msg })
     }
 
+    if (payload.source && payload.sourceId) {
+      const existed = await Publication.query()
+        .where('profile_id', profile.id)
+        .where('source', payload.source)
+        .where('source_id', payload.sourceId)
+        .first()
+      if (existed) {
+        await existed.load('researchOutputType')
+        return response.ok({
+          success: true,
+          message: 'Bài báo đã tồn tại theo nguồn import, trả về bản ghi hiện có.',
+          data: this.serializePublication(existed),
+        })
+      }
+    }
+
     const pub = await Publication.create({
       profileId: profile.id,
       researchOutputTypeId: payload.researchOutputTypeId,
@@ -114,7 +135,11 @@ export default class PublicationsController {
       isbn: payload.isbn ?? null,
       url: payload.url ?? null,
       publicationStatus: payload.publicationStatus,
-      source: 'INTERNAL',
+      source: payload.source ?? 'INTERNAL',
+      sourceId: payload.sourceId ?? null,
+      needsIndexConfirmation: payload.needsIndexConfirmation ?? false,
+      indexMappedCode: payload.indexMappedCode ?? null,
+      indexMappingReason: payload.indexMappingReason ?? null,
       verifiedByNcv: false,
       approvedInternal: null,
       attachmentUrl: payload.attachmentUrl ?? null,
@@ -169,6 +194,13 @@ export default class PublicationsController {
     if (payload.isbn !== undefined) updates.isbn = payload.isbn ?? null
     if (payload.url !== undefined) updates.url = payload.url ?? null
     if (payload.publicationStatus !== undefined) updates.publicationStatus = payload.publicationStatus
+    if (payload.source !== undefined) updates.source = payload.source
+    if (payload.sourceId !== undefined) updates.sourceId = payload.sourceId ?? null
+    if (payload.needsIndexConfirmation !== undefined)
+      updates.needsIndexConfirmation = payload.needsIndexConfirmation
+    if (payload.indexMappedCode !== undefined) updates.indexMappedCode = payload.indexMappedCode ?? null
+    if (payload.indexMappingReason !== undefined)
+      updates.indexMappingReason = payload.indexMappingReason ?? null
     if (payload.attachmentUrl !== undefined) updates.attachmentUrl = payload.attachmentUrl ?? null
     pub.merge(updates)
     await pub.save()

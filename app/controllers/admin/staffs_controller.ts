@@ -112,6 +112,7 @@ export default class AdminStaffsController {
     const page = request.input('page', 1)
     const perPage = request.input('perPage', 20)
     const keyword = request.input('keyword', '')
+    const staffCode = request.input('staffCode', '')
     const departmentIdRaw = request.input('departmentId', '')
     const departmentCode = request.input('departmentCode', '')
     const staffType = request.input('staffType', '')
@@ -130,6 +131,7 @@ export default class AdminStaffsController {
       page: Number(page) || 1,
       perPage: Number(perPage) || 20,
       keyword: keyword || undefined,
+      staffCode: staffCode || undefined,
       departmentId: Number.isFinite(departmentId) ? departmentId : undefined,
       departmentCode: departmentCode || undefined,
       staffType: staffType || undefined,

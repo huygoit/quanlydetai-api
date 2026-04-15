@@ -262,6 +262,7 @@ router
     router.get('/', [ProfileController, 'me'])
     router.get('/suggestions', [ProfileController, 'suggestions'])
     router.get('/author-profiles-lookup', [ProfileController, 'authorProfilesLookup'])
+    router.get('/openalex/publication-drafts', [ProfileController, 'openAlexPublicationDrafts'])
     router.get('/research-output-types/tree', [ProfileController, 'researchOutputTypesTree'])
     router.post('/', [ProfileController, 'storeMe'])
     router.put('/', [ProfileController, 'updateMe'])

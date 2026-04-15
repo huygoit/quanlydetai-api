@@ -9,6 +9,7 @@ export interface PersonalProfileFilters {
   page?: number
   perPage?: number
   keyword?: string
+  staffCode?: string
   departmentId?: number
   status?: string
   sortBy?: string
@@ -87,13 +88,27 @@ export default class PersonalProfileService {
       .preload('user', (u) => u.select('id', 'full_name', 'email'))
       .preload('department', (d) => d.select('id', 'name', 'code'))
 
-    if (filters.keyword) {
+    const kw = filters.keyword?.trim()
+    if (kw) {
       q.where((b) => {
-        b.whereILike('full_name', `%${filters.keyword}%`)
-          .orWhereILike('staff_code', `%${filters.keyword}%`)
-          .orWhereILike('phone', `%${filters.keyword}%`)
-          .orWhereILike('personal_email', `%${filters.keyword}%`)
-          .orWhereILike('work_email', `%${filters.keyword}%`)
+        b.whereILike('full_name', `%${kw}%`)
+          .orWhereILike('staff_code', `%${kw}%`)
+          .orWhereILike('phone', `%${kw}%`)
+          .orWhereILike('personal_email', `%${kw}%`)
+          .orWhereILike('work_email', `%${kw}%`)
+      })
+    }
+    const staffCode = filters.staffCode?.trim()
+    if (staffCode) {
+      const normalizedStaffCode = staffCode.replace(/[^0-9a-zA-Z]/g, '')
+      q.where((b) => {
+        b.whereILike('staff_code', `%${staffCode}%`)
+        if (normalizedStaffCode) {
+          b.orWhereRaw(
+            "regexp_replace(coalesce(staff_code, ''), '[^0-9a-zA-Z]', '', 'g') ILIKE ?",
+            [`%${normalizedStaffCode}%`]
+          )
+        }
       })
     }
     if (filters.departmentId != null) q.where('department_id', filters.departmentId)

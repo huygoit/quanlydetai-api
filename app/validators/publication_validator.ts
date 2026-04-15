@@ -7,6 +7,7 @@ const QUARTILES = ['Q1', 'Q2', 'Q3', 'Q4', 'NO_Q'] as const
 const DOMESTIC_RULE_TYPES = ['HDGSNN_SCORE', 'CONFERENCE_ISBN'] as const
 const PUB_STATUSES = ['PUBLISHED', 'ACCEPTED', 'UNDER_REVIEW'] as const
 const MY_ROLES = ['CHU_TRI', 'DONG_TAC_GIA'] as const
+const SOURCES = ['INTERNAL', 'GOOGLE_SCHOLAR', 'SCV_DHDN', 'OPENALEX'] as const
 
 /** Regex năm học dạng YYYY-YYYY */
 const ACADEMIC_YEAR_REGEX = /^\d{4}-\d{4}$/
@@ -42,6 +43,11 @@ export const createPublicationValidator = vine.compile(
     isbn: vine.string().trim().maxLength(20).optional(),
     url: vine.string().trim().url().optional(),
     publicationStatus: vine.enum(PUB_STATUSES),
+    source: vine.enum(SOURCES).optional(),
+    sourceId: vine.string().trim().maxLength(100).optional(),
+    needsIndexConfirmation: vine.boolean().optional(),
+    indexMappedCode: vine.string().trim().maxLength(50).optional(),
+    indexMappingReason: vine.string().trim().optional(),
     attachmentUrl: vine.string().trim().optional(),
   })
 )
@@ -69,6 +75,11 @@ export const updatePublicationValidator = vine.compile(
     isbn: vine.string().trim().maxLength(20).optional(),
     url: vine.string().trim().url().optional(),
     publicationStatus: vine.enum(PUB_STATUSES).optional(),
+    source: vine.enum(SOURCES).optional(),
+    sourceId: vine.string().trim().maxLength(100).optional(),
+    needsIndexConfirmation: vine.boolean().optional(),
+    indexMappedCode: vine.string().trim().maxLength(50).optional(),
+    indexMappingReason: vine.string().trim().optional(),
     attachmentUrl: vine.string().trim().optional(),
   })
 )

@@ -173,6 +173,28 @@ test.group('KPI Engine integration quy doi gio', () => {
     }
   })
 
+  test('Cong bo FIXED voi a=1.5: gio mot tac gia chinh = 1350, diem = 2.25', async ({ assert }) => {
+    const restore = mockRules({
+      108: { typeId: 108, ruleKind: 'FIXED', hoursValue: 1800, pointsValue: 3, hoursBonus: null },
+    })
+    try {
+      const result = await KpiEngineService.calculateOutputHours(
+        pubOutput({
+          typeId: 108,
+          authors: [
+            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isMainAuthor: true, isCorresponding: true, affiliationType: 'MIXED' },
+          ],
+        }),
+        { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }
+      )
+      assert.equal(result.hours, 1350)
+      assert.equal(result.points, 2.25)
+    } finally {
+      restore()
+    }
+  })
+
   test('Cong bo OUTSIDE thi gio va diem bang 0 theo muc 1.5', async ({ assert }) => {
     const restore = mockRules({
       105: { typeId: 105, ruleKind: 'MULTIPLY_A', hoursValue: 1800, pointsValue: 3, hoursBonus: null },
