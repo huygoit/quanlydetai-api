@@ -21,6 +21,11 @@ const bodyParserConfig = defineConfig({
    */
   json: {
     convertEmptyStringsToNull: true,
+    /**
+     * FE đôi khi gửi JSON dạng primitive (chuỗi/number) hoặc chuỗi JSON (double stringify).
+     * strict=false sẽ cho phép parse các trường hợp này thay vì trả 422 ngay ở bodyparser.
+     */
+    strict: false,
     types: [
       'application/json',
       'application/json-patch+json',

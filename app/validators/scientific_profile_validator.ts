@@ -42,6 +42,27 @@ export const updateProfileValidator = vine.compile(
     mainResearchArea: vine.string().trim().maxLength(255).optional(),
     subResearchAreas: vine.array(vine.string()).optional(),
     keywords: vine.array(vine.string()).optional(),
+
+    /**
+     * Cho phép FE lưu nested languages trong PUT /profile/me.
+     * Nếu gửi mảng này thì backend sẽ replace toàn bộ languages theo payload.
+     */
+    languages: vine
+      .array(
+        vine.object({
+          language: vine.string().trim().minLength(1).maxLength(50),
+          level: vine.string().trim().maxLength(20).optional(),
+          certificate: vine.string().trim().maxLength(100).optional(),
+          /**
+           * Link chứng chỉ: không dùng rule `.url()` của Vine vì `validator.isURL` quá chặt
+           * (presigned URL dài, ký tự đặc biệt, host nội bộ…) dễ làm fail oan.
+           * Backend vẫn chuẩn hoá/ghi DB an toàn qua `normalizeOptionalHttpUrl` trước khi lưu.
+           */
+          certificateUrl: vine.string().trim().maxLength(2000).optional(),
+          certificate_url: vine.string().trim().maxLength(2000).optional(),
+        })
+      )
+      .optional(),
   })
 )
 

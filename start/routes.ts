@@ -9,6 +9,7 @@
 
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
+import env from '#start/env'
 import AuthController from '#controllers/auth_controller'
 import UsersController from '#controllers/users_controller'
 import AdminController from '#controllers/admin_controller'
@@ -36,10 +37,61 @@ import AdminPermissionsController from '#controllers/admin/permissions_controlle
 import AdminIamUsersController from '#controllers/admin/iam_users_controller'
 import AdminPersonalProfilesController from '#controllers/admin/personal_profiles_controller'
 import AdminStaffsController from '#controllers/admin/staffs_controller'
+import path from 'node:path'
+import fs from 'node:fs/promises'
 
 // --- Auth (login, register không cần token)
 router.post('/api/auth/login', [AuthController, 'login'])
 router.post('/api/auth/register', [AuthController, 'register'])
+
+// --- Public: phục vụ file đính kèm hồ sơ theo /storage/profile-attachments/:filename
+router.get('/storage/profile-attachments/:filename', async ({ params, response }) => {
+  const uploadStorageRoot = env.get('UPLOAD_STORAGE_ROOT') || 'storage'
+  const uploadDir = env.get('UPLOAD_PROFILE_ATTACHMENTS_DIR') || 'profile-attachments'
+
+  const filename = String(params.filename || '')
+  if (!filename || filename !== path.basename(filename)) {
+    return response.badRequest({ success: false, message: 'Tên file không hợp lệ.' })
+  }
+
+  try {
+    /**
+     * Không dựa vào đường dẫn source/build (import.meta.url) vì production thường chạy trong `build/`.
+     * Thay vào đó, dò theo `cwd` và fallback sang `cwd/quanlydetai-api` (cấu trúc repo hiện tại).
+     */
+    const fileCandidates = (() => {
+      if (path.isAbsolute(uploadStorageRoot)) {
+        return [path.join(uploadStorageRoot, uploadDir, filename)]
+      }
+      const cwd = process.cwd()
+      return [
+        path.join(cwd, uploadStorageRoot, uploadDir, filename),
+        path.join(cwd, 'quanlydetai-api', uploadStorageRoot, uploadDir, filename),
+      ]
+    })()
+
+    let foundPath: string | null = null
+    for (const p of fileCandidates) {
+      try {
+        await fs.access(p)
+        foundPath = p
+        break
+      } catch {
+        // thử path tiếp theo
+      }
+    }
+
+    if (!foundPath) {
+      return response.notFound({ success: false, message: 'Không tìm thấy file.' })
+    }
+
+    // Ưu tiên hiển thị inline (để <img> render được trong popup)
+    response.header('Content-Disposition', `inline; filename="${filename}"`)
+    return response.download(foundPath)
+  } catch {
+    return response.notFound({ success: false, message: 'Không tìm thấy file.' })
+  }
+})
 
 // --- Auth (cần Bearer token)
 router
@@ -283,6 +335,37 @@ router
   })
   .prefix('/api/profile/me')
   .middleware([middleware.auth()])
+
+// --- Alias không có /api (một số FE đang gọi /profile/me)
+router
+  .group(() => {
+    router.get('/', [ProfileController, 'me'])
+    router.get('/suggestions', [ProfileController, 'suggestions'])
+    router.get('/author-profiles-lookup', [ProfileController, 'authorProfilesLookup'])
+    router.get('/openalex/publication-drafts', [ProfileController, 'openAlexPublicationDrafts'])
+    router.get('/research-output-types/tree', [ProfileController, 'researchOutputTypesTree'])
+    router.post('/', [ProfileController, 'storeMe'])
+    router.put('/', [ProfileController, 'updateMe'])
+    router.post('/submit', [ProfileController, 'submitMe'])
+    router.get('/languages', [ProfileLanguagesController, 'index'])
+    router.post('/languages', [ProfileLanguagesController, 'store'])
+    router.put('/languages/:id', [ProfileLanguagesController, 'update'])
+    router.delete('/languages/:id', [ProfileLanguagesController, 'destroy'])
+    router.get('/attachments', [ProfileAttachmentsController, 'index'])
+    router.post('/attachments', [ProfileAttachmentsController, 'store'])
+    router.delete('/attachments/:id', [ProfileAttachmentsController, 'destroy'])
+    router.get('/publications', [PublicationsController, 'index'])
+    router.post('/publications', [PublicationsController, 'store'])
+    router.put('/publications/:id', [PublicationsController, 'update'])
+    router.delete('/publications/:id', [PublicationsController, 'destroy'])
+    router.get('/publications/:id/authors', [PublicationAuthorsController, 'index'])
+    router.put('/publications/:id/authors', [PublicationAuthorsController, 'update'])
+  })
+  .prefix('/profile/me')
+  .middleware([middleware.auth()])
+
+// --- Upload alias (để FE dùng POST /api/uploads)
+router.post('/api/uploads', [ProfileAttachmentsController, 'store']).middleware([middleware.auth()])
 
 // --- Danh sách hồ sơ + verify (permission: profile.view_all, profile.verify)
 router

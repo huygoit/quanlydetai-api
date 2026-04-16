@@ -1,5 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import app from '@adonisjs/core/services/app'
+import env from '#start/env'
 import { DateTime } from 'luxon'
 import ScientificProfile from '#models/scientific_profile'
 import ProfileAttachment from '#models/profile_attachment'
@@ -8,7 +8,18 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-const UPLOAD_DIR = 'profile-attachments'
+const DEFAULT_UPLOAD_STORAGE_ROOT = 'storage'
+const DEFAULT_UPLOAD_PROFILE_ATTACHMENTS_DIR = 'profile-attachments'
+const DEFAULT_UPLOAD_PUBLIC_BASE_PATH = '/storage'
+
+function normalizePathPart(value: string) {
+  return value.replaceAll('\\', '/').replace(/^\/+|\/+$/g, '')
+}
+
+function normalizeBasePath(value: string) {
+  const v = value.replaceAll('\\', '/').replace(/\/+$/g, '')
+  return v.startsWith('/') ? v : `/${v}`
+}
 
 /**
  * Sub-resource: attachments của hồ sơ me. POST nhận multipart (file + type + name) hoặc JSON (url + type + name).
@@ -37,21 +48,43 @@ export default class ProfileAttachmentsController {
 
     if (file) {
       const payload = await request.validateUsing(createAttachmentValidator)
-      const dir = path.join(app.appRoot, 'storage', UPLOAD_DIR)
+      const uploadStorageRoot = env.get('UPLOAD_STORAGE_ROOT') || DEFAULT_UPLOAD_STORAGE_ROOT
+      const uploadDir = env.get('UPLOAD_PROFILE_ATTACHMENTS_DIR') || DEFAULT_UPLOAD_PROFILE_ATTACHMENTS_DIR
+      const publicBasePath = normalizeBasePath(env.get('UPLOAD_PUBLIC_BASE_PATH') || DEFAULT_UPLOAD_PUBLIC_BASE_PATH)
+
+      /**
+       * Khi chạy trong workspace monorepo, `cwd` có thể là `c:\quanlydetai` (thư mục cha),
+       * nên cần fallback về `c:\quanlydetai\quanlydetai-api`.
+       */
+      const rootDir = (() => {
+        if (path.isAbsolute(uploadStorageRoot)) return uploadStorageRoot
+        const cwd = process.cwd()
+        const direct = path.join(cwd, uploadStorageRoot)
+        return fs
+          .access(direct)
+          .then(() => direct)
+          .catch(() => path.join(cwd, 'quanlydetai-api', uploadStorageRoot))
+      })()
+
+      const resolvedRootDir = await rootDir
+      const dir = path.join(resolvedRootDir, uploadDir)
       await fs.mkdir(dir, { recursive: true })
       const ext = path.extname(file.clientName) || ''
       const filename = `${profile.id}-${randomUUID()}${ext}`
       const filepath = path.join(dir, filename)
       await file.move(path.dirname(filepath), { name: filename })
       if (!file.hasErrors) {
-        url = `/storage/${UPLOAD_DIR}/${filename}`
+        url = `${publicBasePath}/${normalizePathPart(uploadDir)}/${filename}`
       } else {
         return response.badRequest({ success: false, message: 'Tải file thất bại.', errors: file.errors })
       }
+
+      const type = payload.type ?? 'OTHER'
+      const name = (payload.name ?? file.clientName).trim()
       const att = await ProfileAttachment.create({
         profileId: profile.id,
-        type: payload.type,
-        name: payload.name,
+        type,
+        name,
         url,
         uploadedAt: DateTime.now(),
       })

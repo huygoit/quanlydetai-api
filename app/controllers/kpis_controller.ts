@@ -192,7 +192,11 @@ export default class KpisController {
     const P0 = typeof details.P0 === 'number' ? details.P0 : 0
     const n = typeof details.n === 'number' ? details.n : 0
     const p = typeof details.p === 'number' ? details.p : 0
-    const aExcel = typeof details.aExcel === 'number' ? details.aExcel : 1
+    const ruleKindRaw = details.ruleKind
+    const ruleKind = typeof ruleKindRaw === 'string' && ruleKindRaw.trim() ? ruleKindRaw.trim() : null
+    const aExcelRaw = details.aExcel
+    const aExcel =
+      typeof aExcelRaw === 'number' && Number.isFinite(aExcelRaw) ? (aExcelRaw as number) : null
     const aReason = String(details.aReason ?? '')
     const aFactor = typeof details.aFactor === 'number' ? details.aFactor : 1
     const matchedFullName = String(details.matchedFullName ?? '')
@@ -245,9 +249,10 @@ export default class KpisController {
         baseHours: B0,
         /** Điểm danh mục P0 (trước chia tác giả) */
         basePoints: P0,
-        /** Hệ số a theo QĐ trên cả tập tác giả (VD cùng ĐHĐN = 2) — hiển thị “Hệ số a” trên modal */
+        /** Hệ số a mục 1.1 — chỉ có nghĩa với MULTIPLY_A; loại khác null để UI hiển thị NA */
         unitCoefficient: aExcel,
         unitCoefficientReason: aReason || null,
+        ruleKind,
         affiliationCompositeA: aExcel,
         authorUnitFactor: aFactor,
         n,

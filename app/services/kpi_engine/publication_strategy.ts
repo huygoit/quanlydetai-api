@@ -156,10 +156,10 @@ export function giaiThichHeSoAQdCongBoMuc12(
 function baseHoursFromRule(
   kind: string,
   rule: ResearchOutputRule,
-  authors: Array<{ affiliationType: string }>,
+  _authors: Array<{ affiliationType: string }>,
   hdgsnnScore: number | null,
-  /** Hệ số a mục 1.1 (đã suy từ tác giả liên hệ hoặc toàn bài) — dùng cho MULTIPLY_A */
-  aQuyDinh: number
+  /** Giữ tham số để mở rộng sau; hiện không dùng trong nhánh B0. */
+  _aQuyDinh: number
 ): { B0: number; warnings: string[] } {
   const warnings: string[] = []
   const k = kind.toUpperCase()
@@ -296,15 +296,19 @@ export async function publicationStrategyCalculate(
     return { hours: 0, points: 0, warnings, details: { publicationId: publication.id, profileId: context.profileId } }
   }
 
-  const aExcel = aQd
-  /** Bảng QĐ: B = B0 × a (không nhân thêm hệ số theo dòng cơ quan; a đã phản ánh mục 1.1). */
-  const aFactor = 1
   /**
-   * HĐGSNN: B0 đã quy đổi trực tiếp từ điểm HĐGSNN, không áp hệ số a.
-   * Các loại còn lại: B = B0 × a.
+   * Hệ số a mục 1.1 chỉ nhân vào B0 khi rule là MULTIPLY_A (bảng ghi “× a”).
+   * Loại cố định (FIXED), nhân c (MULTIPLY_C), cộng thưởng (BONUS_ADD), HĐGSNN…: B = B0, không có a trong công thức — trả aExcel = null để UI hiển thị NA.
    */
+  const coHeSoATrongCongThuc = kind === 'MULTIPLY_A'
+  const aExcel: number | null = coHeSoATrongCongThuc ? aQd : null
+  const lyDoHeSoA = coHeSoATrongCongThuc
+    ? aInfo.reason
+    : `Loại quy tắc ${kind} không áp hệ số a theo đơn vị (mục 1.1); tổng giờ công trình B lấy trực tiếp từ B0.`
+  /** Bảng QĐ: với MULTIPLY_A thì B = B0 × a; các loại khác B = B0 (a không tham gia). */
+  const aFactor = 1
   const daNhanATrongB0 = kind === 'HDGSNN_POINTS_TO_HOURS'
-  const heSoATrongCongThucB = daNhanATrongB0 ? 1 : aExcel
+  const heSoATrongCongThucB = daNhanATrongB0 || !coHeSoATrongCongThuc ? 1 : aQd
   const B = (rawB0 > 0 ? rawB0 : 0) * heSoATrongCongThucB
   // Điểm cơ sở cũng suy từ giờ cơ sở theo tỉ lệ 1 điểm = 600 giờ.
   const rawP0 = rawB0 / 600
@@ -325,7 +329,7 @@ export async function publicationStrategyCalculate(
         B0: rawB0,
         P0: rawP0,
         aExcel,
-        aReason: aInfo.reason,
+        aReason: lyDoHeSoA,
         aFactor,
         B,
         P,
@@ -367,10 +371,10 @@ export async function publicationStrategyCalculate(
       typeId,
       B0: rawB0,
       P0: rawP0,
-      /** Hệ số a theo QĐ (cả tập tác giả): cùng ĐHĐN = 2, … */
+      /** Chỉ có giá trị khi rule là MULTIPLY_A; loại khác để null (UI hiển thị NA). */
       aExcel,
-      /** Diễn giải vì sao a = 2/1.5/1 theo tập tác giả dùng để xét. */
-      aReason: aInfo.reason,
+      /** Diễn giải hệ số a (MULTIPLY_A) hoặc lý do không áp dụng a. */
+      aReason: lyDoHeSoA,
       /** Luôn 1: sau B = B0×a không nhân thêm theo dòng (theo bảng QĐ chỉ có ×a). */
       aFactor,
       B,

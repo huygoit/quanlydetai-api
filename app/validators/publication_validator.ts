@@ -14,8 +14,8 @@ const ACADEMIC_YEAR_REGEX = /^\d{4}-\d{4}$/
 
 export const createAttachmentValidator = vine.compile(
   vine.object({
-    type: vine.enum(ATTACHMENT_TYPES),
-    name: vine.string().trim().minLength(1).maxLength(255),
+    type: vine.enum(ATTACHMENT_TYPES).optional(),
+    name: vine.string().trim().minLength(1).maxLength(255).optional(),
   })
 )
 

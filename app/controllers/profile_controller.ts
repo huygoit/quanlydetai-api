@@ -1,10 +1,12 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
+import { normalizeOptionalHttpUrl } from '#utils/optional_http_url'
 import ScientificProfile from '#models/scientific_profile'
 import ProfileLanguage from '#models/profile_language'
 import ProfileAttachment from '#models/profile_attachment'
 import Publication from '#models/publication'
 import Catalog from '#models/catalog'
+import db from '@adonisjs/lucid/services/db'
 import NotificationService from '#services/notification_service'
 import ResearchOutputTypeService from '#services/research_output_type_service'
 import OpenAlexService from '#services/openalex_service'
@@ -15,6 +17,87 @@ import { updateProfileValidator } from '#validators/scientific_profile_validator
  * Hồ sơ của bản thân (NCV): GET/POST/PUT /api/profile/me, POST submit.
  */
 export default class ProfileController {
+  private toObject(value: unknown) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>
+    }
+    return {}
+  }
+
+  private parseMaybeJson(value: unknown): unknown {
+    if (typeof value !== 'string') return value
+    const trimmed = value.trim()
+    if (!trimmed) return value
+    try {
+      const once = JSON.parse(trimmed) as unknown
+      if (typeof once === 'string') {
+        try {
+          return JSON.parse(once)
+        } catch {
+          return once
+        }
+      }
+      return once
+    } catch {
+      return value
+    }
+  }
+
+  private normalizeLanguagesInput(source: Record<string, unknown>) {
+    const rawLanguages =
+      source.languages ??
+      source.languageList ??
+      source.foreignLanguages ??
+      this.toObject(source.data).languages ??
+      this.toObject(source.payload).languages ??
+      this.toObject(source.profile).languages
+
+    if (rawLanguages === undefined) return undefined
+
+    const parsed = this.parseMaybeJson(rawLanguages)
+    if (!Array.isArray(parsed)) return []
+
+    return parsed
+      .map((item) => this.toObject(item))
+      .map((item) => {
+        const language = String(item.language ?? item.name ?? item.lang ?? '').trim()
+        const levelRaw = item.level == null ? '' : String(item.level).trim()
+        const certificateRaw = item.certificate == null ? '' : String(item.certificate).trim()
+        const certificateUrlRaw = item.certificateUrl ?? item.certificate_url ?? null
+        const certificateUrl = normalizeOptionalHttpUrl(certificateUrlRaw)
+        return {
+          language,
+          // Validator chỉ nhận string hoặc không có field (không nhận null).
+          level: levelRaw ? levelRaw : undefined,
+          certificate: certificateRaw ? certificateRaw : undefined,
+          certificateUrl,
+        }
+      })
+      .filter((item) => item.language !== '')
+  }
+
+  private getParsedBody(request: HttpContext['request']) {
+    const parsedBody = this.parseMaybeJson(request.body())
+    const root = this.toObject(parsedBody)
+    const data = this.toObject(root.data)
+    const payload = this.toObject(root.payload)
+    const profile = this.toObject(root.profile)
+
+    const merged = {
+      ...data,
+      ...payload,
+      ...profile,
+      ...root,
+    } as Record<string, unknown>
+
+    const normalizedLanguages = this.normalizeLanguagesInput(merged)
+    if (normalizedLanguages !== undefined) {
+      merged.languages = normalizedLanguages
+    }
+
+    return merged
+  }
+
   /**
    * Lấy profile của user hiện tại (hoặc 404).
    */
@@ -46,7 +129,7 @@ export default class ProfileController {
     if (profile) {
       return response.ok({ success: true, data: this.serializeProfile(profile) })
     }
-    const payload = await request.validateUsing(createProfileValidator)
+    const payload = await createProfileValidator.validate(this.getParsedBody(request))
     profile = await ScientificProfile.create({
       userId: user.id,
       fullName: payload.fullName,
@@ -79,7 +162,20 @@ export default class ProfileController {
     if (!profile) {
       return response.notFound({ success: false, message: 'Chưa có hồ sơ.' })
     }
-    const payload = await request.validateUsing(updateProfileValidator)
+    const rawBody = request.body()
+    const parsedBody = this.getParsedBody(request)
+    const hasAnyField = Object.keys(parsedBody).length > 0
+
+    if (!hasAnyField && (typeof rawBody === 'string' || typeof rawBody === 'number')) {
+      return response.status(422).send({
+        success: false,
+        message:
+          'Payload không hợp lệ. API PUT /profile/me yêu cầu JSON object (ví dụ { fullName, languages: [...] }), không nhận giá trị đơn lẻ như "1120".',
+      })
+    }
+
+    const payload = await updateProfileValidator.validate(parsedBody)
+    const normalizedLanguages = this.normalizeLanguagesInput(parsedBody)
     const updates: Record<string, unknown> = {}
     if (payload.fullName !== undefined) updates.fullName = payload.fullName
     if (payload.dateOfBirth !== undefined)
@@ -109,17 +205,47 @@ export default class ProfileController {
     if (payload.mainResearchArea !== undefined) updates.mainResearchArea = payload.mainResearchArea ?? null
     if (payload.subResearchAreas !== undefined) updates.subResearchAreas = payload.subResearchAreas ?? []
     if (payload.keywords !== undefined) updates.keywords = payload.keywords ?? []
-    profile.merge(updates)
-    await profile.save()
+    await db.transaction(async (trx) => {
+      profile.useTransaction(trx)
+      profile.merge(updates)
+      await profile.save()
+
+      /**
+       * Nếu FE gửi `languages` (kể cả mảng rỗng) thì replace toàn bộ.
+       * - `undefined`: không đụng tới dữ liệu languages hiện tại
+       * - `[]`: xoá sạch languages
+       * - `[... ]`: xoá rồi tạo lại theo payload
+       */
+      if (normalizedLanguages !== undefined) {
+        const incoming = normalizedLanguages.map((l) => ({
+          profileId: profile.id,
+          language: l.language,
+          level: l.level ?? null,
+          certificate: l.certificate ?? null,
+          certificateUrl: l.certificateUrl ?? null,
+        }))
+
+        await ProfileLanguage.query({ client: trx }).where('profile_id', profile.id).delete()
+        for (const row of incoming) {
+          const lang = new ProfileLanguage()
+          lang.useTransaction(trx)
+          lang.merge(row)
+          await lang.save()
+        }
+      }
+    })
+
+    // Reload để response có languages mới nhất
+    await profile.load((loader) =>
+      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+    )
+
     profile.completeness = ScientificProfile.calculateCompleteness({
       ...profile.toJSON(),
       languages: profile.languages,
       publications: profile.publications,
     })
     await profile.save()
-    await profile.load((loader) =>
-      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
-    )
     return response.ok({ success: true, data: this.serializeProfile(profile) })
   }
 
@@ -358,6 +484,7 @@ export default class ProfileController {
         level: l.level,
         certificate: l.certificate,
         certificateUrl: l.certificateUrl,
+        certificate_url: l.certificateUrl,
       })) ?? [],
       attachments: (p.attachments as ProfileAttachment[] | undefined)?.map((a) => ({
         id: a.id,
@@ -393,7 +520,6 @@ export default class ProfileController {
         sourceId: pub.sourceId,
         verifiedByNcv: pub.verifiedByNcv,
         approvedInternal: pub.approvedInternal,
-        publicationStatus: pub.publicationStatus,
         createdAt: pub.createdAt.toISO(),
         updatedAt: pub.updatedAt.toISO(),
         }

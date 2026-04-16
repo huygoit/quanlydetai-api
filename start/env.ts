@@ -37,4 +37,20 @@ export default await Env.create(new URL('../', import.meta.url), {
   OPENALEX_API_KEY: Env.schema.string.optional(),
   OPENALEX_BASE_URL: Env.schema.string.optional(),
   OPENALEX_MAILTO: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Uploads (đính kèm hồ sơ)
+  |----------------------------------------------------------
+  |
+  | UPLOAD_STORAGE_ROOT: thư mục gốc lưu file upload. Có thể là:
+  | - đường dẫn tuyệt đối (vd: D:/uploads)
+  | - hoặc tương đối theo appRoot (vd: storage)
+  |
+  | UPLOAD_PROFILE_ATTACHMENTS_DIR: thư mục con cho attachments
+  | UPLOAD_PUBLIC_BASE_PATH: prefix public để FE truy cập (vd: /storage)
+  */
+  UPLOAD_STORAGE_ROOT: Env.schema.string.optional(),
+  UPLOAD_PROFILE_ATTACHMENTS_DIR: Env.schema.string.optional(),
+  UPLOAD_PUBLIC_BASE_PATH: Env.schema.string.optional(),
 })
