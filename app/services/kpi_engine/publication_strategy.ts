@@ -1,4 +1,5 @@
 import type { CalculationResult, KpiContext, KpiOutput } from '#types/kpi'
+import ResearchOutputType from '#models/research_output_type'
 import ResearchOutputRule from '#models/research_output_rule'
 
 /** So khớp id hồ sơ (Lucid/Postgres có thể trả bigint; 8n === 8 là false nếu không ép). */
@@ -20,7 +21,7 @@ function chuanHoaHoTen(s: string): string {
 type PublicationAuthorRow = {
   profileId: number | null
   fullName: string
-  isMainAuthor: boolean
+  isTopAuthor: boolean
   isCorresponding: boolean
   affiliationType: string
   isMultiAffiliationOutsideUdn: boolean
@@ -57,11 +58,11 @@ function chonTacGiaChoProfile(
       warnings.push(
         `Có ${trungTen.length} tác giả trùng họ tên với hồ sơ; dùng tác giả chính đầu tiên trong nhóm trùng tên.`
       )
-      return trungTen.find((a) => a.isMainAuthor) ?? trungTen[0]!
+      return trungTen.find((a) => a.isTopAuthor) ?? trungTen[0]!
     }
   }
 
-  const mainDau = authors.find((a) => a.isMainAuthor)
+  const mainDau = authors.find((a) => a.isTopAuthor)
   if (mainDau) {
     warnings.push(
       'Chưa gắn profile_id cho chính bạn trên bảng tác giả: tạm dùng tác giả chính đầu tiên để tính giờ (nên gắn profile_id hoặc trùng họ tên hồ sơ).'
@@ -100,9 +101,12 @@ type AExplanation = {
   reason: string
 }
 
+/** Cách mô tả tập tác giả khi giải thích hệ số a trong lý do trả về. */
+type LoaiMoTaTapTinhA = 'toan_bo_tac_gia' | 'nhom_tac_gia_chinh'
+
 function giaiThichHeSoATrenTapTacGia(
   authors: Array<{ affiliationType: string }>,
-  useCorrespondingOnly: boolean
+  loaiMoTa: LoaiMoTaTapTinhA
 ): AExplanation {
   if (!authors.length) {
     return {
@@ -113,9 +117,10 @@ function giaiThichHeSoATrenTapTacGia(
   }
   const tatCaThuocDhDn = authors.every((a) => a.affiliationType === 'UDN_ONLY')
   const tatCaNgoaiDhDn = authors.every((a) => a.affiliationType !== 'UDN_ONLY')
-  const moTaTapTacGia = useCorrespondingOnly
-    ? 'tập tác giả liên hệ'
-    : 'toàn bộ tác giả'
+  const moTaTapTacGia =
+    loaiMoTa === 'nhom_tac_gia_chinh'
+      ? 'tập tác giả chính (tác giả đầu ∪ tác giả liên hệ)'
+      : 'toàn bộ tác giả'
 
   if (tatCaThuocDhDn) {
     return {
@@ -135,22 +140,42 @@ function giaiThichHeSoATrenTapTacGia(
   }
 }
 
+/** Phạm vi tính hệ số a theo cấu hình loại kết quả (cột pham_vi_he_so_a_1883). */
+export type PhamViHeSoA1883 = 'authors' | 'chiTacGiaChinh'
+
 /**
- * Bài báo mục 1,2: hệ số a nhìn **tất cả tác giả liên hệ** (cơ quan công tác thể hiện trên bài).
- * Chưa có tác giả liên hệ xác định → coi như mục 3: xét **toàn bộ** tác giả (1.1 áp trên cả nhóm).
+ * Bài báo mục 1–2 (phạm vi chiTacGiaChinh): hệ số a nhìn **tập tác giả chính**
+ * = tác giả đầu ∪ tác giả liên hệ (theo cờ trên từng dòng).
+ * Không ai thuộc tập đó → không áp (a)/(b) → **khoản (c)**: **a = 1**.
+ * Phạm vi `authors`: (a)/(b)/(c) trên **toàn bộ** tác giả (mục 3).
  */
 export function heSoAQdCongBoMuc12(
-  authors: Array<{ isCorresponding: boolean; affiliationType: string }>
+  authors: Array<{ isTopAuthor: boolean; isCorresponding: boolean; affiliationType: string }>,
+  phamViHeSoA1883: PhamViHeSoA1883
 ): number {
-  return giaiThichHeSoAQdCongBoMuc12(authors).a
+  return giaiThichHeSoAQdCongBoMuc12(authors, phamViHeSoA1883).a
 }
 
 export function giaiThichHeSoAQdCongBoMuc12(
-  authors: Array<{ isCorresponding: boolean; affiliationType: string }>
+  authors: Array<{ isTopAuthor: boolean; isCorresponding: boolean; affiliationType: string }>,
+  phamViHeSoA1883: PhamViHeSoA1883
 ): AExplanation {
-  const chiLienHe = authors.filter((a) => a.isCorresponding)
-  const tapDeTinhA = chiLienHe.length > 0 ? chiLienHe : authors
-  return giaiThichHeSoATrenTapTacGia(tapDeTinhA, chiLienHe.length > 0)
+  if (phamViHeSoA1883 === 'authors') {
+    return giaiThichHeSoATrenTapTacGia(authors, 'toan_bo_tac_gia')
+  }
+
+  const tapTacGiaChinh = authors.filter((a) => a.isTopAuthor || a.isCorresponding)
+  if (tapTacGiaChinh.length === 0) {
+    if (!authors.length) {
+      return { a: 1, reason: 'Không có tác giả trong bài — dùng mặc định a = 1.' }
+    }
+    return {
+      a: 1,
+      reason:
+        'Không có ai trong nhóm tác giả chính (chưa đánh dấu tác giả đầu hoặc tác giả liên hệ): không áp được nhánh (a)/(b) trên tập này — theo khoản (c) các trường hợp khác, a = 1.',
+    }
+  }
+  return giaiThichHeSoATrenTapTacGia(tapTacGiaChinh, 'nhom_tac_gia_chinh')
 }
 
 function baseHoursFromRule(
@@ -231,14 +256,14 @@ export async function publicationStrategyCalculate(
 
   const tongTacGia = authors.length
   /** 1.2–1.3: n = nhóm tác giả chính = tác giả đầu ∪ tác giả liên hệ (mỗi dòng một người). */
-  const tacGiaTrongNhomChinh = authors.filter((a) => a.isMainAuthor || a.isCorresponding)
+  const tacGiaTrongNhomChinh = authors.filter((a) => a.isTopAuthor || a.isCorresponding)
   let n = tacGiaTrongNhomChinh.length
   /** p luôn là tổng số tác giả của công trình (không phải chỉ số tác giả liên hệ). */
   const p = tongTacGia
   const coTacGiaLienHe = authors.some((a) => a.isCorresponding)
   if (!coTacGiaLienHe) {
     warnings.push(
-      'Chưa đánh dấu tác giả liên hệ: hệ số a mục 1.1 tính trên toàn bộ tác giả (như mục 3); nên đánh dấu đúng tác giả liên hệ để áp đúng mục 1–2.'
+      'Chưa đánh dấu tác giả liên hệ: nên cập nhật đúng theo bài báo; với phạm vi a theo nhóm chính, hệ thống vẫn xét các dòng đã vào nhóm (đầu ∪ liên hệ).'
     )
   }
 
@@ -265,7 +290,23 @@ export async function publicationStrategyCalculate(
     return { hours: 0, points: 0, warnings, details: { n, p, tongTacGia } }
   }
 
-  const aInfo = giaiThichHeSoAQdCongBoMuc12(authors)
+  let phamViHeSoA1883: PhamViHeSoA1883 = 'chiTacGiaChinh'
+  try {
+    const type = await ResearchOutputType.find(typeId)
+    if (type?.phamViHeSoA1883 === 'authors' || type?.phamViHeSoA1883 === 'chiTacGiaChinh') {
+      phamViHeSoA1883 = type.phamViHeSoA1883
+    } else {
+      warnings.push(
+        'Chưa cấu hình phamViHeSoA1883 cho loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
+      )
+    }
+  } catch {
+    warnings.push(
+      'Không đọc được cấu hình phamViHeSoA1883 của loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
+    )
+  }
+
+  const aInfo = giaiThichHeSoAQdCongBoMuc12(authors, phamViHeSoA1883)
   const aQd = aInfo.a
 
   let rule: ResearchOutputRule
@@ -336,7 +377,7 @@ export async function publicationStrategyCalculate(
         n,
         p,
         tongTacGia,
-        isMainAuthor: false,
+        isTopAuthor: false,
         multiAffiliationDivide: false,
         femaleBonus: context.isFemale ?? false,
         ruleKind: kind,
@@ -347,7 +388,7 @@ export async function publicationStrategyCalculate(
 
   /** Thuộc nhóm nhận 1/3 chia đều + phần 2/3 chia p: tác giả đầu (chính) hoặc tác giả liên hệ. */
   const trongNhomChinhTheoQD =
-    authorForProfile.isMainAuthor || authorForProfile.isCorresponding
+    authorForProfile.isTopAuthor || authorForProfile.isCorresponding
   const isMain = trongNhomChinhTheoQD || tongTacGia === 1
   let hours = isMain ? B / (3 * n) + (2 * B) / (3 * p) : (2 * B) / (3 * p)
   let points = 0
@@ -360,7 +401,8 @@ export async function publicationStrategyCalculate(
   }
 
   hours = Math.round(hours * 100) / 100
-  points = Math.round((hours / 600) * 100) / 100
+  // Điểm phần NCV = giờ/600; giữ 4 chữ số thập phân để không lệch so với P0 nhỏ (vd 0,035).
+  points = Math.round((hours / 600) * 10000) / 10000
 
   return {
     hours,
@@ -382,7 +424,7 @@ export async function publicationStrategyCalculate(
       n,
       p,
       tongTacGia,
-      isMainAuthor: isMain,
+        isTopAuthor: isMain,
       multiAffiliationDivide: authorForProfile.isMultiAffiliationOutsideUdn,
       femaleBonus: context.isFemale ?? false,
       ruleKind: kind,

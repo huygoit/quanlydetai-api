@@ -29,8 +29,8 @@ export default class PublicationAuthor extends BaseModel {
   @column()
   declare authorOrder: number
 
-  @column()
-  declare isMainAuthor: boolean
+  @column({ columnName: 'is_top_author' })
+  declare isTopAuthor: boolean
 
   @column()
   declare isCorresponding: boolean

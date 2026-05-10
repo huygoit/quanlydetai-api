@@ -51,19 +51,35 @@ type PublicationDetailRow = {
   tenVaiTro: string
   gioNckh: number | null
   doiTuong: string
+  /**
+   * Cột Excel (Có/x/1…) — nếu có giá trị rõ ràng thì ưu tiên hơn suy từ "Tên vai trò".
+   * null = không có cột hoặc ô để trống → suy luận từ vai trò.
+   */
+  tacGiaDungDau: boolean | null
+  tacGiaLienHe: boolean | null
 }
 
 const UDN_UNIT = 'The University of Danang (Đại học Đà Nẵng)'
 const OTHER_UNIT = 'Other Organization (Đơn vị khác)'
+
+/**
+ * Trùng một phần tử trong `UDN_AFFILIATION_UNITS` của FE (`profilePublications.ts`).
+ * CB có “Mã cán bộ” trong sheet chi tiết → gán cơ quan mặc định là ĐH Sư phạm (không import chéo file FE để build API không phụ thuộc UI).
+ */
+const UDN_AFFILIATION_UNIT_USE_SP =
+  'The University of Danang - University of Science and Education (Trường Đại học Sư phạm)' as const
 
 function normalizeText(raw: unknown): string {
   return String(raw ?? '').trim()
 }
 
 function normalizeTextLoose(raw: unknown): string {
+  // Ký tự đ/Đ không tách thành d + dấu khi NFD → vẫn là đ; không khớp pattern ASCII "dung dau", "dong"...
   return normalizeText(raw)
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
+    .replace(/\u0111/g, 'd')
+    .replace(/\u0110/g, 'd')
     .replace(/\s+/g, ' ')
     .toLowerCase()
 }
@@ -71,6 +87,53 @@ function normalizeTextLoose(raw: unknown): string {
 function toNumber(raw: unknown): number | null {
   const n = Number(raw)
   return Number.isFinite(n) ? n : null
+}
+
+/** Đọc ô đúng tiêu đề (đã chuẩn hoá dấu/khoảng trắng) để khớp cột Excel dù khác khoảng trắng nhẹ */
+function firstDefinedCell(row: Record<string, unknown>, headerNames: string[]): unknown {
+  for (const name of headerNames) {
+    const needle = normalizeTextLoose(name)
+    for (const key of Object.keys(row)) {
+      if (normalizeTextLoose(key) === needle) {
+        const v = row[key]
+        if (v !== undefined && v !== '') return v
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * Parse ô Có/Không/x/1… — null nghĩa là không áp (để logic suy từ "Tên vai trò").
+ */
+function parseOptionalBooleanVi(raw: unknown): boolean | null {
+  if (raw === null || raw === undefined) return null
+  if (typeof raw === 'boolean') return raw
+  if (typeof raw === 'number') {
+    if (raw === 1) return true
+    if (raw === 0) return false
+    return null
+  }
+  const s = normalizeTextLoose(String(raw))
+  if (!s) return null
+  if (['1', 'x', 'co', 'yes', 'true', 'v', '*'].includes(s)) return true
+  if (['0', 'khong', 'no', 'false', 'k'].includes(s)) return false
+  return null
+}
+
+/** Suy từ "Tên vai trò" sau khi normalize NFD — khớp nhiều cách gọi trong file nguồn */
+function inferIsMainAuthorFromVaiTro(roleLo: string): boolean {
+  return (
+    roleLo.includes('dung dau') ||
+    roleLo.includes('tac gia chinh') ||
+    roleLo.includes('chu tri') ||
+    roleLo.includes('first author') ||
+    roleLo.includes('lead author')
+  )
+}
+
+function inferIsCorrespondingFromVaiTro(roleLo: string): boolean {
+  return roleLo.includes('lien he') || roleLo.includes('corresponding')
 }
 
 function parseExcelDate(raw: unknown): string {
@@ -121,6 +184,15 @@ function inferAffiliation(detail: PublicationDetailRow): {
   affiliationType: 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
   isMultiAffiliationOutsideUdn: boolean
 } {
+  const maCanBo = normalizeText(detail.maCanBo)
+  if (maCanBo.length > 0) {
+    return {
+      affiliationUnits: [UDN_AFFILIATION_UNIT_USE_SP],
+      affiliationType: 'UDN_ONLY',
+      isMultiAffiliationOutsideUdn: false,
+    }
+  }
+
   const donVi = normalizeTextLoose(detail.tenDonViMoi || detail.tenDonVi)
   const doiTuong = normalizeTextLoose(detail.doiTuong)
   const isUdn =
@@ -211,6 +283,13 @@ function parseDetailRows(rows: Record<string, unknown>[]): PublicationDetailRow[
   return rows.map((r) => {
     const rawCode = normalizeText(r['Mã bài báo'])
     if (rawCode) currentCode = rawCode
+    const rawDungDau = firstDefinedCell(r, [
+      'Tác giả đứng đầu',
+      'TG đứng đầu',
+      'Đứng đầu',
+      'Main author',
+    ])
+    const rawLienHe = firstDefinedCell(r, ['Tác giả liên hệ', 'TG liên hệ', 'Corresponding'])
     return {
       // Sheet chi tiết thường merge ô "Mã bài báo"; các dòng bên dưới để trống.
       // Dùng mã gần nhất phía trên để không làm rơi tác giả.
@@ -223,6 +302,8 @@ function parseDetailRows(rows: Record<string, unknown>[]): PublicationDetailRow[
       tenVaiTro: normalizeText(r['Tên vai trò']),
       gioNckh: toNumber(r['Giờ NCKH']),
       doiTuong: normalizeText(r['Đối tượng']),
+      tacGiaDungDau: parseOptionalBooleanVi(rawDungDau),
+      tacGiaLienHe: parseOptionalBooleanVi(rawLienHe),
     }
   })
 }
@@ -304,6 +385,8 @@ export default class PublicationExcelImportService {
             tenVaiTro: 'Tác giả đứng đầu',
             gioNckh: null,
             doiTuong: 'Giảng viên',
+            tacGiaDungDau: true,
+            tacGiaLienHe: null,
           },
         ]
         summary.warnings.push(
@@ -311,11 +394,15 @@ export default class PublicationExcelImportService {
         )
       }
       const uuTienChuBai = [...dRows].sort((a, b) => {
-        const ra = normalizeTextLoose(a.tenVaiTro)
-        const rb = normalizeTextLoose(b.tenVaiTro)
-        const sa = ra.includes('dung dau') ? 1 : ra.includes('lien he') ? 2 : 3
-        const sb = rb.includes('dung dau') ? 1 : rb.includes('lien he') ? 2 : 3
-        return sa - sb
+        const rank = (d: PublicationDetailRow) => {
+          if (d.tacGiaDungDau === true) return 1
+          if (d.tacGiaLienHe === true) return 2
+          const rd = normalizeTextLoose(d.tenVaiTro)
+          if (inferIsMainAuthorFromVaiTro(rd)) return 1
+          if (inferIsCorrespondingFromVaiTro(rd)) return 2
+          return 3
+        }
+        return rank(a) - rank(b)
       })
       let ownerProfileId: number | undefined
       for (const d of uuTienChuBai) {
@@ -337,8 +424,16 @@ export default class PublicationExcelImportService {
       const authorNames = dRows.map((d) => d.hoTenCanBo.trim()).filter(Boolean)
       const uniqueAuthorNames = [...new Set(authorNames)]
       const authorsText = uniqueAuthorNames.join(', ')
-      const corresponding = dRows.find((d) => normalizeTextLoose(d.tenVaiTro).includes('lien he'))
-      const firstAuthor = dRows.find((d) => normalizeTextLoose(d.tenVaiTro).includes('dung dau'))
+      const corresponding = dRows.find((d) => {
+        if (d.tacGiaLienHe === true) return true
+        if (d.tacGiaLienHe === false) return false
+        return inferIsCorrespondingFromVaiTro(normalizeTextLoose(d.tenVaiTro))
+      })
+      const firstAuthor = dRows.find((d) => {
+        if (d.tacGiaDungDau === true) return true
+        if (d.tacGiaDungDau === false) return false
+        return inferIsMainAuthorFromVaiTro(normalizeTextLoose(d.tenVaiTro))
+      })
       const journalOrConference = normalizeText(row.tenTapChi).replace(/\s+/g, ' ').trim() || 'Không rõ nguồn công bố'
 
       if (options.dryRun) {
@@ -410,8 +505,10 @@ export default class PublicationExcelImportService {
         let order = 1
         for (const d of dRows) {
           const role = normalizeTextLoose(d.tenVaiTro)
-          const isMain = role.includes('dung dau')
-          const isCorr = role.includes('lien he')
+          const isMain =
+            d.tacGiaDungDau !== null ? d.tacGiaDungDau : inferIsMainAuthorFromVaiTro(role)
+          const isCorr =
+            d.tacGiaLienHe !== null ? d.tacGiaLienHe : inferIsCorrespondingFromVaiTro(role)
           const authorProfileId =
             profileByStaffCodeMap.get(normalizeTextLoose(d.maCanBo)) ??
             profileMap.get(normalizeTextLoose(d.hoTenCanBo)) ??
@@ -423,7 +520,7 @@ export default class PublicationExcelImportService {
               profileId: authorProfileId,
               fullName: d.hoTenCanBo,
               authorOrder: order++,
-              isMainAuthor: isMain,
+              isTopAuthor: isMain,
               isCorresponding: isCorr,
               affiliationType: aff.affiliationType,
               affiliationUnits: aff.affiliationUnits,

@@ -42,7 +42,7 @@ export type KpiOutput =
       authors: Array<{
         profileId: number | null
         fullName: string
-        isMainAuthor: boolean
+        isTopAuthor: boolean
         isCorresponding: boolean
         affiliationType: string
         isMultiAffiliationOutsideUdn: boolean

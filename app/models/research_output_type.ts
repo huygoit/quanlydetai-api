@@ -34,6 +34,16 @@ export default class ResearchOutputType extends BaseModel {
   @column()
   declare note: string | null
 
+  /**
+   * QĐ 1883: phạm vi tính hệ số a cho công bố.
+   * - chiTacGiaChinh: mục 1–2 — tập dùng để tính a = tác giả đầu ∪ tác giả liên hệ
+   * - authors: mục 3 — xét toàn bộ tác giả
+   *
+   * Nullable để không bắt buộc cho mọi node; chỉ leaf nào có áp hệ số a thì set.
+   */
+  @column({ columnName: 'pham_vi_he_so_a_1883' })
+  declare phamViHeSoA1883: 'authors' | 'chiTacGiaChinh' | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

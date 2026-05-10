@@ -36,7 +36,7 @@ function pubOutput(params: {
   typeId: number | null
   hdgsnnScore?: number | null
   authors: Array<{
-    isMainAuthor: boolean
+    isTopAuthor: boolean
     isCorresponding: boolean
     affiliationType: 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
     isMultiAffiliationOutsideUdn?: boolean
@@ -53,7 +53,7 @@ function pubOutput(params: {
     authors: params.authors.map((a, idx) => ({
       profileId: idx === 0 ? 100 : idx + 1000,
       fullName: `Tac gia ${idx + 1}`,
-      isMainAuthor: a.isMainAuthor,
+      isTopAuthor: a.isTopAuthor,
       isCorresponding: a.isCorresponding,
       affiliationType: a.affiliationType,
       isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn ?? false,
@@ -88,8 +88,8 @@ test.group('KPI Engine integration quy doi gio', () => {
         pubOutput({
           typeId: 101,
           authors: [
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }
@@ -110,9 +110,9 @@ test.group('KPI Engine integration quy doi gio', () => {
         pubOutput({
           typeId: 102,
           authors: [
-            { isMainAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
-            { isMainAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }
@@ -133,8 +133,8 @@ test.group('KPI Engine integration quy doi gio', () => {
         pubOutput({
           typeId: 103,
           authors: [
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: true, profileFullName: 'Tac gia 1' }
@@ -156,12 +156,12 @@ test.group('KPI Engine integration quy doi gio', () => {
           typeId: 104,
           authors: [
             {
-              isMainAuthor: true,
+              isTopAuthor: true,
               isCorresponding: true,
               affiliationType: 'MIXED',
               isMultiAffiliationOutsideUdn: true,
             },
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }
@@ -182,8 +182,8 @@ test.group('KPI Engine integration quy doi gio', () => {
         pubOutput({
           typeId: 108,
           authors: [
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'MIXED' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'MIXED' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }
@@ -204,8 +204,8 @@ test.group('KPI Engine integration quy doi gio', () => {
         pubOutput({
           typeId: 105,
           authors: [
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'OUTSIDE' },
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'OUTSIDE' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }
@@ -233,8 +233,8 @@ test.group('KPI Engine integration quy doi gio', () => {
           typeId: 106,
           hdgsnnScore: 1.5,
           authors: [
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
-            { isMainAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: true, isCorresponding: true, affiliationType: 'UDN_ONLY' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }
@@ -255,8 +255,8 @@ test.group('KPI Engine integration quy doi gio', () => {
         pubOutput({
           typeId: 107,
           authors: [
-            { isMainAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
-            { isMainAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
+            { isTopAuthor: false, isCorresponding: false, affiliationType: 'UDN_ONLY' },
           ],
         }),
         { profileId: 100, academicYear: '2025-2026', isFemale: false, profileFullName: 'Tac gia 1' }

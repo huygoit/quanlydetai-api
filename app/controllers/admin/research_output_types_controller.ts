@@ -44,6 +44,7 @@ export default class AdminResearchOutputTypesController {
       sortOrder: payload.sortOrder ?? 0,
       isActive: payload.isActive ?? true,
       note: payload.note ?? null,
+      phamViHeSoA1883: payload.phamViHeSoA1883 ?? null,
     })
     return response.created({ success: true, data: type })
   }
@@ -75,6 +76,7 @@ export default class AdminResearchOutputTypesController {
     if (payload.sortOrder !== undefined) type.sortOrder = payload.sortOrder
     if (payload.isActive !== undefined) type.isActive = payload.isActive
     if (payload.note !== undefined) type.note = payload.note
+    if (payload.phamViHeSoA1883 !== undefined) type.phamViHeSoA1883 = payload.phamViHeSoA1883 ?? null
     await type.save()
     return response.ok({ success: true, data: type })
   }

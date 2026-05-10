@@ -19,6 +19,8 @@ export default class ResearchOutputTypeService {
       hasRule: boolean
       /** rule_kind của leaf (null nếu chưa có rule hoặc không phải lá) */
       ruleKind: string | null
+      /** QĐ 1883: phạm vi tính hệ số a (leaf, nếu có) */
+      phamViHeSoA1883: 'authors' | 'chiTacGiaChinh' | null
       children: Array<unknown>
     }>
   > {
@@ -40,6 +42,7 @@ export default class ResearchOutputTypeService {
     isActive: boolean
     hasRule: boolean
     ruleKind: string | null
+    phamViHeSoA1883: 'authors' | 'chiTacGiaChinh' | null
     children: Array<unknown>
   }> {
     const rule = await ResearchOutputRule.query().where('type_id', node.id).first()
@@ -59,6 +62,7 @@ export default class ResearchOutputTypeService {
       isActive: node.isActive,
       hasRule,
       ruleKind,
+      phamViHeSoA1883: node.phamViHeSoA1883 ?? null,
       children: childNodes,
     }
   }
@@ -76,7 +80,7 @@ export default class ResearchOutputTypeService {
         throw new Error('Không được tạo chu trình (parent là con cháu của node)')
       }
       visited.add(currentId)
-      const parent = await ResearchOutputType.find(currentId)
+      const parent: ResearchOutputType | null = await ResearchOutputType.find(currentId)
       currentId = parent?.parentId ?? null
     }
   }

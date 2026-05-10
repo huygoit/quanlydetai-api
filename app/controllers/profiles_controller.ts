@@ -120,7 +120,7 @@ export default class ProfilesController {
       profileId: a.profileId,
       fullName: a.fullName,
       authorOrder: a.authorOrder,
-      isMainAuthor: a.isMainAuthor,
+      isTopAuthor: a.isTopAuthor,
       isCorresponding: a.isCorresponding,
       affiliationType: a.affiliationType,
       isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,

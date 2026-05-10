@@ -1,6 +1,7 @@
 import vine from '@vinejs/vine'
 
 const RULE_KINDS = ['FIXED', 'MULTIPLY_A', 'HDGSNN_POINTS_TO_HOURS', 'MULTIPLY_C', 'RANGE_REVENUE', 'BONUS_ADD'] as const
+const PHAM_VI_HE_SO_A_1883 = ['authors', 'chiTacGiaChinh'] as const
 
 /** Tạo node mới (level 1: parent_id null; 2–3: parent_id bắt buộc). */
 export const createResearchOutputTypeValidator = vine.compile(
@@ -12,6 +13,7 @@ export const createResearchOutputTypeValidator = vine.compile(
     sortOrder: vine.number().optional(),
     isActive: vine.boolean().optional(),
     note: vine.string().trim().maxLength(2000).optional(),
+    phamViHeSoA1883: vine.enum(PHAM_VI_HE_SO_A_1883).optional(),
   })
 )
 
@@ -25,6 +27,7 @@ export const updateResearchOutputTypeValidator = vine.compile(
     sortOrder: vine.number().optional(),
     isActive: vine.boolean().optional(),
     note: vine.string().trim().maxLength(2000).optional(),
+    phamViHeSoA1883: vine.enum(PHAM_VI_HE_SO_A_1883).optional(),
   })
 )
 

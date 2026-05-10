@@ -35,7 +35,7 @@ const authorSchema = vine.object({
   full_name: vine.string().trim().minLength(1).maxLength(255),
   affiliation_units: vine.array(vine.string().trim().minLength(1).maxLength(255)).optional(),
   author_order: vine.number().min(1),
-  is_main_author: vine.boolean(),
+  is_top_author: vine.boolean(),
   is_corresponding: vine.boolean(),
   affiliation_type: vine.enum(AFFILIATION_TYPES),
   is_multi_affiliation_outside_udn: vine.boolean(),
@@ -43,7 +43,7 @@ const authorSchema = vine.object({
 
 /** Kiểm tra p >= 1, n >= 1, n <= p, author_order unique. Gọi từ controller sau khi validate. */
 export function validateAuthorsListRules(
-  authors: Array<{ author_order: number; is_main_author: boolean; is_corresponding?: boolean }>
+  authors: Array<{ author_order: number; is_top_author: boolean; is_corresponding?: boolean }>
 ): void {
   const p = authors.length
   if (p < 1) {
@@ -51,12 +51,12 @@ export function validateAuthorsListRules(
       { field: 'authors', message: 'Cần ít nhất 1 tác giả', rule: 'minLength' },
     ])
   }
-  const n = authors.filter((a) => a.is_main_author || a.is_corresponding).length
+  const n = authors.filter((a) => a.is_top_author || a.is_corresponding).length
   if (n < 1) {
     throw new errors.E_VALIDATION_ERROR([
       {
         field: 'authors',
-        message: 'Cần ít nhất 1 tác giả trong nhóm chính (is_main_author hoặc is_corresponding)',
+        message: 'Cần ít nhất 1 tác giả trong nhóm chính (is_top_author hoặc is_corresponding)',
         rule: 'minLength',
       },
     ])
@@ -86,7 +86,7 @@ export type AuthorPayloadRow = {
   full_name: string
   affiliation_units?: string[]
   author_order: number
-  is_main_author: boolean
+  is_top_author: boolean
   is_corresponding: boolean
   affiliation_type: (typeof AFFILIATION_TYPES)[number]
   is_multi_affiliation_outside_udn: boolean
@@ -141,7 +141,7 @@ export function dedupeOwnerAuthorRowsForProfile(
   const keeperIdx = scored[0]!.i
   const keeper = authors[keeperIdx]!
   keeper.profile_id = oid
-  keeper.is_main_author = indices.some((i) => authors[i]!.is_main_author)
+  keeper.is_top_author = indices.some((i) => authors[i]!.is_top_author)
   keeper.is_corresponding = indices.some((i) => authors[i]!.is_corresponding)
   keeper.author_order = Math.min(...indices.map((i) => authors[i]!.author_order))
 

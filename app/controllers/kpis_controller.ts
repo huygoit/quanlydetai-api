@@ -56,11 +56,11 @@ function gioMotTacGiaTheoQD(
   n: number,
   p: number,
   tongTacGia: number,
-  isMainAuthor: boolean,
+  isTopAuthor: boolean,
   isCorresponding: boolean
 ): number {
   if (!(B > 0) || n < 1 || p < 1) return 0
-  const trongNhomChinh = isMainAuthor || isCorresponding
+  const trongNhomChinh = isTopAuthor || isCorresponding
   const tinhNhuChinh = trongNhomChinh || tongTacGia === 1
   const raw = tinhNhuChinh ? B / (3 * n) + (2 * B) / (3 * p) : (2 * B) / (3 * p)
   return Math.round(raw * 100) / 100
@@ -174,7 +174,7 @@ export default class KpisController {
       authors: publication.publicationAuthors.map((a) => ({
         profileId: a.profileId != null ? toFinitePositiveInt(a.profileId) : null,
         fullName: a.fullName,
-        isMainAuthor: a.isMainAuthor,
+        isTopAuthor: a.isTopAuthor,
         isCorresponding: a.isCorresponding,
         affiliationType: a.affiliationType,
         isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
@@ -203,6 +203,11 @@ export default class KpisController {
     const B = typeof details.B === 'number' ? details.B : 0
     const Ppool = typeof details.P === 'number' ? details.P : 0
     const tongTacGia = publication.publicationAuthors.length
+    const nTopAuthorsOnly = publication.publicationAuthors.filter((a) => a.isTopAuthor).length
+    const nCorrespondingAuthors = publication.publicationAuthors.filter((a) => a.isCorresponding).length
+    const nPrimaryOrCorrespondingAuthors = publication.publicationAuthors.filter(
+      (a) => a.isTopAuthor || a.isCorresponding
+    ).length
 
     const authorBreakdown = [...publication.publicationAuthors]
       .sort((a, b) => a.authorOrder - b.authorOrder)
@@ -215,20 +220,20 @@ export default class KpisController {
         let h = 0
         let pts = 0
         if (duocTinhTheoMuc15(a.affiliationType)) {
-          h = gioMotTacGiaTheoQD(B, n, p, tongTacGia, a.isMainAuthor, a.isCorresponding)
+          h = gioMotTacGiaTheoQD(B, n, p, tongTacGia, a.isTopAuthor, a.isCorresponding)
           if (a.isMultiAffiliationOutsideUdn) {
             h = Math.round((h / 2) * 100) / 100
           }
           if (rowIsFemale) {
             h = Math.round(h * 1.2 * 100) / 100
           }
-          // Điểm từng tác giả được suy trực tiếp từ giờ từng tác giả: 1 điểm = 600 giờ.
-          pts = Math.round((h / 600) * 100) / 100
+          // Điểm từng tác giả = giờ/600; làm tròn 4 chữ số thập phân để khớp P0 nhỏ (vd 21 giờ → 0,035 điểm), tránh nhầm với làm tròn 2 số.
+          pts = Math.round((h / 600) * 10000) / 10000
         }
         return {
           authorName: a.fullName,
           authorOrder: a.authorOrder,
-          isMainAuthor: a.isMainAuthor,
+          isTopAuthor: a.isTopAuthor,
           isCorresponding: a.isCorresponding,
           convertedHours: h,
           convertedPoints: pts,
@@ -257,7 +262,13 @@ export default class KpisController {
         authorUnitFactor: aFactor,
         n,
         p,
-        nMainAuthors: n,
+        /**
+         * `n` trong công thức là hợp (tác giả chính ∪ tác giả liên hệ).
+         * Trả thêm các chỉ số tách riêng để tránh hiểu nhầm.
+         */
+        nTopAuthors: nTopAuthorsOnly,
+        nCorrespondingAuthors,
+        nPrimaryOrCorrespondingAuthors,
         pTotalAuthors: p,
         /** Tổng giờ công trình sau B0×a, trước chia n/p (ký hiệu B trong QĐ 1.3) */
         poolHoursB: B,

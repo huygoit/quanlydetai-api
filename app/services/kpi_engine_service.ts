@@ -90,7 +90,7 @@ export default class KpiEngineService {
       const authors = pub.publicationAuthors.map((a) => ({
         profileId: a.profileId,
         fullName: a.fullName,
-        isMainAuthor: a.isMainAuthor,
+        isTopAuthor: a.isTopAuthor,
         isCorresponding: a.isCorresponding,
         affiliationType: a.affiliationType,
         isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,

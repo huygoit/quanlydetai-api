@@ -55,7 +55,7 @@ export type OpenAlexPublicationAuthorDraft = {
   fullName: string
   profileId: number | null
   authorOrder: number
-  isMainAuthor: boolean
+  isTopAuthor: boolean
   isCorresponding: boolean
   affiliationUnits: string[]
   affiliationType: 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
@@ -309,7 +309,7 @@ export default class OpenAlexService {
             fullName,
             profileId: isOwnerByOrcid || isOwnerByName ? params.profileId : null,
             authorOrder: idx + 1,
-            isMainAuthor: idx === 0,
+            isTopAuthor: idx === 0,
             isCorresponding: Boolean(a.is_corresponding),
             affiliationUnits: normalizedUnits,
             affiliationType,

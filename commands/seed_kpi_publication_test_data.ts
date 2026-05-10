@@ -144,7 +144,7 @@ async function createPublicationWithAuthors(input: {
   authors: Array<{
     profileId: number | null
     fullName: string
-    isMainAuthor: boolean
+    isTopAuthor: boolean
     isCorresponding: boolean
     affiliationType: 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
     isMultiAffiliationOutsideUdn?: boolean
@@ -194,7 +194,7 @@ async function createPublicationWithAuthors(input: {
       profileId: a.profileId,
       fullName: a.fullName,
       authorOrder: i + 1,
-      isMainAuthor: a.isMainAuthor,
+      isTopAuthor: a.isTopAuthor,
       isCorresponding: a.isCorresponding,
       affiliationType: a.affiliationType,
       isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn === true,
@@ -214,7 +214,7 @@ async function createPublicationWithAuthors(input: {
       authors: input.authors.map((a) => ({
         profileId: a.profileId,
         fullName: a.fullName,
-        isMainAuthor: a.isMainAuthor,
+        isTopAuthor: a.isTopAuthor,
         isCorresponding: a.isCorresponding,
         affiliationType: a.affiliationType,
         isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn === true,
@@ -296,14 +296,14 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: Number(mainProfile.id),
             fullName: 'NCV TEST KPI',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },
           {
             profileId: null,
             fullName: 'Dong tac gia 01',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },
@@ -323,14 +323,14 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: Number(mainProfile.id),
             fullName: 'NCV TEST KPI',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },
           {
             profileId: null,
             fullName: 'Dong tac gia MIXED',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'MIXED',
           },
@@ -347,14 +347,14 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: Number(mainProfile.id),
             fullName: 'NCV TEST KPI',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'OUTSIDE',
           },
           {
             profileId: null,
             fullName: 'Dong tac gia 02',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },
@@ -371,7 +371,7 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: Number(mainProfile.id),
             fullName: 'NCV TEST KPI',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'MIXED',
             isMultiAffiliationOutsideUdn: true,
@@ -379,7 +379,7 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: null,
             fullName: 'Dong tac gia 03',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },
@@ -396,21 +396,21 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: Number(mainProfile.id),
             fullName: 'NCV TEST KPI',
-            isMainAuthor: false,
+            isTopAuthor: false,
             isCorresponding: false,
             affiliationType: 'UDN_ONLY',
           },
           {
             profileId: null,
             fullName: 'Tac gia chinh 01',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },
           {
             profileId: null,
             fullName: 'Tac gia 03',
-            isMainAuthor: false,
+            isTopAuthor: false,
             isCorresponding: false,
             affiliationType: 'UDN_ONLY',
           },
@@ -427,7 +427,7 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: Number(mainProfile.id),
             fullName: 'NCV TEST KPI',
-            isMainAuthor: false,
+            isTopAuthor: false,
             isCorresponding: false,
             affiliationType: 'UDN_ONLY',
           },
@@ -445,14 +445,14 @@ export default class SeedKpiPublicationTestData extends BaseCommand {
           {
             profileId: Number(femaleProfile.id),
             fullName: 'NCV TEST KPI FEMALE',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },
           {
             profileId: null,
             fullName: 'Dong tac gia 04',
-            isMainAuthor: true,
+            isTopAuthor: true,
             isCorresponding: true,
             affiliationType: 'UDN_ONLY',
           },

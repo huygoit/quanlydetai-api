@@ -72,7 +72,7 @@ export default class PublicationAuthorsController {
       fullName: a.fullName,
       affiliationUnits: a.affiliationUnits ?? [],
       authorOrder: a.authorOrder,
-      isMainAuthor: a.isMainAuthor,
+      isTopAuthor: a.isTopAuthor,
       isCorresponding: a.isCorresponding,
       affiliationType: a.affiliationType,
       isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
@@ -83,7 +83,7 @@ export default class PublicationAuthorsController {
 
   /**
    * PUT /api/profile/me/publications/:id/authors
-   * Body (snake_case): { authors: [{ id?, profile_id?, full_name, author_order, is_main_author, is_corresponding, affiliation_type, is_multi_affiliation_outside_udn }] }
+   * Body (snake_case): { authors: [{ id?, profile_id?, full_name, author_order, is_top_author, is_corresponding, affiliation_type, is_multi_affiliation_outside_udn }] }
    * Upsert: cập nhật theo id (phải thuộc publication này), tạo mới nếu không có id, xóa các bản ghi không còn trong payload.
    * Phải có ít nhất một tác giả gắn profile_id trùng chủ hồ sơ (sau khi server gộp trùng / gắn id); nếu không → 422.
    */
@@ -134,7 +134,7 @@ export default class PublicationAuthorsController {
           author.fullName = a.full_name
           author.affiliationUnits = a.affiliation_units ?? []
           author.authorOrder = a.author_order
-          author.isMainAuthor = a.is_main_author
+          author.isTopAuthor = a.is_top_author
           author.isCorresponding = a.is_corresponding
           author.affiliationType = effectiveAffType
           author.isMultiAffiliationOutsideUdn = effectiveMulti
@@ -149,7 +149,7 @@ export default class PublicationAuthorsController {
         fullName: a.full_name,
         affiliationUnits: a.affiliation_units ?? [],
         authorOrder: a.author_order,
-        isMainAuthor: a.is_main_author,
+        isTopAuthor: a.is_top_author,
         isCorresponding: a.is_corresponding,
         affiliationType: effectiveAffType,
         isMultiAffiliationOutsideUdn: effectiveMulti,
@@ -165,7 +165,7 @@ export default class PublicationAuthorsController {
       fullName: a.fullName,
       affiliationUnits: a.affiliationUnits ?? [],
       authorOrder: a.authorOrder,
-      isMainAuthor: a.isMainAuthor,
+      isTopAuthor: a.isTopAuthor,
       isCorresponding: a.isCorresponding,
       affiliationType: a.affiliationType,
       isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
