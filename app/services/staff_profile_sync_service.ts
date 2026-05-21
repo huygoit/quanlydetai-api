@@ -1,5 +1,6 @@
 import Staff from '#models/staff'
 import ScientificProfile from '#models/scientific_profile'
+import { resolveScientificProfileAcademicTitleKey } from '#constants/scientific_profile_catalog'
 import User from '#models/user'
 import { DateTime } from 'luxon'
 
@@ -83,7 +84,7 @@ function buildPayload(staff: Staff, user: User | null): BaseSyncPayload {
     department: staff.departmentName?.trim() || null,
     currentTitle: fitText(staff.positionTitle || staff.currentJob, 100),
     managementRole: fitText(staff.concurrentPosition, 100),
-    academicTitle: fitText(staff.academicTitle, 10),
+    academicTitle: resolveScientificProfileAcademicTitleKey(staff.academicTitle),
   }
 }
 

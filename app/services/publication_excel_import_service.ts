@@ -6,6 +6,7 @@ import Staff from '#models/staff'
 import Publication from '#models/publication'
 import PublicationAuthor from '#models/publication_author'
 import ResearchOutputType from '#models/research_output_type'
+import type { UdnAffiliationUnitKey } from '#constants/udn_affiliation_units'
 
 type ImportOptions = {
   file: string
@@ -59,15 +60,11 @@ type PublicationDetailRow = {
   tacGiaLienHe: boolean | null
 }
 
-const UDN_UNIT = 'The University of Danang (Đại học Đà Nẵng)'
-const OTHER_UNIT = 'Other Organization (Đơn vị khác)'
+const UDN_UNIT_KEY: UdnAffiliationUnitKey = 'UDN'
+const OTHER_UNIT_KEY: UdnAffiliationUnitKey = 'OTHER'
 
-/**
- * Trùng một phần tử trong `UDN_AFFILIATION_UNITS` của FE (`profilePublications.ts`).
- * CB có “Mã cán bộ” trong sheet chi tiết → gán cơ quan mặc định là ĐH Sư phạm (không import chéo file FE để build API không phụ thuộc UI).
- */
-const UDN_AFFILIATION_UNIT_USE_SP =
-  'The University of Danang - University of Science and Education (Trường Đại học Sư phạm)' as const
+/** CB có mã cán bộ trong sheet → gán cơ quan mặc định ĐH Sư phạm. */
+const UDN_AFFILIATION_UNIT_USE_SP_KEY: UdnAffiliationUnitKey = 'UDN_USE'
 
 function normalizeText(raw: unknown): string {
   return String(raw ?? '').trim()
@@ -180,14 +177,14 @@ function mapLeafCode(maLoaiCongViec: string, tenLoaiPhanCap: string): string | n
 }
 
 function inferAffiliation(detail: PublicationDetailRow): {
-  affiliationUnits: string[]
+  affiliationUnits: UdnAffiliationUnitKey[]
   affiliationType: 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
   isMultiAffiliationOutsideUdn: boolean
 } {
   const maCanBo = normalizeText(detail.maCanBo)
   if (maCanBo.length > 0) {
     return {
-      affiliationUnits: [UDN_AFFILIATION_UNIT_USE_SP],
+      affiliationUnits: [UDN_AFFILIATION_UNIT_USE_SP_KEY],
       affiliationType: 'UDN_ONLY',
       isMultiAffiliationOutsideUdn: false,
     }
@@ -204,13 +201,13 @@ function inferAffiliation(detail: PublicationDetailRow): {
 
   if (isUdn) {
     return {
-      affiliationUnits: [UDN_UNIT],
+      affiliationUnits: [UDN_UNIT_KEY],
       affiliationType: 'UDN_ONLY',
       isMultiAffiliationOutsideUdn: false,
     }
   }
   return {
-    affiliationUnits: [OTHER_UNIT],
+    affiliationUnits: [OTHER_UNIT_KEY],
     affiliationType: 'OUTSIDE',
     isMultiAffiliationOutsideUdn: false,
   }

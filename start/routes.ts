@@ -32,6 +32,8 @@ import KpisController from '#controllers/kpis_controller'
 import AdminResearchOutputTypesController from '#controllers/admin/research_output_types_controller'
 import AdminResearchOutputRulesController from '#controllers/admin/research_output_rules_controller'
 import AdminDepartmentsController from '#controllers/admin/departments_controller'
+import DepartmentsController from '#controllers/departments_controller'
+import ScientificProfileCatalogController from '#controllers/scientific_profile_catalog_controller'
 import AdminRolesController from '#controllers/admin/roles_controller'
 import AdminPermissionsController from '#controllers/admin/permissions_controller'
 import AdminIamUsersController from '#controllers/admin/iam_users_controller'
@@ -146,6 +148,16 @@ router
   })
   .prefix('/api/admin/departments')
   .use([middleware.auth()])
+
+// --- Catalog đơn vị (đọc, chỉ cần đăng nhập)
+router
+  .group(() => {
+    router.get('/options', [DepartmentsController, 'options'])
+    router.get('/', [DepartmentsController, 'index'])
+    router.get('/:id', [DepartmentsController, 'show'])
+  })
+  .prefix('/api/departments')
+  .middleware([middleware.auth()])
 
 // --- Admin: IAM Roles (permission-based)
 router
@@ -295,6 +307,19 @@ router
 // --- Catalogs public: lấy theo type (không cần auth)
 router.get('/api/catalogs/by-type/:type', [CatalogsController, 'byType'])
 
+// --- Catalog hồ sơ khoa học: học vị / học hàm (chỉ cần đăng nhập)
+router
+  .group(() => {
+    router.get('/options', [ScientificProfileCatalogController, 'options'])
+    router.get('/degrees/options', [ScientificProfileCatalogController, 'degreeOptions'])
+    router.get('/academic-titles/options', [
+      ScientificProfileCatalogController,
+      'academicTitleOptions',
+    ])
+  })
+  .prefix('/api/catalog/scientific-profile')
+  .middleware([middleware.auth()])
+
 // --- Notifications (user đăng nhập: danh sách, đánh dấu đọc, xóa)
 router
   .group(() => {
@@ -306,6 +331,11 @@ router
     router.delete('/:id', [NotificationsController, 'destroy'])
   })
   .prefix('/api/notifications')
+  .middleware([middleware.auth()])
+
+// --- Danh mục cơ quan công tác ĐHĐN (key + value)
+router
+  .get('/api/profile/udn-affiliation-units', [ProfileController, 'udnAffiliationUnits'])
   .middleware([middleware.auth()])
 
 // --- Hồ sơ khoa học của bản thân (NCV)

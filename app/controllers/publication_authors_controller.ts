@@ -86,6 +86,7 @@ export default class PublicationAuthorsController {
    * Body (snake_case): { authors: [{ id?, profile_id?, full_name, author_order, is_top_author, is_corresponding, affiliation_type, is_multi_affiliation_outside_udn }] }
    * Upsert: cập nhật theo id (phải thuộc publication này), tạo mới nếu không có id, xóa các bản ghi không còn trong payload.
    * Phải có ít nhất một tác giả gắn profile_id trùng chủ hồ sơ (sau khi server gộp trùng / gắn id); nếu không → 422.
+   * Không bắt buộc có tác giả nhóm chính (is_top_author / is_corresponding) khi lưu.
    */
   async update({ auth, params, request, response }: HttpContext) {
     const profile = await this.getMyProfile(auth.use('api').user!.id)

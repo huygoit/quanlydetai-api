@@ -10,8 +10,22 @@ import db from '@adonisjs/lucid/services/db'
 import NotificationService from '#services/notification_service'
 import ResearchOutputTypeService from '#services/research_output_type_service'
 import OpenAlexService from '#services/openalex_service'
+import { formatPublishedAtForResponse } from '#utils/publication_date_helper'
 import { createProfileValidator } from '#validators/scientific_profile_validator'
 import { updateProfileValidator } from '#validators/scientific_profile_validator'
+import { listUdnAffiliationUnitsForSelect } from '#constants/udn_affiliation_units'
+import {
+  resolveDepartmentFields,
+  resolveOrganizationFields,
+} from '#services/profile_unit_sync_service'
+import {
+  getScientificProfileAcademicTitleLabel,
+  getScientificProfileDegreeLabel,
+  listScientificProfileAcademicTitleOptions,
+  listScientificProfileDegreeOptions,
+  resolveScientificProfileAcademicTitleKey,
+  resolveScientificProfileDegreeKey,
+} from '#constants/scientific_profile_catalog'
 
 /**
  * Hồ sơ của bản thân (NCV): GET/POST/PUT /api/profile/me, POST submit.
@@ -108,6 +122,7 @@ export default class ProfileController {
       .preload('languages')
       .preload('attachments')
       .preload('publications', (q) => q.preload('researchOutputType'))
+      .preload('departmentUnit')
       .first()
     if (!profile) {
       return response.ok({ success: true, data: null })
@@ -127,23 +142,75 @@ export default class ProfileController {
       .preload('publications', (q) => q.preload('researchOutputType'))
       .first()
     if (profile) {
+      await profile.load('departmentUnit')
       return response.ok({ success: true, data: this.serializeProfile(profile) })
     }
     const payload = await createProfileValidator.validate(this.getParsedBody(request))
+    const orgId = payload.organizationId ?? payload.organization_id
+    let orgFields: { organization: string; organizationId: string | null }
+    try {
+      orgFields = resolveOrganizationFields({
+        organization: payload.organization,
+        organizationId: orgId,
+      })
+    } catch (e) {
+      const code = (e as Error).message
+      if (code === 'ORGANIZATION_REQUIRED') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Cần organization hoặc organizationId (cơ quan công tác).',
+        })
+      }
+      if (code === 'INVALID_ORGANIZATION_ID') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'organizationId không hợp lệ.',
+        })
+      }
+      throw e
+    }
+
+    const deptId = payload.departmentId ?? payload.department_id
+    let deptFields = { faculty: null as string | null, departmentId: null as number | null }
+    if (payload.faculty !== undefined || deptId !== undefined) {
+      try {
+        deptFields = await resolveDepartmentFields({
+          faculty: payload.faculty,
+          departmentId: deptId,
+        })
+      } catch (e) {
+        if ((e as Error).message === 'INVALID_DEPARTMENT_ID') {
+          return response.unprocessableEntity({
+            success: false,
+            message: 'departmentId không hợp lệ hoặc không ACTIVE.',
+          })
+        }
+        throw e
+      }
+    }
+
     profile = await ScientificProfile.create({
       userId: user.id,
       fullName: payload.fullName,
       workEmail: payload.workEmail,
-      organization: payload.organization,
+      organization: orgFields.organization,
+      organizationId: orgFields.organizationId,
+      faculty: deptFields.faculty,
+      departmentId: deptFields.departmentId,
       status: 'DRAFT',
       completeness: ScientificProfile.calculateCompleteness({
         fullName: payload.fullName,
         workEmail: payload.workEmail,
-        organization: payload.organization,
+        organization: orgFields.organization,
+        faculty: deptFields.faculty,
       }),
     })
     await profile.load((loader) =>
-      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+      loader
+        .load('languages')
+        .load('attachments')
+        .load('publications', (q) => q.preload('researchOutputType'))
+        .load('departmentUnit')
     )
     return response.created({ success: true, data: this.serializeProfile(profile) })
   }
@@ -158,6 +225,7 @@ export default class ProfileController {
       .preload('languages')
       .preload('attachments')
       .preload('publications', (q) => q.preload('researchOutputType'))
+      .preload('departmentUnit')
       .first()
     if (!profile) {
       return response.notFound({ success: false, message: 'Chưa có hồ sơ.' })
@@ -190,15 +258,96 @@ export default class ProfileController {
     if (payload.personalWebsite !== undefined) updates.personalWebsite = payload.personalWebsite ?? null
     if (payload.avatarUrl !== undefined) updates.avatarUrl = payload.avatarUrl ?? null
     if (payload.bio !== undefined) updates.bio = payload.bio ?? null
-    if (payload.organization !== undefined) updates.organization = payload.organization
-    if (payload.faculty !== undefined) updates.faculty = payload.faculty ?? null
+    const orgIdInput = payload.organizationId ?? payload.organization_id
+    if (payload.organization !== undefined || orgIdInput !== undefined) {
+      try {
+        const orgFields = resolveOrganizationFields({
+          organization: payload.organization ?? profile.organization,
+          organizationId: orgIdInput ?? profile.organizationId,
+        })
+        updates.organization = orgFields.organization
+        updates.organizationId = orgFields.organizationId
+      } catch (e) {
+        if ((e as Error).message === 'INVALID_ORGANIZATION_ID') {
+          return response.unprocessableEntity({
+            success: false,
+            message: 'organizationId không hợp lệ.',
+          })
+        }
+        throw e
+      }
+    }
+
+    const deptIdInput = payload.departmentId ?? payload.department_id
+    if (payload.faculty !== undefined || deptIdInput !== undefined) {
+      try {
+        const deptFields = await resolveDepartmentFields({
+          faculty:
+            payload.faculty !== undefined ? payload.faculty : profile.faculty,
+          departmentId:
+            deptIdInput !== undefined ? deptIdInput : profile.departmentId,
+        })
+        updates.faculty = deptFields.faculty
+        updates.departmentId = deptFields.departmentId
+      } catch (e) {
+        if ((e as Error).message === 'INVALID_DEPARTMENT_ID') {
+          return response.unprocessableEntity({
+            success: false,
+            message: 'departmentId không hợp lệ hoặc không ACTIVE.',
+          })
+        }
+        throw e
+      }
+    }
+
     if (payload.department !== undefined) updates.department = payload.department ?? null
     if (payload.currentTitle !== undefined) updates.currentTitle = payload.currentTitle ?? null
     if (payload.managementRole !== undefined) updates.managementRole = payload.managementRole ?? null
     if (payload.startWorkingAt !== undefined)
       updates.startWorkingAt = payload.startWorkingAt ? DateTime.fromISO(payload.startWorkingAt) : null
-    if (payload.degree !== undefined) updates.degree = payload.degree ?? null
-    if (payload.academicTitle !== undefined) updates.academicTitle = payload.academicTitle ?? null
+    if (payload.degree !== undefined) {
+      const raw = payload.degree == null ? '' : String(payload.degree).trim()
+      if (!raw) {
+        updates.degree = null
+      } else {
+        const key = resolveScientificProfileDegreeKey(raw)
+        if (!key) {
+          return response.unprocessableEntity({
+            success: false,
+            message:
+              'degree không hợp lệ. Gửi key: HIGH_SCHOOL, BACHELOR, UNDERGRADUATE, MASTER, DOCTORATE.',
+          })
+        }
+        updates.degree = key
+      }
+    }
+    if (payload.academicTitle !== undefined) {
+      const raw = payload.academicTitle == null ? '' : String(payload.academicTitle).trim()
+      if (!raw) {
+        updates.academicTitle = null
+        updates.academicTitleYear = null
+      } else {
+        const titleKey = resolveScientificProfileAcademicTitleKey(raw)
+        if (!titleKey) {
+          return response.unprocessableEntity({
+            success: false,
+            message:
+              'academicTitle không hợp lệ. Gửi key: NONE, ASSOCIATE_PROFESSOR, PROFESSOR.',
+          })
+        }
+        updates.academicTitle = titleKey
+        if (titleKey === 'NONE') {
+          updates.academicTitleYear = null
+        }
+      }
+    }
+
+    const academicTitleYearInput = payload.academicTitleYear ?? payload.academic_title_year
+    if (academicTitleYearInput !== undefined) {
+      updates.academicTitleYear =
+        academicTitleYearInput === null ? null : Number(academicTitleYearInput)
+    }
+
     if (payload.degreeYear !== undefined) updates.degreeYear = payload.degreeYear ?? null
     if (payload.degreeInstitution !== undefined) updates.degreeInstitution = payload.degreeInstitution ?? null
     if (payload.degreeCountry !== undefined) updates.degreeCountry = payload.degreeCountry ?? null
@@ -237,7 +386,11 @@ export default class ProfileController {
 
     // Reload để response có languages mới nhất
     await profile.load((loader) =>
-      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
+      loader
+        .load('languages')
+        .load('attachments')
+        .load('publications', (q) => q.preload('researchOutputType'))
+        .load('departmentUnit')
     )
 
     profile.completeness = ScientificProfile.calculateCompleteness({
@@ -348,17 +501,14 @@ export default class ProfileController {
     ])
     const data = {
       genders: [{ code: 'Nam', name: 'Nam' }, { code: 'Nữ', name: 'Nữ' }, { code: 'Khác', name: 'Khác' }],
-      degrees: [
-        { code: 'Cu_nhan', name: 'Cử nhân' },
-        { code: 'Thac_si', name: 'Thạc sĩ' },
-        { code: 'Tien_si', name: 'Tiến sĩ' },
-        { code: 'Khac', name: 'Khác' },
-      ],
-      academicTitles: [
-        { code: 'Khong', name: 'Không' },
-        { code: 'PGS', name: 'PGS' },
-        { code: 'GS', name: 'GS' },
-      ],
+      degrees: listScientificProfileDegreeOptions().map((d) => ({
+        code: d.value,
+        name: d.label,
+      })),
+      academicTitles: listScientificProfileAcademicTitleOptions().map((t) => ({
+        code: t.value,
+        name: t.label,
+      })),
       researchAreas: fields.map((c) => ({ code: c.code, name: c.name })),
       units: units.map((c) => ({ code: c.code, name: c.name })),
       languages: languages.map((c) => ({ code: c.code, name: c.name })),
@@ -442,8 +592,19 @@ export default class ProfileController {
     }
   }
 
+  /**
+   * GET /api/profile/udn-affiliation-units — danh mục cơ quan công tác (key + value).
+   */
+  async udnAffiliationUnits({ response }: HttpContext) {
+    return response.ok({
+      success: true,
+      data: listUdnAffiliationUnitsForSelect(false),
+    })
+  }
+
   /** Dùng chung cho response profile (có thể gọi từ ProfilesController). */
   serializeProfile(p: ScientificProfile) {
+    const dept = p.departmentUnit
     return {
       id: p.id,
       userId: p.userId,
@@ -460,13 +621,30 @@ export default class ProfileController {
       avatarUrl: p.avatarUrl,
       bio: p.bio,
       organization: p.organization,
+      organizationId: p.organizationId ?? null,
+      organization_id: p.organizationId ?? null,
       faculty: p.faculty,
+      departmentId: p.departmentId ?? null,
+      department_id: p.departmentId ?? null,
       department: p.department,
+      departmentUnit: dept
+        ? {
+            id: dept.id,
+            code: dept.code,
+            name: dept.name,
+            short_name: dept.shortName ?? null,
+            type: dept.type,
+          }
+        : null,
       currentTitle: p.currentTitle,
       managementRole: p.managementRole,
       startWorkingAt: p.startWorkingAt ? p.startWorkingAt.toISODate() : null,
       degree: p.degree,
+      degreeLabel: getScientificProfileDegreeLabel(p.degree),
       academicTitle: p.academicTitle,
+      academicTitleLabel: getScientificProfileAcademicTitleLabel(p.academicTitle),
+      academicTitleYear: p.academicTitleYear ?? null,
+      academic_title_year: p.academicTitleYear ?? null,
       degreeYear: p.degreeYear,
       degreeInstitution: p.degreeInstitution,
       degreeCountry: p.degreeCountry,
@@ -504,6 +682,8 @@ export default class ProfileController {
         publicationType: pub.publicationType,
         journalOrConference: pub.journalOrConference,
         year: pub.year,
+        publishedAt: formatPublishedAtForResponse(pub.publishedAt),
+        published_at: formatPublishedAtForResponse(pub.publishedAt),
         publicationStatus: pub.publicationStatus,
         rank: pub.rank,
         quartile: pub.quartile,

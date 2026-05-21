@@ -1,6 +1,11 @@
 import openAlexConfig from '#config/openalex'
 import ResearchOutputType from '#models/research_output_type'
 import JournalIndexLookupService from '#services/journal_index_lookup_service'
+import {
+  normalizeMatchText,
+  resolveUdnAffiliationUnitKey,
+  type UdnAffiliationUnitKey,
+} from '#constants/udn_affiliation_units'
 
 type OpenAlexAuthor = {
   id?: string
@@ -57,7 +62,7 @@ export type OpenAlexPublicationAuthorDraft = {
   authorOrder: number
   isTopAuthor: boolean
   isCorresponding: boolean
-  affiliationUnits: string[]
+  affiliationUnits: UdnAffiliationUnitKey[]
   affiliationType: 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
   isMultiAffiliationOutsideUdn: boolean
 }
@@ -84,31 +89,7 @@ export type OpenAlexPublicationDraft = {
   authors: OpenAlexPublicationAuthorDraft[]
 }
 
-const OTHER_ORG_LABEL = 'Other Organization (Đơn vị khác)'
-const UDN_AFFILIATION_UNITS = [
-  'The University of Danang (Đại học Đà Nẵng)',
-  'The University of Danang - University of Science and Technology (Trường Đại học Bách khoa)',
-  'The University of Danang - University of Economics (Trường Đại học Kinh tế)',
-  'The University of Danang - University of Science and Education (Trường Đại học Sư phạm)',
-  'University of Foreign Language Studies - The University of Danang (Trường Đại học Ngoại ngữ)',
-  'University of Technology and Education - The University of Danang (Trường Đại học Sư phạm Kỹ thuật)',
-  'Vietnam-Korea University of Information and Communication Technology - The University of Danang (Trường Đại học Công nghệ Thông tin và Truyền thông Việt - Hàn)',
-  'School of Medicine and Pharmacy - The University of Danang (Trường Y Dược)',
-  'The University of Danang Campus in Kon Tum (Phân hiệu Đại học Đà Nẵng tại Kon Tum)',
-  'Vietnam-UK Institute for Research and Executive Education - The University of Danang (Viện Nghiên cứu và Đào tạo Việt - Anh)',
-  'Danang International Institute of Technology - The University of Danang (Viện Công nghệ Quốc tế DNIIT)',
-  'Faculty of Physical Education - The University of Danang (Khoa Giáo dục Thể chất)',
-  'Center for Defense and Security Education - The University of Danang (Trung tâm Giáo dục Quốc phòng và An ninh)',
-] as const
-
-function normalizeSpace(input: string): string {
-  return input
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+const OTHER_ORG_KEY: UdnAffiliationUnitKey = 'OTHER'
 
 function toOpenAlexOrcid(orcid: string): string {
   const raw = orcid.trim()
@@ -164,23 +145,13 @@ function inferResearchOutputTypeCode(work: OpenAlexWork): { code: string; reason
   }
 }
 
-function mapInstitutionToUdnUnit(name: string): string | null {
-  const n = normalizeSpace(name)
-  if (!n) return null
-  const found = UDN_AFFILIATION_UNITS.find((unit) => {
-    const u = normalizeSpace(unit)
-    return n === u || n.includes(u) || u.includes(n)
-  })
-  if (found) return found
-  if (n.includes('university of danang') || n.includes('dai hoc da nang')) {
-    return UDN_AFFILIATION_UNITS[0]
-  }
-  return null
+function mapInstitutionToUdnUnitKey(name: string): UdnAffiliationUnitKey | null {
+  return resolveUdnAffiliationUnitKey(name)
 }
 
-function deriveAffiliationTypeFromUnits(units: string[]): 'UDN_ONLY' | 'MIXED' | 'OUTSIDE' {
-  const hasOutside = units.includes(OTHER_ORG_LABEL)
-  const hasUdn = units.some((u) => u !== OTHER_ORG_LABEL)
+function deriveAffiliationTypeFromUnits(units: UdnAffiliationUnitKey[]): 'UDN_ONLY' | 'MIXED' | 'OUTSIDE' {
+  const hasOutside = units.includes(OTHER_ORG_KEY)
+  const hasUdn = units.some((u) => u !== OTHER_ORG_KEY)
   if (hasOutside && hasUdn) return 'MIXED'
   if (hasOutside) return 'OUTSIDE'
   return 'UDN_ONLY'
@@ -221,7 +192,7 @@ export default class OpenAlexService {
     year?: number
     perPage?: number
   }): Promise<OpenAlexPublicationDraft[]> {
-    const normalizedOwnerOrcid = normalizeSpace(toOpenAlexOrcid(params.orcid))
+    const normalizedOwnerOrcid = normalizeMatchText(toOpenAlexOrcid(params.orcid))
     const authorId = await this.resolveAuthorIdByOrcid(params.orcid)
     if (!authorId) return []
 
@@ -280,7 +251,7 @@ export default class OpenAlexService {
           needsIndexConfirmation = resolved.needsConfirmation
         }
 
-        const ownerNorm = normalizeSpace(params.profileFullName)
+        const ownerNorm = normalizeMatchText(params.profileFullName)
         const authors = (Array.isArray(work.authorships) ? work.authorships : []).map((a, idx) => {
           const fullName = String(a.author?.display_name ?? '').trim() || `Tác giả ${idx + 1}`
           const institutions = Array.isArray(a.institutions) ? a.institutions : []
@@ -288,23 +259,25 @@ export default class OpenAlexService {
             new Set(
               institutions
                 .map((i) => String(i.display_name ?? '').trim())
-                .map((name) => mapInstitutionToUdnUnit(name))
-                .filter((v): v is string => Boolean(v))
+                .map((name) => mapInstitutionToUdnUnitKey(name))
+                .filter((v): v is UdnAffiliationUnitKey => Boolean(v))
             )
           )
-          const hasOutsideFromInstitutions = institutions.some((i) => !mapInstitutionToUdnUnit(String(i.display_name ?? '')))
-          const affiliationUnits = [...mappedUnits]
+          const hasOutsideFromInstitutions = institutions.some(
+            (i) => !mapInstitutionToUdnUnitKey(String(i.display_name ?? ''))
+          )
+          const affiliationUnits: UdnAffiliationUnitKey[] = [...mappedUnits]
           if (affiliationUnits.length === 0 || hasOutsideFromInstitutions) {
-            affiliationUnits.push(OTHER_ORG_LABEL)
+            affiliationUnits.push(OTHER_ORG_KEY)
           }
           const normalizedUnits = Array.from(new Set(affiliationUnits))
           const affiliationType = deriveAffiliationTypeFromUnits(normalizedUnits)
-          const normalizedAuthorOrcid = normalizeSpace(String(a.author?.orcid ?? ''))
+          const normalizedAuthorOrcid = normalizeMatchText(String(a.author?.orcid ?? ''))
           const isOwnerByOrcid =
             normalizedOwnerOrcid.length > 0 &&
             normalizedAuthorOrcid.length > 0 &&
             normalizedOwnerOrcid === normalizedAuthorOrcid
-          const isOwnerByName = ownerNorm.length >= 2 && normalizeSpace(fullName) === ownerNorm
+          const isOwnerByName = ownerNorm.length >= 2 && normalizeMatchText(fullName) === ownerNorm
           return {
             fullName,
             profileId: isOwnerByOrcid || isOwnerByName ? params.profileId : null,

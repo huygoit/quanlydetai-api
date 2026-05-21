@@ -1,6 +1,19 @@
 import Department from '#models/department'
 import type { ModelPaginatorContract } from '@adonisjs/lucid/types/model'
+import type { ModelQueryBuilderContract } from '@adonisjs/lucid/types/model'
 import type { DepartmentType, DepartmentStatus } from '#models/department'
+
+/** Loại đơn vị thuộc nhóm khoa / phòng / ban (loại trừ cấp trường) */
+const KHOA_PHONG_BAN_TYPES: DepartmentType[] = [
+  'FACULTY',
+  'OFFICE',
+  'CENTER',
+  'BOARD',
+  'COUNCIL',
+  'OTHER',
+]
+
+export type DepartmentCatalogScope = 'all' | 'khoa_phong_ban' | 'truong'
 
 export interface DepartmentFilters {
   page?: number
@@ -10,6 +23,10 @@ export interface DepartmentFilters {
   status?: string
   sortBy?: string
   order?: 'asc' | 'desc'
+}
+
+export interface DepartmentCatalogFilters extends DepartmentFilters {
+  scope?: DepartmentCatalogScope
 }
 
 interface CreatePayload {
@@ -37,6 +54,90 @@ interface UpdatePayload {
  */
 export default class DepartmentService {
   /**
+   * Áp dụng bộ lọc catalog (mặc định ACTIVE, scope preset).
+   */
+  private static applyCatalogFilters(
+    q: ModelQueryBuilderContract<typeof Department, Department>,
+    filters: DepartmentCatalogFilters
+  ) {
+    const status = (filters.status as DepartmentStatus | undefined) ?? 'ACTIVE'
+    q.where('status', status)
+
+    if (filters.keyword) {
+      q.where((b) => {
+        b.whereILike('code', `%${filters.keyword}%`)
+          .orWhereILike('name', `%${filters.keyword}%`)
+          .orWhereILike('short_name', `%${filters.keyword}%`)
+      })
+    }
+    if (filters.type) q.where('type', filters.type as DepartmentType)
+
+    const scope = filters.scope ?? 'all'
+    if (scope === 'khoa_phong_ban') {
+      q.whereIn('type', KHOA_PHONG_BAN_TYPES)
+    } else if (scope === 'truong') {
+      q.where('type', 'UNIVERSITY')
+    }
+  }
+
+  /**
+   * Sắp xếp catalog: mặc định display_order ASC, name ASC.
+   */
+  private static applyCatalogSort(
+    q: ModelQueryBuilderContract<typeof Department, Department>,
+    filters: DepartmentCatalogFilters
+  ) {
+    const sortBy = filters.sortBy ?? 'display_order'
+    const order = filters.order ?? 'asc'
+    const validSortColumns = ['display_order', 'name', 'code']
+    const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'display_order'
+    const sortOrder = order === 'desc' ? 'desc' : 'asc'
+
+    if (sortColumn === 'display_order') {
+      q.orderBy('display_order', sortOrder).orderBy('name', 'asc')
+    } else {
+      q.orderBy(sortColumn, sortOrder)
+    }
+  }
+
+  /**
+   * Danh sách catalog có phân trang (đọc chung, mặc định ACTIVE).
+   */
+  static async paginateCatalog(
+    filters: DepartmentCatalogFilters = {}
+  ): Promise<ModelPaginatorContract<Department>> {
+    const page = filters.page ?? 1
+    const perPage = Math.min(filters.perPage ?? 500, 1000)
+    const q = Department.query()
+    this.applyCatalogFilters(q, filters)
+    this.applyCatalogSort(q, filters)
+    return q.paginate(page, perPage)
+  }
+
+  /**
+   * Danh sách gọn cho dropdown (không phân trang, tối đa 1000 bản ghi).
+   */
+  static async listCatalogOptions(
+    filters: DepartmentCatalogFilters = {}
+  ): Promise<Department[]> {
+    const q = Department.query()
+    this.applyCatalogFilters(q, filters)
+    this.applyCatalogSort(q, filters)
+    return q.limit(1000)
+  }
+
+  /**
+   * Chi tiết catalog: chỉ đơn vị ACTIVE.
+   */
+  static async findActiveById(id: number): Promise<Department> {
+    const dept = await Department.query().where('id', id).where('status', 'ACTIVE').first()
+    if (!dept) {
+      throw new Error('DEPARTMENT_NOT_FOUND')
+    }
+    return dept
+  }
+
+  /**
    * Danh sách có phân trang, filter, search.
    */
   static async paginate(
@@ -51,7 +152,9 @@ export default class DepartmentService {
 
     if (filters.keyword) {
       q.where((b) => {
-        b.whereILike('code', `%${filters.keyword}%`).orWhereILike('name', `%${filters.keyword}%`)
+        b.whereILike('code', `%${filters.keyword}%`)
+          .orWhereILike('name', `%${filters.keyword}%`)
+          .orWhereILike('short_name', `%${filters.keyword}%`)
       })
     }
     if (filters.type) q.where('type', filters.type)

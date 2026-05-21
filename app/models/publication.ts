@@ -37,6 +37,9 @@ export default class Publication extends BaseModel {
   @column()
   declare year: number | null
 
+  @column.date()
+  declare publishedAt: DateTime | null
+
   @column()
   declare volume: string | null
 

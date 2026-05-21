@@ -1,9 +1,15 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import { DateTime } from 'luxon'
 import ScientificProfile from '#models/scientific_profile'
 import Publication from '#models/publication'
 import { createPublicationValidator } from '#validators/publication_validator'
 import { updatePublicationValidator } from '#validators/publication_validator'
 import PublicationResearchTypeService from '#services/publication_research_type_service'
+import {
+  formatPublishedAtForResponse,
+  resolvePublicationDatesForCreate,
+  resolvePublicationDatesForUpdate,
+} from '#utils/publication_date_helper'
 
 /**
  * Sub-resource: publications của hồ sơ me (GET/POST /api/profile/me/publications, PUT/DELETE /:id).
@@ -32,6 +38,8 @@ export default class PublicationsController {
       publicationType: p.publicationType,
       journalOrConference: p.journalOrConference,
       year: p.year,
+      publishedAt: formatPublishedAtForResponse(p.publishedAt),
+      published_at: formatPublishedAtForResponse(p.publishedAt),
       volume: p.volume,
       issue: p.issue,
       pages: p.pages,
@@ -85,6 +93,27 @@ export default class PublicationsController {
     const profile = await this.getMyProfile(auth.use('api').user!.id)
     if (!profile) return response.notFound({ success: false, message: 'Chưa có hồ sơ.' })
     const payload = await request.validateUsing(createPublicationValidator)
+
+    let publicationDates: { publishedAt: DateTime | null; year: number | null }
+    try {
+      publicationDates = resolvePublicationDatesForCreate(payload)
+    } catch (e) {
+      const code = (e as Error).message
+      if (code === 'INVALID_PUBLISHED_AT') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'publishedAt không hợp lệ (định dạng YYYY-MM-DD).',
+        })
+      }
+      if (code === 'PUBLISHED_AT_FUTURE') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Ngày xuất bản không được vượt quá năm hiện tại + 1.',
+        })
+      }
+      throw e
+    }
+
     try {
       await PublicationResearchTypeService.validateLeafWithRule(
         payload.researchOutputTypeId,
@@ -121,7 +150,8 @@ export default class PublicationsController {
       myRole: payload.myRole ?? null,
       publicationType: payload.publicationType ?? 'JOURNAL',
       journalOrConference: payload.journalOrConference,
-      year: payload.year ?? null,
+      year: publicationDates.year,
+      publishedAt: publicationDates.publishedAt,
       volume: payload.volume ?? null,
       issue: payload.issue ?? null,
       pages: payload.pages ?? null,
@@ -162,6 +192,26 @@ export default class PublicationsController {
     if (!pub) return response.notFound({ success: false, message: 'Không tìm thấy công bố.' })
     const payload = await request.validateUsing(updatePublicationValidator)
 
+    let dateUpdates: ReturnType<typeof resolvePublicationDatesForUpdate> = {}
+    try {
+      dateUpdates = resolvePublicationDatesForUpdate(payload)
+    } catch (e) {
+      const code = (e as Error).message
+      if (code === 'INVALID_PUBLISHED_AT') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'publishedAt không hợp lệ (định dạng YYYY-MM-DD).',
+        })
+      }
+      if (code === 'PUBLISHED_AT_FUTURE') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Ngày xuất bản không được vượt quá năm hiện tại + 1.',
+        })
+      }
+      throw e
+    }
+
     const nextTypeId = payload.researchOutputTypeId ?? pub.researchOutputTypeId
     const nextHdgsnn = payload.hdgsnnScore !== undefined ? payload.hdgsnnScore : pub.hdgsnnScore
     const nextIsbn = payload.isbn !== undefined ? payload.isbn : pub.isbn
@@ -180,7 +230,8 @@ export default class PublicationsController {
     if (payload.myRole !== undefined) updates.myRole = payload.myRole ?? null
     if (payload.publicationType !== undefined) updates.publicationType = payload.publicationType
     if (payload.journalOrConference !== undefined) updates.journalOrConference = payload.journalOrConference
-    if (payload.year !== undefined) updates.year = payload.year ?? null
+    if (dateUpdates.publishedAt !== undefined) updates.publishedAt = dateUpdates.publishedAt
+    if (dateUpdates.year !== undefined) updates.year = dateUpdates.year
     if (payload.volume !== undefined) updates.volume = payload.volume ?? null
     if (payload.issue !== undefined) updates.issue = payload.issue ?? null
     if (payload.pages !== undefined) updates.pages = payload.pages ?? null

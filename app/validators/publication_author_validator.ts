@@ -41,7 +41,10 @@ const authorSchema = vine.object({
   is_multi_affiliation_outside_udn: vine.boolean(),
 })
 
-/** Kiểm tra p >= 1, n >= 1, n <= p, author_order unique. Gọi từ controller sau khi validate. */
+/**
+ * Kiểm tra p >= 1, author_order unique; n <= p nếu có nhóm chính.
+ * Không bắt buộc nhóm chính (is_top_author / is_corresponding) — FE/KPI xử lý cảnh báo sau.
+ */
 export function validateAuthorsListRules(
   authors: Array<{ author_order: number; is_top_author: boolean; is_corresponding?: boolean }>
 ): void {
@@ -52,15 +55,6 @@ export function validateAuthorsListRules(
     ])
   }
   const n = authors.filter((a) => a.is_top_author || a.is_corresponding).length
-  if (n < 1) {
-    throw new errors.E_VALIDATION_ERROR([
-      {
-        field: 'authors',
-        message: 'Cần ít nhất 1 tác giả trong nhóm chính (is_top_author hoặc is_corresponding)',
-        rule: 'minLength',
-      },
-    ])
-  }
   if (n > p) {
     throw new errors.E_VALIDATION_ERROR([
       {

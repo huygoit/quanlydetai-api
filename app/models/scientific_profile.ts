@@ -2,6 +2,8 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
+import Department from '#models/department'
+import type { UdnAffiliationUnitKey } from '#constants/udn_affiliation_units'
 import ProfileLanguage from '#models/profile_language'
 import ProfileAttachment from '#models/profile_attachment'
 import Publication from '#models/publication'
@@ -61,8 +63,16 @@ export default class ScientificProfile extends BaseModel {
   @column()
   declare organization: string
 
+  /** Key trong UDN_AFFILIATION_UNITS (cơ quan công tác cấp trường ĐHĐN). */
+  @column()
+  declare organizationId: UdnAffiliationUnitKey | null
+
   @column()
   declare faculty: string | null
+
+  /** FK departments — khoa / phòng / ban. */
+  @column()
+  declare departmentId: number | null
 
   @column()
   declare department: string | null
@@ -81,6 +91,10 @@ export default class ScientificProfile extends BaseModel {
 
   @column()
   declare academicTitle: string | null
+
+  /** Năm công nhận học hàm (PGS/GS). */
+  @column()
+  declare academicTitleYear: number | null
 
   @column()
   declare degreeYear: number | null
@@ -129,6 +143,9 @@ export default class ScientificProfile extends BaseModel {
 
   @belongsTo(() => User, { foreignKey: 'userId' })
   declare user: BelongsTo<typeof User>
+
+  @belongsTo(() => Department, { foreignKey: 'departmentId' })
+  declare departmentUnit: BelongsTo<typeof Department>
 
   @hasMany(() => ProfileLanguage, { foreignKey: 'profileId' })
   declare languages: HasMany<typeof ProfileLanguage>
