@@ -11,6 +11,7 @@ import NotificationService from '#services/notification_service'
 import ResearchOutputTypeService from '#services/research_output_type_service'
 import OpenAlexService from '#services/openalex_service'
 import { formatPublishedAtForResponse } from '#utils/publication_date_helper'
+import PublicationAccessService from '#services/publication_access_service'
 import { createProfileValidator } from '#validators/scientific_profile_validator'
 import { updateProfileValidator } from '#validators/scientific_profile_validator'
 import { listUdnAffiliationUnitsForSelect } from '#constants/udn_affiliation_units'
@@ -112,6 +113,19 @@ export default class ProfileController {
     return merged
   }
 
+  /** Công bố hiển thị trên hồ sơ: bài chủ + bài đồng tác giả (có profile_id trong publication_authors). */
+  private async attachAccessiblePublications(profile: ScientificProfile) {
+    const pubs = await PublicationAccessService.accessiblePublicationsQuery(profile.id)
+      .preload('researchOutputType')
+      .orderBy('year', 'desc')
+      .orderBy('id', 'desc')
+    profile.$setRelated('publications', pubs)
+  }
+
+  private async loadOwnedPublications(profileId: number) {
+    return Publication.query().where('profile_id', profileId)
+  }
+
   /**
    * Lấy profile của user hiện tại (hoặc 404).
    */
@@ -121,12 +135,12 @@ export default class ProfileController {
       .where('user_id', user.id)
       .preload('languages')
       .preload('attachments')
-      .preload('publications', (q) => q.preload('researchOutputType'))
       .preload('departmentUnit')
       .first()
     if (!profile) {
       return response.ok({ success: true, data: null })
     }
+    await this.attachAccessiblePublications(profile)
     return response.ok({ success: true, data: this.serializeProfile(profile) })
   }
 
@@ -139,10 +153,10 @@ export default class ProfileController {
       .where('user_id', user.id)
       .preload('languages')
       .preload('attachments')
-      .preload('publications', (q) => q.preload('researchOutputType'))
       .first()
     if (profile) {
       await profile.load('departmentUnit')
+      await this.attachAccessiblePublications(profile)
       return response.ok({ success: true, data: this.serializeProfile(profile) })
     }
     const payload = await createProfileValidator.validate(this.getParsedBody(request))
@@ -206,12 +220,9 @@ export default class ProfileController {
       }),
     })
     await profile.load((loader) =>
-      loader
-        .load('languages')
-        .load('attachments')
-        .load('publications', (q) => q.preload('researchOutputType'))
-        .load('departmentUnit')
+      loader.load('languages').load('attachments').load('departmentUnit')
     )
+    await this.attachAccessiblePublications(profile)
     return response.created({ success: true, data: this.serializeProfile(profile) })
   }
 
@@ -224,7 +235,6 @@ export default class ProfileController {
       .where('user_id', user.id)
       .preload('languages')
       .preload('attachments')
-      .preload('publications', (q) => q.preload('researchOutputType'))
       .preload('departmentUnit')
       .first()
     if (!profile) {
@@ -385,20 +395,16 @@ export default class ProfileController {
     })
 
     // Reload để response có languages mới nhất
-    await profile.load((loader) =>
-      loader
-        .load('languages')
-        .load('attachments')
-        .load('publications', (q) => q.preload('researchOutputType'))
-        .load('departmentUnit')
-    )
+    await profile.load((loader) => loader.load('languages').load('attachments').load('departmentUnit'))
 
+    const ownedPublications = await this.loadOwnedPublications(profile.id)
     profile.completeness = ScientificProfile.calculateCompleteness({
       ...profile.toJSON(),
       languages: profile.languages,
-      publications: profile.publications,
+      publications: ownedPublications,
     })
     await profile.save()
+    await this.attachAccessiblePublications(profile)
     return response.ok({ success: true, data: this.serializeProfile(profile) })
   }
 
@@ -483,9 +489,8 @@ export default class ProfileController {
     profile.needMoreInfoReason = null
     await profile.save()
     await NotificationService.notifyProfileSubmitted(profile.id, profile.fullName)
-    await profile.load((loader) =>
-      loader.load('languages').load('attachments').load('publications', (q) => q.preload('researchOutputType'))
-    )
+    await profile.load((loader) => loader.load('languages').load('attachments').load('departmentUnit'))
+    await this.attachAccessiblePublications(profile)
     return response.ok({ success: true, message: 'Đã gửi hồ sơ để xác thực.', data: this.serializeProfile(profile) })
   }
 
@@ -519,6 +524,7 @@ export default class ProfileController {
   /**
    * GET /api/profile/me/author-profiles-lookup?q=&limit=
    * Gợi ý hồ sơ khoa học nội bộ để gắn profile_id khi khai báo tác giả công bố (không cần quyền profile.view_all).
+   * Response: id, fullName, degree/academicTitle (key catalog), organization, department (nhãn hiển thị).
    */
   async authorProfilesLookup({ request, response }: HttpContext) {
     const q = String(request.input('q', '')).trim()
@@ -536,18 +542,27 @@ export default class ProfileController {
           .orWhereILike('faculty', like)
           .orWhereILike('department', like)
       })
+      .preload('departmentUnit')
       .orderBy('full_name', 'asc')
       .limit(limit)
-      .select('id', 'full_name', 'work_email', 'organization', 'faculty', 'department', 'status')
+      .select(
+        'id',
+        'full_name',
+        'degree',
+        'academic_title',
+        'organization',
+        'faculty',
+        'department',
+        'department_id'
+      )
 
     const data = rows.map((p) => ({
       id: p.id,
       fullName: p.fullName,
-      workEmail: p.workEmail,
-      organization: p.organization,
-      faculty: p.faculty,
-      department: p.department,
-      status: p.status,
+      degree: p.degree ?? null,
+      academicTitle: p.academicTitle ?? null,
+      organization: p.organization ?? null,
+      department: p.departmentUnit?.name ?? p.faculty ?? p.department ?? null,
     }))
     return response.ok({ success: true, data })
   }
@@ -673,8 +688,11 @@ export default class ProfileController {
       })) ?? [],
       publications: (p.publications as Publication[] | undefined)?.map((pub) => {
         const rot = pub.researchOutputType
+        const isOwner = PublicationAccessService.isOwner(pub, p.id)
         return {
         id: pub.id,
+        isOwner,
+        canEdit: isOwner,
         title: pub.title,
         authors: pub.authors,
         researchOutputTypeId: pub.researchOutputTypeId,

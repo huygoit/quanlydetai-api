@@ -10,6 +10,7 @@ import {
   resolvePublicationDatesForCreate,
   resolvePublicationDatesForUpdate,
 } from '#utils/publication_date_helper'
+import PublicationAccessService from '#services/publication_access_service'
 
 /**
  * Sub-resource: publications của hồ sơ me (GET/POST /api/profile/me/publications, PUT/DELETE /:id).
@@ -19,9 +20,12 @@ export default class PublicationsController {
     return ScientificProfile.findBy('user_id', userId)
   }
 
-  private serializePublication(p: Publication) {
+  private serializePublication(p: Publication, viewerProfileId: number) {
+    const isOwner = PublicationAccessService.isOwner(p, viewerProfileId)
     return {
       id: p.id,
+      isOwner,
+      canEdit: isOwner,
       title: p.title,
       authors: p.authors,
       correspondingAuthor: p.correspondingAuthor,
@@ -72,8 +76,7 @@ export default class PublicationsController {
     const rank = request.input('rank', '')
     const year = request.input('year', '')
 
-    const q = Publication.query()
-      .where('profile_id', profile.id)
+    const q = PublicationAccessService.accessiblePublicationsQuery(profile.id)
       .preload('researchOutputType')
       .orderBy('year', 'desc')
       .orderBy('id', 'desc')
@@ -81,7 +84,7 @@ export default class PublicationsController {
     if (rank) q.where('rank', rank)
     if (year) q.where('year', year)
     const paginated = await q.paginate(page, perPage)
-    const data = paginated.all().map((p) => this.serializePublication(p))
+    const data = paginated.all().map((p) => this.serializePublication(p, profile.id))
     return response.ok({
       success: true,
       data,
@@ -136,7 +139,7 @@ export default class PublicationsController {
         return response.ok({
           success: true,
           message: 'Bài báo đã tồn tại theo nguồn import, trả về bản ghi hiện có.',
-          data: this.serializePublication(existed),
+          data: this.serializePublication(existed, profile.id),
         })
       }
     }
@@ -178,18 +181,24 @@ export default class PublicationsController {
     await this.updateProfileCompleteness(profile.id)
     return response.created({
       success: true,
-      data: this.serializePublication(pub),
+      data: this.serializePublication(pub, profile.id),
     })
   }
 
   async update({ auth, params, request, response }: HttpContext) {
     const profile = await this.getMyProfile(auth.use('api').user!.id)
     if (!profile) return response.notFound({ success: false, message: 'Chưa có hồ sơ.' })
-    const pub = await Publication.query()
-      .where('id', params.id)
-      .where('profile_id', profile.id)
-      .first()
-    if (!pub) return response.notFound({ success: false, message: 'Không tìm thấy công bố.' })
+    const pub = await PublicationAccessService.findEditable(Number(params.id), profile.id)
+    if (!pub) {
+      const viewable = await PublicationAccessService.findViewable(Number(params.id), profile.id)
+      if (viewable) {
+        return response.forbidden({
+          success: false,
+          message: 'Chỉ chủ bài kê khai mới được sửa công bố.',
+        })
+      }
+      return response.notFound({ success: false, message: 'Không tìm thấy công bố.' })
+    }
     const payload = await request.validateUsing(updatePublicationValidator)
 
     let dateUpdates: ReturnType<typeof resolvePublicationDatesForUpdate> = {}
@@ -257,14 +266,23 @@ export default class PublicationsController {
     await pub.save()
     await pub.load('researchOutputType')
     await this.updateProfileCompleteness(profile.id)
-    return response.ok({ success: true, data: this.serializePublication(pub) })
+    return response.ok({ success: true, data: this.serializePublication(pub, profile.id) })
   }
 
   async destroy({ auth, params, response }: HttpContext) {
     const profile = await this.getMyProfile(auth.use('api').user!.id)
     if (!profile) return response.notFound({ success: false, message: 'Chưa có hồ sơ.' })
-    const pub = await Publication.query().where('id', params.id).where('profile_id', profile.id).first()
-    if (!pub) return response.notFound({ success: false, message: 'Không tìm thấy công bố.' })
+    const pub = await PublicationAccessService.findEditable(Number(params.id), profile.id)
+    if (!pub) {
+      const viewable = await PublicationAccessService.findViewable(Number(params.id), profile.id)
+      if (viewable) {
+        return response.forbidden({
+          success: false,
+          message: 'Chỉ chủ bài kê khai mới được xóa công bố.',
+        })
+      }
+      return response.notFound({ success: false, message: 'Không tìm thấy công bố.' })
+    }
     await pub.delete()
     await this.updateProfileCompleteness(profile.id)
     return response.ok({ success: true, message: 'Đã xóa.' })

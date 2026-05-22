@@ -8,7 +8,10 @@ import {
   dedupeOwnerAuthorRowsForProfile,
   ensureOwnerProfileOnAuthorRows,
   validateOwnerProfileLinked,
+  prepareAuthorsRequestBody,
+  resolvedProfileIdFromRow,
 } from '#validators/publication_author_validator'
+import PublicationAccessService from '#services/publication_access_service'
 
 const OTHER_UNIT_LABEL = 'Other Organization (Đơn vị khác)'
 const LEGACY_OTHER_UNIT_LABEL = 'Đơn vị khác'
@@ -54,12 +57,9 @@ export default class PublicationAuthorsController {
       return response.badRequest({ success: false, message: 'id không hợp lệ.' })
     }
 
-    const publication = await Publication.query()
-      .where('id', pubId)
-      .where('profile_id', profile.id)
-      .first()
+    const publication = await PublicationAccessService.findViewable(pubId, profile.id)
     if (!publication) {
-      return response.notFound({ success: false, message: 'Không tìm thấy công bố hoặc không thuộc hồ sơ của bạn.' })
+      return response.notFound({ success: false, message: 'Không tìm thấy công bố hoặc bạn không có quyền xem.' })
     }
 
     const authors = await PublicationAuthor.query()
@@ -97,14 +97,19 @@ export default class PublicationAuthorsController {
       return response.badRequest({ success: false, message: 'id không hợp lệ.' })
     }
 
-    const publication = await Publication.query()
-      .where('id', pubId)
-      .where('profile_id', profile.id)
-      .first()
+    const publication = await PublicationAccessService.findEditable(pubId, profile.id)
     if (!publication) {
-      return response.notFound({ success: false, message: 'Không tìm thấy công bố hoặc không thuộc hồ sơ của bạn.' })
+      const viewable = await PublicationAccessService.findViewable(pubId, profile.id)
+      if (viewable) {
+        return response.forbidden({
+          success: false,
+          message: 'Chỉ chủ bài kê khai mới được sửa danh sách tác giả.',
+        })
+      }
+      return response.notFound({ success: false, message: 'Không tìm thấy công bố hoặc bạn không có quyền sửa.' })
     }
 
+    prepareAuthorsRequestBody(request)
     const payload = await request.validateUsing(upsertPublicationAuthorsValidator)
     dedupeOwnerAuthorRowsForProfile(payload.authors, profile.id, profile.fullName ?? '')
     ensureOwnerProfileOnAuthorRows(payload.authors, profile.id, profile.fullName ?? '')
@@ -126,6 +131,8 @@ export default class PublicationAuthorsController {
       const derivedAffType = deriveAffiliationTypeFromUnits(a.affiliation_units)
       const effectiveAffType = derivedAffType ?? a.affiliation_type
       const effectiveMulti = effectiveAffType === 'MIXED'
+      const nextProfileId = resolvedProfileIdFromRow(a)
+
       if (a.id != null) {
         const author = await PublicationAuthor.query()
           .where('id', a.id)
@@ -139,14 +146,16 @@ export default class PublicationAuthorsController {
           author.isCorresponding = a.is_corresponding
           author.affiliationType = effectiveAffType
           author.isMultiAffiliationOutsideUdn = effectiveMulti
-          author.profileId = a.profile_id ?? null
+          if (nextProfileId !== undefined) {
+            author.profileId = nextProfileId
+          }
           await author.save()
           continue
         }
       }
       await PublicationAuthor.create({
         publicationId: pubId,
-        profileId: a.profile_id ?? null,
+        profileId: nextProfileId ?? null,
         fullName: a.full_name,
         affiliationUnits: a.affiliation_units ?? [],
         authorOrder: a.author_order,

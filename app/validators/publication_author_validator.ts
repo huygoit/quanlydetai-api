@@ -31,7 +31,9 @@ function chuanHoaHoTen(s: string): string {
 /** Schema một tác giả trong danh sách PUT /publications/:id/authors (chấp nhận snake_case theo spec) */
 const authorSchema = vine.object({
   id: vine.number().optional(),
-  profile_id: vine.number().optional(),
+  profile_id: vine.number().optional().nullable(),
+  /** FE thường gửi camelCase — chuẩn hoá sang profile_id trước khi lưu */
+  profileId: vine.number().optional().nullable(),
   full_name: vine.string().trim().minLength(1).maxLength(255),
   affiliation_units: vine.array(vine.string().trim().minLength(1).maxLength(255)).optional(),
   author_order: vine.number().min(1),
@@ -77,6 +79,7 @@ export function validateAuthorsListRules(
 export type AuthorPayloadRow = {
   id?: number
   profile_id?: number | null
+  profileId?: number | null
   full_name: string
   affiliation_units?: string[]
   author_order: number
@@ -210,6 +213,45 @@ export function injectOwnerAuthorRowIfMissing(
   ownerFullName: string
 ): void {
   ensureOwnerProfileOnAuthorRows(authors, ownerProfileId, ownerFullName)
+}
+
+/**
+ * Chuẩn hoá body PUT authors trước validate: profileId → profile_id, ép id số.
+ */
+export function prepareAuthorsRequestBody(request: {
+  input: (key: string, defaultValue?: unknown) => unknown
+}): void {
+  const raw = request.input('authors')
+  if (!Array.isArray(raw)) return
+
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+
+    if (r.profileId !== undefined && r.profile_id === undefined) {
+      r.profile_id = r.profileId
+    }
+
+    if (r.id != null && typeof r.id !== 'number') {
+      const n = Number(r.id)
+      if (Number.isFinite(n)) r.id = Math.trunc(n)
+    }
+    if (r.profile_id != null && typeof r.profile_id !== 'number') {
+      const n = Number(r.profile_id)
+      if (Number.isFinite(n)) r.profile_id = Math.trunc(n)
+    }
+    if (r.profileId != null && typeof r.profileId !== 'number') {
+      const n = Number(r.profileId)
+      if (Number.isFinite(n)) r.profileId = Math.trunc(n)
+    }
+  }
+}
+
+/** Sau validate: một giá trị profile_id thống nhất (ưu tiên snake_case). */
+export function resolvedProfileIdFromRow(a: AuthorPayloadRow): number | null | undefined {
+  if (a.profile_id !== undefined) return a.profile_id ?? null
+  if (a.profileId !== undefined) return a.profileId ?? null
+  return undefined
 }
 
 export const upsertPublicationAuthorsValidator = vine.compile(

@@ -1,8 +1,10 @@
 import Publication from '#models/publication'
+import PublicationAuthor from '#models/publication_author'
 import ProjectProposal from '#models/project_proposal'
 import ScientificProfile from '#models/scientific_profile'
 import KpiResult from '#models/kpi_result'
 import { getStrategyForOutput } from '#services/kpi_engine'
+import PublicationAccessService from '#services/publication_access_service'
 import type { CalculationResult, KpiContext, KpiOutput } from '#types/kpi'
 
 const DEFAULT_QUOTA = 600
@@ -40,7 +42,8 @@ export default class KpiEngineService {
   }
 
   /**
-   * Tính toàn bộ KPI cho một giảng viên: mọi công bố của hồ sơ + mọi đề tài đã duyệt của user (không lọc theo năm học).
+   * Tính toàn bộ KPI cho một giảng viên: mọi KQNC mà NCV là tác giả (chủ bài hoặc publication_authors.profile_id)
+   * + mọi đề tài đã duyệt của user. Cùng tập dữ liệu với GET /api/profile/me/publications.
    * `academicYear` chỉ còn để trả về/ghi cache `kpi_results` theo khóa cũ của API.
    */
   static async calculateTeacherKpi(
@@ -81,8 +84,7 @@ export default class KpiEngineService {
 
     const outputs: KpiOutput[] = []
 
-    const publications = await Publication.query()
-      .where('profile_id', profileId)
+    const publications = await PublicationAccessService.accessiblePublicationsQuery(profileId)
       .preload('publicationAuthors')
       .orderBy('id', 'asc')
 
@@ -174,6 +176,10 @@ export default class KpiEngineService {
    */
   static async recalcAcademicYear(academicYear: string): Promise<{ updated: number }> {
     const profileIdsFromPubs = await Publication.query().distinct('profile_id').select('profile_id')
+    const profileIdsFromCoAuthors = await PublicationAuthor.query()
+      .whereNotNull('profile_id')
+      .distinct('profile_id')
+      .select('profile_id')
     const profileIdsFromProposals = await ProjectProposal.query()
       .where('status', 'APPROVED')
       .distinct('owner_id')
@@ -184,6 +190,9 @@ export default class KpiEngineService {
     const profileIdsFromProposalsResolved = new Set(profilesByUser.map((p) => p.id))
     const allProfileIds = new Set<number>()
     for (const r of profileIdsFromPubs) allProfileIds.add(r.profileId)
+    for (const r of profileIdsFromCoAuthors) {
+      if (r.profileId != null) allProfileIds.add(r.profileId)
+    }
     profileIdsFromProposalsResolved.forEach((id) => allProfileIds.add(id))
 
     let updated = 0
