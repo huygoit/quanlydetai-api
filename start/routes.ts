@@ -9,7 +9,6 @@
 
 import router from '@adonisjs/core/services/router'
 import { middleware } from '#start/kernel'
-import env from '#start/env'
 import AuthController from '#controllers/auth_controller'
 import UsersController from '#controllers/users_controller'
 import AdminController from '#controllers/admin_controller'
@@ -38,9 +37,10 @@ import AdminRolesController from '#controllers/admin/roles_controller'
 import AdminPermissionsController from '#controllers/admin/permissions_controller'
 import AdminIamUsersController from '#controllers/admin/iam_users_controller'
 import AdminPersonalProfilesController from '#controllers/admin/personal_profiles_controller'
+import MePersonalProfileController from '#controllers/me_personal_profile_controller'
 import AdminStaffsController from '#controllers/admin/staffs_controller'
 import path from 'node:path'
-import fs from 'node:fs/promises'
+import { findAttachmentFilePath } from '#utils/upload_storage_helper'
 
 // --- Auth (login, register không cần token)
 router.post('/api/auth/login', [AuthController, 'login'])
@@ -48,46 +48,17 @@ router.post('/api/auth/register', [AuthController, 'register'])
 
 // --- Public: phục vụ file đính kèm hồ sơ theo /storage/profile-attachments/:filename
 router.get('/storage/profile-attachments/:filename', async ({ params, response }) => {
-  const uploadStorageRoot = env.get('UPLOAD_STORAGE_ROOT') || 'storage'
-  const uploadDir = env.get('UPLOAD_PROFILE_ATTACHMENTS_DIR') || 'profile-attachments'
-
   const filename = String(params.filename || '')
   if (!filename || filename !== path.basename(filename)) {
     return response.badRequest({ success: false, message: 'Tên file không hợp lệ.' })
   }
 
   try {
-    /**
-     * Không dựa vào đường dẫn source/build (import.meta.url) vì production thường chạy trong `build/`.
-     * Thay vào đó, dò theo `cwd` và fallback sang `cwd/quanlydetai-api` (cấu trúc repo hiện tại).
-     */
-    const fileCandidates = (() => {
-      if (path.isAbsolute(uploadStorageRoot)) {
-        return [path.join(uploadStorageRoot, uploadDir, filename)]
-      }
-      const cwd = process.cwd()
-      return [
-        path.join(cwd, uploadStorageRoot, uploadDir, filename),
-        path.join(cwd, 'quanlydetai-api', uploadStorageRoot, uploadDir, filename),
-      ]
-    })()
-
-    let foundPath: string | null = null
-    for (const p of fileCandidates) {
-      try {
-        await fs.access(p)
-        foundPath = p
-        break
-      } catch {
-        // thử path tiếp theo
-      }
-    }
-
+    const foundPath = await findAttachmentFilePath(filename)
     if (!foundPath) {
       return response.notFound({ success: false, message: 'Không tìm thấy file.' })
     }
 
-    // Ưu tiên hiển thị inline (để <img> render được trong popup)
     response.header('Content-Disposition', `inline; filename="${filename}"`)
     return response.download(foundPath)
   } catch {
@@ -364,6 +335,15 @@ router
     router.put('/publications/:id/authors', [PublicationAuthorsController, 'update'])
   })
   .prefix('/api/profile/me')
+  .middleware([middleware.auth()])
+
+// --- Hồ sơ cá nhân của user đang đăng nhập (xem + tự sửa)
+router
+  .group(() => {
+    router.get('/', [MePersonalProfileController, 'show'])
+    router.put('/', [MePersonalProfileController, 'update'])
+  })
+  .prefix('/api/me/personal-profile')
   .middleware([middleware.auth()])
 
 // --- Alias không có /api (một số FE đang gọi /profile/me)

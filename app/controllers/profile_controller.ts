@@ -714,6 +714,7 @@ export default class ProfileController {
         issn: pub.issn,
         isbn: pub.isbn,
         url: pub.url,
+        attachmentUrl: pub.attachmentUrl,
         source: pub.source,
         sourceId: pub.sourceId,
         verifiedByNcv: pub.verifiedByNcv,
