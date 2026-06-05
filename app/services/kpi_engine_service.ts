@@ -5,6 +5,12 @@ import ScientificProfile from '#models/scientific_profile'
 import KpiResult from '#models/kpi_result'
 import { getStrategyForOutput } from '#services/kpi_engine'
 import PublicationAccessService from '#services/publication_access_service'
+import {
+  type KpiPeriodRange,
+  khoangNamTaiChinh,
+  projectTrongKhoangKy,
+  publicationTrongKhoangKy,
+} from '#utils/kpi_period_helper'
 import type { CalculationResult, KpiContext, KpiOutput } from '#types/kpi'
 
 const DEFAULT_QUOTA = 600
@@ -42,16 +48,16 @@ export default class KpiEngineService {
   }
 
   /**
-   * Tính toàn bộ KPI cho một giảng viên: mọi KQNC mà NCV là tác giả (chủ bài hoặc publication_authors.profile_id)
-   * + mọi đề tài đã duyệt của user. Cùng tập dữ liệu với GET /api/profile/me/publications.
-   * `academicYear` chỉ còn để trả về/ghi cache `kpi_results` theo khóa cũ của API.
+   * Tính KPI giảng viên trong khoảng thời gian (theo publishedAt KQNC; đề tài theo year).
+   * Mặc định: năm tài chính hiện tại (từ tháng 4).
    */
   static async calculateTeacherKpi(
     profileId: number,
-    academicYear: string
+    period: KpiPeriodRange
   ): Promise<{
     profileId: number
-    academicYear: string
+    periodFrom: string
+    periodTo: string
     totalHours: number
     /** Tổng điểm quy đổi (KQNC / HĐGSNN) */
     totalPoints: number
@@ -64,7 +70,8 @@ export default class KpiEngineService {
     if (!profile) {
       return {
         profileId,
-        academicYear,
+        periodFrom: period.fromDate,
+        periodTo: period.toDate,
         totalHours: 0,
         totalPoints: 0,
         metQuota: false,
@@ -77,7 +84,7 @@ export default class KpiEngineService {
     const isFemale = isFemaleGender(profile.gender)
     const context: KpiContext = {
       profileId,
-      academicYear,
+      academicYear: `${period.fromDate}_${period.toDate}`,
       isFemale,
       profileFullName: profile.fullName ?? null,
     }
@@ -89,6 +96,7 @@ export default class KpiEngineService {
       .orderBy('id', 'asc')
 
     for (const pub of publications) {
+      if (!publicationTrongKhoangKy(pub, period)) continue
       const authors = pub.publicationAuthors.map((a) => ({
         profileId: a.profileId,
         fullName: a.fullName,
@@ -115,6 +123,7 @@ export default class KpiEngineService {
       .orderBy('id', 'asc')
 
     for (const proj of projects) {
+      if (!projectTrongKhoangKy(proj, period)) continue
       outputs.push({
         type: 'PROJECT',
         project: {
@@ -160,7 +169,8 @@ export default class KpiEngineService {
 
     return {
       profileId,
-      academicYear,
+      periodFrom: period.fromDate,
+      periodTo: period.toDate,
       totalHours,
       totalPoints,
       metQuota,
@@ -171,8 +181,7 @@ export default class KpiEngineService {
   }
 
   /**
-   * Tính lại KPI và upsert `kpi_results` theo khóa `academicYear` (query param).
-   * Tổng giờ/điểm không phụ thuộc năm học — mọi profile có công bố hoặc đề tài duyệt đều được cập nhật.
+   * Tính lại KPI và upsert `kpi_results` (khóa academic_year giữ tương thích — giá trị = năm TC mặc định).
    */
   static async recalcAcademicYear(academicYear: string): Promise<{ updated: number }> {
     const profileIdsFromPubs = await Publication.query().distinct('profile_id').select('profile_id')
@@ -195,9 +204,10 @@ export default class KpiEngineService {
     }
     profileIdsFromProposalsResolved.forEach((id) => allProfileIds.add(id))
 
+    const period = khoangNamTaiChinh()
     let updated = 0
     for (const profileId of allProfileIds) {
-      const result = await this.calculateTeacherKpi(profileId, academicYear)
+      const result = await this.calculateTeacherKpi(profileId, period)
       await KpiResult.updateOrCreate(
         { profileId, academicYear },
         {

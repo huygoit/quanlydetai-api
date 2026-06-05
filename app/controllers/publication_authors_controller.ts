@@ -10,8 +10,10 @@ import {
   validateOwnerProfileLinked,
   prepareAuthorsRequestBody,
   resolvedProfileIdFromRow,
+  resolvedStudentIdFromRow,
 } from '#validators/publication_author_validator'
 import PublicationAccessService from '#services/publication_access_service'
+import { formatAuthorsDisplayFromRows } from '#utils/publication_authors_display'
 
 const OTHER_UNIT_LABEL = 'Other Organization (Đơn vị khác)'
 const LEGACY_OTHER_UNIT_LABEL = 'Đơn vị khác'
@@ -69,6 +71,7 @@ export default class PublicationAuthorsController {
     const data = authors.map((a) => ({
       id: a.id,
       profileId: a.profileId,
+      studentId: a.studentId,
       fullName: a.fullName,
       affiliationUnits: a.affiliationUnits ?? [],
       authorOrder: a.authorOrder,
@@ -132,6 +135,7 @@ export default class PublicationAuthorsController {
       const effectiveAffType = derivedAffType ?? a.affiliation_type
       const effectiveMulti = effectiveAffType === 'MIXED'
       const nextProfileId = resolvedProfileIdFromRow(a)
+      const nextStudentId = resolvedStudentIdFromRow(a)
 
       if (a.id != null) {
         const author = await PublicationAuthor.query()
@@ -149,6 +153,9 @@ export default class PublicationAuthorsController {
           if (nextProfileId !== undefined) {
             author.profileId = nextProfileId
           }
+          if (nextStudentId !== undefined) {
+            author.studentId = nextStudentId
+          }
           await author.save()
           continue
         }
@@ -156,6 +163,7 @@ export default class PublicationAuthorsController {
       await PublicationAuthor.create({
         publicationId: pubId,
         profileId: nextProfileId ?? null,
+        studentId: nextStudentId ?? null,
         fullName: a.full_name,
         affiliationUnits: a.affiliation_units ?? [],
         authorOrder: a.author_order,
@@ -169,9 +177,17 @@ export default class PublicationAuthorsController {
     const authors = await PublicationAuthor.query()
       .where('publication_id', pubId)
       .orderBy('author_order', 'asc')
+
+    const authorsDisplay = formatAuthorsDisplayFromRows(authors)
+    if (authorsDisplay) {
+      publication.authors = authorsDisplay
+      await publication.save()
+    }
+
     const data = authors.map((a) => ({
       id: a.id,
       profileId: a.profileId,
+      studentId: a.studentId,
       fullName: a.fullName,
       affiliationUnits: a.affiliationUnits ?? [],
       authorOrder: a.authorOrder,

@@ -34,6 +34,8 @@ const authorSchema = vine.object({
   profile_id: vine.number().optional().nullable(),
   /** FE thường gửi camelCase — chuẩn hoá sang profile_id trước khi lưu */
   profileId: vine.number().optional().nullable(),
+  student_id: vine.number().optional().nullable(),
+  studentId: vine.number().optional().nullable(),
   full_name: vine.string().trim().minLength(1).maxLength(255),
   affiliation_units: vine.array(vine.string().trim().minLength(1).maxLength(255)).optional(),
   author_order: vine.number().min(1),
@@ -80,6 +82,8 @@ export type AuthorPayloadRow = {
   id?: number
   profile_id?: number | null
   profileId?: number | null
+  student_id?: number | null
+  studentId?: number | null
   full_name: string
   affiliation_units?: string[]
   author_order: number
@@ -231,6 +235,9 @@ export function prepareAuthorsRequestBody(request: {
     if (r.profileId !== undefined && r.profile_id === undefined) {
       r.profile_id = r.profileId
     }
+    if (r.studentId !== undefined && r.student_id === undefined) {
+      r.student_id = r.studentId
+    }
 
     if (r.id != null && typeof r.id !== 'number') {
       const n = Number(r.id)
@@ -244,6 +251,14 @@ export function prepareAuthorsRequestBody(request: {
       const n = Number(r.profileId)
       if (Number.isFinite(n)) r.profileId = Math.trunc(n)
     }
+    if (r.student_id != null && typeof r.student_id !== 'number') {
+      const n = Number(r.student_id)
+      if (Number.isFinite(n)) r.student_id = Math.trunc(n)
+    }
+    if (r.studentId != null && typeof r.studentId !== 'number') {
+      const n = Number(r.studentId)
+      if (Number.isFinite(n)) r.studentId = Math.trunc(n)
+    }
   }
 }
 
@@ -251,6 +266,13 @@ export function prepareAuthorsRequestBody(request: {
 export function resolvedProfileIdFromRow(a: AuthorPayloadRow): number | null | undefined {
   if (a.profile_id !== undefined) return a.profile_id ?? null
   if (a.profileId !== undefined) return a.profileId ?? null
+  return undefined
+}
+
+/** Sau validate: một giá trị student_id thống nhất (ưu tiên snake_case). */
+export function resolvedStudentIdFromRow(a: AuthorPayloadRow): number | null | undefined {
+  if (a.student_id !== undefined) return a.student_id ?? null
+  if (a.studentId !== undefined) return a.studentId ?? null
   return undefined
 }
 

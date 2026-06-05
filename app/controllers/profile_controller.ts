@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import { normalizeOptionalHttpUrl } from '#utils/optional_http_url'
 import ScientificProfile from '#models/scientific_profile'
+import Student from '#models/student'
 import ProfileLanguage from '#models/profile_language'
 import ProfileAttachment from '#models/profile_attachment'
 import Publication from '#models/publication'
@@ -11,6 +12,7 @@ import NotificationService from '#services/notification_service'
 import ResearchOutputTypeService from '#services/research_output_type_service'
 import OpenAlexService from '#services/openalex_service'
 import { formatPublishedAtForResponse } from '#utils/publication_date_helper'
+import { resolvePublicationAuthorsDisplay } from '#utils/publication_authors_display'
 import PublicationAccessService from '#services/publication_access_service'
 import { createProfileValidator } from '#validators/scientific_profile_validator'
 import { updateProfileValidator } from '#validators/scientific_profile_validator'
@@ -114,9 +116,10 @@ export default class ProfileController {
   }
 
   /** Công bố hiển thị trên hồ sơ: bài chủ + bài đồng tác giả (có profile_id trong publication_authors). */
-  private async attachAccessiblePublications(profile: ScientificProfile) {
+  async attachAccessiblePublications(profile: ScientificProfile) {
     const pubs = await PublicationAccessService.accessiblePublicationsQuery(profile.id)
       .preload('researchOutputType')
+      .preload('publicationAuthors', (q) => q.orderBy('author_order', 'asc'))
       .orderBy('year', 'desc')
       .orderBy('id', 'desc')
     profile.$setRelated('publications', pubs)
@@ -568,6 +571,67 @@ export default class ProfileController {
   }
 
   /**
+   * GET /api/profile/me/author-students-lookup?q=&limit=
+   * Gợi ý sinh viên (bảng students) để gắn student_id khi khai báo tác giả công bố.
+   */
+  async authorStudentsLookup({ request, response }: HttpContext) {
+    const q = String(request.input('q', '')).trim()
+    const limitRaw = Number(request.input('limit', 20))
+    const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 20, 1), 50)
+    if (q.length < 2) {
+      return response.ok({ success: true, data: [] })
+    }
+    const like = `%${q}%`
+    const rows = await Student.query()
+      .where((b) => {
+        b.whereILike('full_name', like)
+          .orWhereILike('student_code', like)
+          .orWhereILike('school_email', like)
+          .orWhereILike('personal_email', like)
+          .orWhereILike('class_name', like)
+          .orWhereILike('class_code', like)
+          .orWhereILike('major_name', like)
+      })
+      .preload('department')
+      .orderBy('full_name', 'asc')
+      .limit(limit)
+      .select(
+        'id',
+        'student_code',
+        'full_name',
+        'first_name',
+        'last_name',
+        'school_email',
+        'personal_email',
+        'class_code',
+        'class_name',
+        'major_name',
+        'department_id',
+        'status'
+      )
+
+    const data = rows.map((s) => {
+      const ten =
+        (s.fullName && String(s.fullName).trim()) ||
+        [s.lastName, s.firstName].filter(Boolean).join(' ').trim() ||
+        null
+      return {
+        id: s.id,
+        fullName: ten,
+        studentCode: s.studentCode ?? null,
+        schoolEmail: s.schoolEmail ?? null,
+        personalEmail: s.personalEmail ?? null,
+        classCode: s.classCode ?? null,
+        className: s.className ?? null,
+        majorName: s.majorName ?? null,
+        department: s.department?.name ?? null,
+        status: s.status ?? null,
+      }
+    })
+    return response.ok({ success: true, data })
+  }
+
+  /**
    * GET /api/profile/me/openalex/publication-drafts
    * Lấy danh sách bài báo từ OpenAlex theo ORCID của user đăng nhập và map sang form tạo kết quả NCKH.
    */
@@ -694,7 +758,8 @@ export default class ProfileController {
         isOwner,
         canEdit: isOwner,
         title: pub.title,
-        authors: pub.authors,
+        authors: resolvePublicationAuthorsDisplay(pub),
+        myRole: pub.myRole,
         researchOutputTypeId: pub.researchOutputTypeId,
         researchOutputType: rot ? { id: rot.id, code: rot.code, name: rot.name } : null,
         publicationType: pub.publicationType,

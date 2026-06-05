@@ -11,6 +11,7 @@ import {
   resolvePublicationDatesForUpdate,
 } from '#utils/publication_date_helper'
 import PublicationAccessService from '#services/publication_access_service'
+import { resolvePublicationAuthorsDisplay } from '#utils/publication_authors_display'
 
 /**
  * Sub-resource: publications của hồ sơ me (GET/POST /api/profile/me/publications, PUT/DELETE /:id).
@@ -27,7 +28,7 @@ export default class PublicationsController {
       isOwner,
       canEdit: isOwner,
       title: p.title,
-      authors: p.authors,
+      authors: resolvePublicationAuthorsDisplay(p),
       correspondingAuthor: p.correspondingAuthor,
       myRole: p.myRole,
       researchOutputTypeId: p.researchOutputTypeId,
@@ -78,6 +79,7 @@ export default class PublicationsController {
 
     const q = PublicationAccessService.accessiblePublicationsQuery(profile.id)
       .preload('researchOutputType')
+      .preload('publicationAuthors', (pa) => pa.orderBy('author_order', 'asc'))
       .orderBy('year', 'desc')
       .orderBy('id', 'desc')
     if (publicationType) q.where('publication_type', publicationType)

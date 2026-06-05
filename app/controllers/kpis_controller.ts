@@ -4,6 +4,7 @@ import ScientificProfile from '#models/scientific_profile'
 import KpiResult from '#models/kpi_result'
 import KpiEngineService from '#services/kpi_engine_service'
 import PermissionService from '#services/permission_service'
+import { resolveKpiPeriodRange } from '#utils/kpi_period_helper'
 
 /** Lucid/Postgres bigInteger có thể là bigint — Number.isFinite(bigint) là false, phải ép về number. */
 function toFinitePositiveInt(v: unknown): number | null {
@@ -77,7 +78,8 @@ function duocTinhTheoMuc15(affiliationType: string): boolean {
 export default class KpisController {
   /**
    * GET /api/kpis/teachers/:profileId
-   * Query: academic_year (VD 2024-2025). Nếu không truyền, lấy năm học hiện tại (9-8).
+   * Query: from_date, to_date (YYYY-MM-DD). Mặc định: năm tài chính hiện tại (từ 01/04).
+   * academic_year (cũ) vẫn nhận nhưng không dùng để lọc — ưu tiên from_date/to_date.
    */
   async teachersShow({ params, request, response }: HttpContext) {
     const profileId = toFinitePositiveInt(params.profileId)
@@ -85,26 +87,25 @@ export default class KpisController {
       return response.badRequest({ success: false, message: 'profileId không hợp lệ.' })
     }
 
-    let academicYear = request.input('academic_year', '') as string
-    if (!academicYear.trim()) {
-      const now = new Date()
-      const y = now.getFullYear()
-      const m = now.getMonth() + 1
-      if (m >= 9) academicYear = `${y}-${y + 1}`
-      else academicYear = `${y - 1}-${y}`
-    }
+    const period = resolveKpiPeriodRange(
+      request.input('from_date'),
+      request.input('to_date')
+    )
 
-    const result = await KpiEngineService.calculateTeacherKpi(profileId, academicYear)
+    const result = await KpiEngineService.calculateTeacherKpi(profileId, period)
     const cached = await KpiResult.query()
       .where('profile_id', profileId)
-      .where('academic_year', academicYear)
+      .where('academic_year', period.fromDate)
       .first()
 
     return response.ok({
       success: true,
       data: {
         profileId: result.profileId,
-        academicYear: result.academicYear,
+        periodFrom: result.periodFrom,
+        periodTo: result.periodTo,
+        fromDate: result.periodFrom,
+        toDate: result.periodTo,
         totalHours: result.totalHours,
         totalPoints: result.totalPoints,
         metQuota: result.metQuota,

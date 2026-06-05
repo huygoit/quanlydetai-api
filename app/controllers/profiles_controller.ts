@@ -7,6 +7,7 @@ import ProfileVerifyLog from '#models/profile_verify_log'
 import NotificationService from '#services/notification_service'
 import { verifyProfileValidator } from '#validators/scientific_profile_validator'
 import ProfileController from '#controllers/profile_controller'
+import PublicationAccessService from '#services/publication_access_service'
 
 const profileSerializer = new ProfileController()
 
@@ -105,10 +106,10 @@ export default class ProfilesController {
     if (!Number.isFinite(profileId) || !Number.isFinite(pubId)) {
       return response.badRequest({ success: false, message: 'id hoặc pubId không hợp lệ.' })
     }
-    const publication = await Publication.query()
-      .where('id', pubId)
-      .where('profile_id', profileId)
-      .first()
+    const profile = await ScientificProfile.find(profileId)
+    if (!profile) return response.notFound({ success: false, message: 'Không tìm thấy hồ sơ.' })
+
+    const publication = await PublicationAccessService.findViewable(pubId, profileId)
     if (!publication) {
       return response.notFound({ success: false, message: 'Không tìm thấy công bố hoặc không thuộc hồ sơ này.' })
     }
@@ -118,7 +119,9 @@ export default class ProfilesController {
     const data = authors.map((a) => ({
       id: a.id,
       profileId: a.profileId,
+      studentId: a.studentId,
       fullName: a.fullName,
+      affiliationUnits: a.affiliationUnits ?? [],
       authorOrder: a.authorOrder,
       isTopAuthor: a.isTopAuthor,
       isCorresponding: a.isCorresponding,
@@ -136,9 +139,9 @@ export default class ProfilesController {
       .where('id', params.id)
       .preload('languages')
       .preload('attachments')
-      .preload('publications', (q) => q.preload('researchOutputType'))
       .first()
     if (!profile) return response.notFound({ success: false, message: 'Không tìm thấy hồ sơ.' })
+    await profileSerializer.attachAccessiblePublications(profile)
     return response.ok({ success: true, data: profileSerializer.serializeProfile(profile) })
   }
 
