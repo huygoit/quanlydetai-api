@@ -39,5 +39,42 @@ test.group('DashboardOverviewService', () => {
     assert.isAtLeast(alerts.length, 1)
     assert.isTrue(alerts.some((a) => a.key === 'trend_drop'))
   })
+
+  test('aggregatePublicationsByRootType rolls leaf counts up to root type', ({ assert }) => {
+    const typeById = new Map([
+      [1, { id: 1, parentId: null, code: 'I', name: 'Công bố khoa học' }],
+      [2, { id: 2, parentId: 1, code: 'I.1', name: 'Bài báo tạp chí' }],
+      [3, { id: 3, parentId: 2, code: 'PUB_WOS_Q1', name: 'Bài báo WOS Q1' }],
+      [4, { id: 4, parentId: null, code: 'II', name: 'Sách, giáo trình' }],
+    ])
+
+    const result = DashboardOverviewService.aggregatePublicationsByRootType(
+      [
+        { research_output_type_id: 3, total: 5 },
+        { research_output_type_id: 4, total: 2 },
+        { research_output_type_id: null, total: 1 },
+      ],
+      typeById,
+      [
+        { id: 1, parentId: null, code: 'I', name: 'Công bố khoa học', sortOrder: 1 },
+        { id: 4, parentId: null, code: 'II', name: 'Sách, giáo trình', sortOrder: 2 },
+        { id: 5, parentId: null, code: 'III', name: 'Bằng độc quyền', sortOrder: 3 },
+      ]
+    )
+
+    const pub = result.find((r) => r.code === 'I')
+    const book = result.find((r) => r.code === 'II')
+    const patent = result.find((r) => r.code === 'III')
+    const unclassified = result.find((r) => r.code === 'UNCLASSIFIED')
+    assert.exists(pub)
+    assert.equal(pub!.count, 5)
+    assert.exists(book)
+    assert.equal(book!.count, 2)
+    assert.exists(patent)
+    assert.equal(patent!.count, 0)
+    assert.exists(unclassified)
+    assert.equal(unclassified!.count, 1)
+    assert.equal(result.length, 4)
+  })
 })
 

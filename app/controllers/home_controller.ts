@@ -6,6 +6,7 @@ import User from '#models/user'
 import CouncilSession from '#models/council_session'
 import Student from '#models/student'
 import ScientificProfile from '#models/scientific_profile'
+import ResearchOutputType from '#models/research_output_type'
 import PermissionService from '#services/permission_service'
 import DashboardOverviewService from '#services/dashboard_overview_service'
 import db from '@adonisjs/lucid/services/db'
@@ -989,6 +990,49 @@ export default class HomeController {
     const fieldStats = DashboardOverviewService.mergeFieldStats(projectFieldRows, startupFieldRows)
     const alerts = DashboardOverviewService.buildAlerts(trend, unitStats, fieldStats)
 
+    const pubByTypeBase = db
+      .from('publications as pub')
+      .join('scientific_profiles as sp', 'pub.profile_id', 'sp.id')
+      .join('users as u', 'sp.user_id', 'u.id')
+      .where('u.is_active', true)
+
+    if (filterYear) {
+      pubByTypeBase.where((q) => {
+        q.whereRaw('COALESCE(EXTRACT(YEAR FROM pub.published_at)::int, pub.year) = ?', [filterYear]).orWhereRaw(
+          '(pub.published_at IS NULL AND pub.year IS NULL AND EXTRACT(YEAR FROM pub.created_at)::int = ?)',
+          [filterYear]
+        )
+      })
+    }
+    if (filterDepartmentId) {
+      pubByTypeBase.where((q) => {
+        q.where('u.department_id', filterDepartmentId).orWhere('sp.department_id', filterDepartmentId)
+      })
+    }
+    if (filterField) {
+      pubByTypeBase.whereILike('sp.main_research_area', `%${filterField}%`)
+    }
+
+    const [pubCountByTypeRows, researchOutputTypeRows] = await Promise.all([
+      pubByTypeBase.clone().select('pub.research_output_type_id').count('* as total').groupBy('pub.research_output_type_id'),
+      ResearchOutputType.query().select('id', 'parentId', 'code', 'name', 'sortOrder').orderBy('sortOrder', 'asc'),
+    ])
+
+    const typeNodes = researchOutputTypeRows.map((t) => ({
+      id: t.id,
+      parentId: t.parentId,
+      code: t.code,
+      name: t.name,
+      sortOrder: t.sortOrder,
+    }))
+    const typeById = new Map(typeNodes.map((t) => [t.id, t]))
+    const rootTypes = typeNodes.filter((t) => t.parentId == null)
+    const publicationsByRootType = DashboardOverviewService.aggregatePublicationsByRootType(
+      pubCountByTypeRows as Array<{ research_output_type_id: number | null; total: string | number }>,
+      typeById,
+      rootTypes
+    )
+
     const departments = await db
       .from('departments')
       .where('status', 'ACTIVE')
@@ -1024,6 +1068,7 @@ export default class HomeController {
         fieldStats,
         topUnits: unitStats.slice(0, 8),
         topFields: fieldStats.slice(0, 8),
+        publicationsByRootType,
         alerts,
       },
     })
