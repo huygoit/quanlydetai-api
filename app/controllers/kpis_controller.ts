@@ -5,6 +5,7 @@ import KpiResult from '#models/kpi_result'
 import KpiEngineService from '#services/kpi_engine_service'
 import PermissionService from '#services/permission_service'
 import { resolveKpiPeriodRange } from '#utils/kpi_period_helper'
+import { genderForPublicationAuthorRow } from '#utils/publication_author_api'
 
 /** Lucid/Postgres bigInteger có thể là bigint — Number.isFinite(bigint) là false, phải ép về number. */
 function toFinitePositiveInt(v: unknown): number | null {
@@ -129,7 +130,7 @@ export default class KpisController {
 
     const publication = await Publication.query()
       .where('id', pubId)
-      .preload('publicationAuthors', (q) => q.preload('profile'))
+      .preload('publicationAuthors', (q) => q.preload('profile').preload('student'))
       .first()
     if (!publication) {
       return response.notFound({ success: false, message: 'Không tìm thấy công bố.' })
@@ -161,6 +162,8 @@ export default class KpisController {
       )
       if (rowOfViewer?.profile) {
         isFemale = isFemaleGender(rowOfViewer.profile.gender)
+      } else if (rowOfViewer) {
+        isFemale = isFemaleGender(genderForPublicationAuthorRow(rowOfViewer))
       }
     }
 
@@ -217,7 +220,7 @@ export default class KpisController {
           (a.profileId != null && sameNumericId(a.profileId, profileId)) ||
           (matchedFullName.length > 0 &&
             a.fullName.trim().toLowerCase() === matchedFullName.trim().toLowerCase())
-        const rowIsFemale = isFemaleGender(a.profile?.gender)
+        const rowIsFemale = isFemaleGender(genderForPublicationAuthorRow(a))
         let h = 0
         let pts = 0
         if (duocTinhTheoMuc15(a.affiliationType)) {

@@ -5,15 +5,19 @@ import PublicationAuthor from '#models/publication_author'
 import {
   upsertPublicationAuthorsValidator,
   validateAuthorsListRules,
+  validateManualAuthorGender,
   dedupeOwnerAuthorRowsForProfile,
   ensureOwnerProfileOnAuthorRows,
   validateOwnerProfileLinked,
   prepareAuthorsRequestBody,
   resolvedProfileIdFromRow,
   resolvedStudentIdFromRow,
+  resolvedGenderForSave,
 } from '#validators/publication_author_validator'
 import PublicationAccessService from '#services/publication_access_service'
+import ScientificProfileAdminService from '#services/scientific_profile_admin_service'
 import { formatAuthorsDisplayFromRows } from '#utils/publication_authors_display'
+import { mapPublicationAuthorToApi } from '#utils/publication_author_api'
 
 const OTHER_UNIT_LABEL = 'Other Organization (Đơn vị khác)'
 const LEGACY_OTHER_UNIT_LABEL = 'Đơn vị khác'
@@ -66,27 +70,25 @@ export default class PublicationAuthorsController {
 
     const authors = await PublicationAuthor.query()
       .where('publication_id', pubId)
+      .preload('profile', (q) => q.select('id', 'gender'))
+      .preload('student', (q) => q.select('id', 'gender'))
       .orderBy('author_order', 'asc')
 
-    const data = authors.map((a) => ({
-      id: a.id,
-      profileId: a.profileId,
-      studentId: a.studentId,
-      fullName: a.fullName,
-      affiliationUnits: a.affiliationUnits ?? [],
-      authorOrder: a.authorOrder,
-      isTopAuthor: a.isTopAuthor,
-      isCorresponding: a.isCorresponding,
-      affiliationType: a.affiliationType,
-      isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
-    }))
+    const adminProfileIds = await ScientificProfileAdminService.adminProfileIdsAmong(
+      authors.map((a) => a.profileId).filter((id): id is number => id != null)
+    )
+    const visibleAuthors = authors.filter(
+      (a) => a.profileId == null || !adminProfileIds.has(Number(a.profileId))
+    )
+
+    const data = visibleAuthors.map((a) => mapPublicationAuthorToApi(a))
 
     return response.ok({ success: true, data })
   }
 
   /**
    * PUT /api/profile/me/publications/:id/authors
-   * Body (snake_case): { authors: [{ id?, profile_id?, full_name, author_order, is_top_author, is_corresponding, affiliation_type, is_multi_affiliation_outside_udn }] }
+   * Body (snake_case): { authors: [{ id?, profile_id?, student_id?, gender?, full_name, author_order, is_top_author, is_corresponding, affiliation_type, is_multi_affiliation_outside_udn, affiliation_units? }] }
    * Upsert: cập nhật theo id (phải thuộc publication này), tạo mới nếu không có id, xóa các bản ghi không còn trong payload.
    * Phải có ít nhất một tác giả gắn profile_id trùng chủ hồ sơ (sau khi server gộp trùng / gắn id); nếu không → 422.
    * Không bắt buộc có tác giả nhóm chính (is_top_author / is_corresponding) khi lưu.
@@ -114,10 +116,22 @@ export default class PublicationAuthorsController {
 
     prepareAuthorsRequestBody(request)
     const payload = await request.validateUsing(upsertPublicationAuthorsValidator)
-    dedupeOwnerAuthorRowsForProfile(payload.authors, profile.id, profile.fullName ?? '')
-    ensureOwnerProfileOnAuthorRows(payload.authors, profile.id, profile.fullName ?? '')
+
+    const userId = auth.use('api').user!.id
+    const isAdminKeKhai = await ScientificProfileAdminService.userHasAdminKeKhaiRole(userId)
+
+    payload.authors = await ScientificProfileAdminService.stripAdminProfilesFromAuthorRows(
+      payload.authors
+    )
+
+    if (!isAdminKeKhai) {
+      dedupeOwnerAuthorRowsForProfile(payload.authors, profile.id, profile.fullName ?? '')
+      ensureOwnerProfileOnAuthorRows(payload.authors, profile.id, profile.fullName ?? '')
+      validateOwnerProfileLinked(payload.authors, profile.id)
+    }
+
     validateAuthorsListRules(payload.authors)
-    validateOwnerProfileLinked(payload.authors, profile.id)
+    validateManualAuthorGender(payload.authors)
     const incomingIds = new Set(
       payload.authors.map((a) => a.id).filter((id): id is number => id !== undefined && id !== null)
     )
@@ -136,6 +150,7 @@ export default class PublicationAuthorsController {
       const effectiveMulti = effectiveAffType === 'MIXED'
       const nextProfileId = resolvedProfileIdFromRow(a)
       const nextStudentId = resolvedStudentIdFromRow(a)
+      const nextGender = resolvedGenderForSave(a)
 
       if (a.id != null) {
         const author = await PublicationAuthor.query()
@@ -143,6 +158,14 @@ export default class PublicationAuthorsController {
           .where('publication_id', pubId)
           .first()
         if (author) {
+          const isOwnerRow =
+            author.profileId != null && Number(author.profileId) === Number(profile.id)
+          if (isOwnerRow && !isAdminKeKhai) {
+            author.isTopAuthor = a.is_top_author
+            author.isCorresponding = a.is_corresponding
+            await author.save()
+            continue
+          }
           author.fullName = a.full_name
           author.affiliationUnits = a.affiliation_units ?? []
           author.authorOrder = a.author_order
@@ -150,6 +173,7 @@ export default class PublicationAuthorsController {
           author.isCorresponding = a.is_corresponding
           author.affiliationType = effectiveAffType
           author.isMultiAffiliationOutsideUdn = effectiveMulti
+          author.gender = nextGender
           if (nextProfileId !== undefined) {
             author.profileId = nextProfileId
           }
@@ -164,6 +188,7 @@ export default class PublicationAuthorsController {
         publicationId: pubId,
         profileId: nextProfileId ?? null,
         studentId: nextStudentId ?? null,
+        gender: nextGender,
         fullName: a.full_name,
         affiliationUnits: a.affiliation_units ?? [],
         authorOrder: a.author_order,
@@ -174,28 +199,26 @@ export default class PublicationAuthorsController {
       })
     }
 
-    const authors = await PublicationAuthor.query()
+    const savedAuthors = await PublicationAuthor.query()
       .where('publication_id', pubId)
+      .preload('profile', (q) => q.select('id', 'gender'))
+      .preload('student', (q) => q.select('id', 'gender'))
       .orderBy('author_order', 'asc')
 
-    const authorsDisplay = formatAuthorsDisplayFromRows(authors)
+    const adminProfileIdsSaved = await ScientificProfileAdminService.adminProfileIdsAmong(
+      savedAuthors.map((a) => a.profileId).filter((id): id is number => id != null)
+    )
+    const visibleSaved = savedAuthors.filter(
+      (a) => a.profileId == null || !adminProfileIdsSaved.has(Number(a.profileId))
+    )
+
+    const authorsDisplay = formatAuthorsDisplayFromRows(visibleSaved)
     if (authorsDisplay) {
       publication.authors = authorsDisplay
       await publication.save()
     }
 
-    const data = authors.map((a) => ({
-      id: a.id,
-      profileId: a.profileId,
-      studentId: a.studentId,
-      fullName: a.fullName,
-      affiliationUnits: a.affiliationUnits ?? [],
-      authorOrder: a.authorOrder,
-      isTopAuthor: a.isTopAuthor,
-      isCorresponding: a.isCorresponding,
-      affiliationType: a.affiliationType,
-      isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
-    }))
+    const data = visibleSaved.map((a) => mapPublicationAuthorToApi(a))
 
     return response.ok({ success: true, data })
   }

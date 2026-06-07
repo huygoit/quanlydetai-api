@@ -8,6 +8,7 @@ import NotificationService from '#services/notification_service'
 import { verifyProfileValidator } from '#validators/scientific_profile_validator'
 import ProfileController from '#controllers/profile_controller'
 import PublicationAccessService from '#services/publication_access_service'
+import { mapPublicationAuthorToApi } from '#utils/publication_author_api'
 
 const profileSerializer = new ProfileController()
 
@@ -115,19 +116,10 @@ export default class ProfilesController {
     }
     const authors = await PublicationAuthor.query()
       .where('publication_id', pubId)
+      .preload('profile', (q) => q.select('id', 'gender'))
+      .preload('student', (q) => q.select('id', 'gender'))
       .orderBy('author_order', 'asc')
-    const data = authors.map((a) => ({
-      id: a.id,
-      profileId: a.profileId,
-      studentId: a.studentId,
-      fullName: a.fullName,
-      affiliationUnits: a.affiliationUnits ?? [],
-      authorOrder: a.authorOrder,
-      isTopAuthor: a.isTopAuthor,
-      isCorresponding: a.isCorresponding,
-      affiliationType: a.affiliationType,
-      isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
-    }))
+    const data = authors.map((a) => mapPublicationAuthorToApi(a))
     return response.ok({ success: true, data })
   }
 

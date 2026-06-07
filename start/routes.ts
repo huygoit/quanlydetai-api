@@ -336,7 +336,7 @@ router
     router.put('/publications/:id/authors', [PublicationAuthorsController, 'update'])
   })
   .prefix('/api/profile/me')
-  .middleware([middleware.auth()])
+  .middleware([middleware.auth(), middleware.personalWorkspace()])
 
 // --- Hồ sơ cá nhân của user đang đăng nhập (xem + tự sửa)
 router
@@ -345,7 +345,7 @@ router
     router.put('/', [MePersonalProfileController, 'update'])
   })
   .prefix('/api/me/personal-profile')
-  .middleware([middleware.auth()])
+  .middleware([middleware.auth(), middleware.personalWorkspace()])
 
 // --- Alias không có /api (một số FE đang gọi /profile/me)
 router
@@ -374,7 +374,7 @@ router
     router.put('/publications/:id/authors', [PublicationAuthorsController, 'update'])
   })
   .prefix('/profile/me')
-  .middleware([middleware.auth()])
+  .middleware([middleware.auth(), middleware.personalWorkspace()])
 
 // --- Upload alias (để FE dùng POST /api/uploads)
 router.post('/api/uploads', [ProfileAttachmentsController, 'store']).middleware([middleware.auth()])
@@ -397,9 +397,9 @@ router
 router
   .group(() => {
     router.get('/', [IdeasController, 'index'])
-    router.get('/my', [IdeasController, 'myIndex'])
+    router.get('/my', [IdeasController, 'myIndex']).middleware([middleware.personalWorkspace()])
     router.get('/:id', [IdeasController, 'show'])
-    router.post('/', [IdeasController, 'store'])
+    router.post('/', [IdeasController, 'store']).middleware([middleware.personalWorkspace()])
     router.put('/:id', [IdeasController, 'update'])
     router.delete('/:id', [IdeasController, 'destroy'])
     router.post('/:id/submit', [IdeasController, 'submit'])
@@ -466,8 +466,8 @@ router
     router.get('/summary', [HomeController, 'summary'])
     router.get('/tasks', [HomeController, 'tasks'])
     router.get('/notifications', [HomeController, 'notifications'])
-    router.get('/my-projects', [HomeController, 'myProjects'])
-    router.get('/my-ideas', [HomeController, 'myIdeas'])
+    router.get('/my-projects', [HomeController, 'myProjects']).middleware([middleware.personalWorkspace()])
+    router.get('/my-ideas', [HomeController, 'myIdeas']).middleware([middleware.personalWorkspace()])
     router.get('/workflow-steps', [HomeController, 'workflowSteps'])
     router.get('/pending-proposals', [HomeController, 'pendingProposals'])
     router.get('/delayed-projects', [HomeController, 'delayedProjects'])

@@ -14,6 +14,7 @@ import OpenAlexService from '#services/openalex_service'
 import { formatPublishedAtForResponse } from '#utils/publication_date_helper'
 import { resolvePublicationAuthorsDisplay } from '#utils/publication_authors_display'
 import PublicationAccessService from '#services/publication_access_service'
+import ScientificProfileAdminService from '#services/scientific_profile_admin_service'
 import { createProfileValidator } from '#validators/scientific_profile_validator'
 import { updateProfileValidator } from '#validators/scientific_profile_validator'
 import { listUdnAffiliationUnitsForSelect } from '#constants/udn_affiliation_units'
@@ -537,7 +538,8 @@ export default class ProfileController {
       return response.ok({ success: true, data: [] })
     }
     const like = `%${q}%`
-    const rows = await ScientificProfile.query()
+    const adminUserIds = await ScientificProfileAdminService.getUserIdsWithAdminKeKhaiRole()
+    const rowsQuery = ScientificProfile.query()
       .where((b) => {
         b.whereILike('full_name', like)
           .orWhereILike('work_email', like)
@@ -545,12 +547,17 @@ export default class ProfileController {
           .orWhereILike('faculty', like)
           .orWhereILike('department', like)
       })
+    if (adminUserIds.length > 0) {
+      rowsQuery.whereNotIn('user_id', adminUserIds)
+    }
+    const rows = await rowsQuery
       .preload('departmentUnit')
       .orderBy('full_name', 'asc')
       .limit(limit)
       .select(
         'id',
         'full_name',
+        'gender',
         'degree',
         'academic_title',
         'organization',
@@ -562,6 +569,7 @@ export default class ProfileController {
     const data = rows.map((p) => ({
       id: p.id,
       fullName: p.fullName,
+      gender: p.gender ?? null,
       degree: p.degree ?? null,
       academicTitle: p.academicTitle ?? null,
       organization: p.organization ?? null,
@@ -599,6 +607,7 @@ export default class ProfileController {
         'id',
         'student_code',
         'full_name',
+        'gender',
         'first_name',
         'last_name',
         'school_email',
@@ -618,6 +627,7 @@ export default class ProfileController {
       return {
         id: s.id,
         fullName: ten,
+        gender: s.gender ?? null,
         studentCode: s.studentCode ?? null,
         schoolEmail: s.schoolEmail ?? null,
         personalEmail: s.personalEmail ?? null,

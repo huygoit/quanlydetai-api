@@ -8,6 +8,9 @@ import Student from '#models/student'
 /** Loại affiliation tác giả */
 export type AffiliationType = 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
 
+/** Giới tính tác giả nhập tay — khớp FE (MALE/FEMALE/OTHER). */
+export type AuthorGender = 'MALE' | 'FEMALE' | 'OTHER'
+
 /**
  * Tác giả bài báo: liên kết publication – profile, thứ tự, vai trò, affiliation.
  * Phục vụ tính giờ NCKH theo QĐ 1883.
@@ -26,6 +29,9 @@ export default class PublicationAuthor extends BaseModel {
 
   @column()
   declare studentId: number | null
+
+  @column()
+  declare gender: AuthorGender | null
 
   @column()
   declare fullName: string

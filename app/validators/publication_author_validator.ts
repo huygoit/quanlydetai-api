@@ -2,6 +2,19 @@ import vine from '@vinejs/vine'
 import { errors } from '@vinejs/vine'
 
 const AFFILIATION_TYPES = ['UDN_ONLY', 'MIXED', 'OUTSIDE'] as const
+const AUTHOR_GENDERS = ['MALE', 'FEMALE', 'OTHER'] as const
+
+/** Tác giả không liên kết profile_id / student_id — cần gender nhập tay. */
+export function laTacGiaNhapTay(row: {
+  profile_id?: number | null
+  profileId?: number | null
+  student_id?: number | null
+  studentId?: number | null
+}): boolean {
+  const pid = row.profile_id !== undefined ? row.profile_id : row.profileId
+  const sid = row.student_id !== undefined ? row.student_id : row.studentId
+  return (pid == null || pid === undefined) && (sid == null || sid === undefined)
+}
 
 /** Ép id (Lucid/JSON có thể là string/bigint) về number an toàn */
 function toFiniteId(v: unknown): number | null {
@@ -36,6 +49,7 @@ const authorSchema = vine.object({
   profileId: vine.number().optional().nullable(),
   student_id: vine.number().optional().nullable(),
   studentId: vine.number().optional().nullable(),
+  gender: vine.enum(AUTHOR_GENDERS).optional().nullable(),
   full_name: vine.string().trim().minLength(1).maxLength(255),
   affiliation_units: vine.array(vine.string().trim().minLength(1).maxLength(255)).optional(),
   author_order: vine.number().min(1),
@@ -84,6 +98,7 @@ export type AuthorPayloadRow = {
   profileId?: number | null
   student_id?: number | null
   studentId?: number | null
+  gender?: (typeof AUTHOR_GENDERS)[number] | null
   full_name: string
   affiliation_units?: string[]
   author_order: number
@@ -91,6 +106,28 @@ export type AuthorPayloadRow = {
   is_corresponding: boolean
   affiliation_type: (typeof AFFILIATION_TYPES)[number]
   is_multi_affiliation_outside_udn: boolean
+}
+
+/** Bắt buộc gender khi tác giả nhập tay (không profile_id / student_id). */
+export function validateManualAuthorGender(authors: AuthorPayloadRow[]): void {
+  for (let i = 0; i < authors.length; i++) {
+    const a = authors[i]!
+    if (!laTacGiaNhapTay(a)) continue
+    if (a.gender && AUTHOR_GENDERS.includes(a.gender)) continue
+    throw new errors.E_VALIDATION_ERROR([
+      {
+        field: `authors.${i}.gender`,
+        message: `Tác giả "${a.full_name.trim()}" (nhập tay) cần chọn giới tính (MALE/FEMALE/OTHER)`,
+        rule: 'required',
+      },
+    ])
+  }
+}
+
+/** Giá trị gender lưu DB: null nếu liên kết hồ sơ/sinh viên. */
+export function resolvedGenderForSave(a: AuthorPayloadRow): (typeof AUTHOR_GENDERS)[number] | null {
+  if (!laTacGiaNhapTay(a)) return null
+  return a.gender ?? null
 }
 
 /**
