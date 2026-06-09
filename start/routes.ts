@@ -39,6 +39,8 @@ import AdminIamUsersController from '#controllers/admin/iam_users_controller'
 import AdminPersonalProfilesController from '#controllers/admin/personal_profiles_controller'
 import MePersonalProfileController from '#controllers/me_personal_profile_controller'
 import AdminStaffsController from '#controllers/admin/staffs_controller'
+import AdminPublicationsController from '#controllers/admin/publications_controller'
+import AdminPublicationAuthorsController from '#controllers/admin/publication_authors_controller'
 import path from 'node:path'
 import { findAttachmentFilePath } from '#utils/upload_storage_helper'
 
@@ -247,6 +249,43 @@ router
       .use(middleware.permission('department.view'))
   })
   .prefix('/api/admin/staffs')
+  .use([middleware.auth()])
+
+// --- Admin: kết quả NCKH toàn hệ thống (permission: publication.*)
+router
+  .group(() => {
+    router
+      .get('/', [AdminPublicationsController, 'index'])
+      .use(middleware.permission('publication.view'))
+    router
+      .get('/lookup/author-profiles', [ProfileController, 'authorProfilesLookup'])
+      .use(middleware.permission('publication.view'))
+    router
+      .get('/lookup/author-students', [ProfileController, 'authorStudentsLookup'])
+      .use(middleware.permission('publication.view'))
+    router
+      .get('/research-output-types/tree', [ProfileController, 'researchOutputTypesTree'])
+      .use(middleware.permission('publication.view'))
+    router
+      .get('/:id/authors', [AdminPublicationAuthorsController, 'index'])
+      .use(middleware.permission('publication.view'))
+    router
+      .put('/:id/authors', [AdminPublicationAuthorsController, 'update'])
+      .use(middleware.permission('publication.update'))
+    router
+      .get('/:id', [AdminPublicationsController, 'show'])
+      .use(middleware.permission('publication.view'))
+    router
+      .post('/', [AdminPublicationsController, 'store'])
+      .use(middleware.permission('publication.create'))
+    router
+      .put('/:id', [AdminPublicationsController, 'update'])
+      .use(middleware.permission('publication.update'))
+    router
+      .delete('/:id', [AdminPublicationsController, 'destroy'])
+      .use(middleware.permission('publication.delete'))
+  })
+  .prefix('/api/admin/publications')
   .use([middleware.auth()])
 
 // --- Admin: catalogs CRUD (chỉ ADMIN)

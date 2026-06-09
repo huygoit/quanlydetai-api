@@ -137,26 +137,17 @@ export default class KpisController {
     }
 
     const ownerPubProfileId = toFinitePositiveInt(publication.profileId)
-    if (ownerPubProfileId == null) {
-      return response.badRequest({
-        success: false,
-        message: 'Công bố thiếu profile chủ (publications.profile_id).',
-      })
-    }
 
     const profileIdParam = request.input('profile_id', '') as string
     const fromQuery =
       profileIdParam != null && String(profileIdParam).trim() !== ''
         ? toFinitePositiveInt(profileIdParam)
         : null
-    const profileId = fromQuery ?? toFinitePositiveInt(publication.profileId)
-    if (profileId == null) {
-      return response.badRequest({ success: false, message: 'profile_id không hợp lệ.' })
-    }
+    const profileId = fromQuery ?? ownerPubProfileId ?? null
 
-    const profile = await ScientificProfile.find(profileId)
+    const profile = profileId != null ? await ScientificProfile.find(profileId) : null
     let isFemale = isFemaleGender(profile?.gender)
-    if (!isFemale) {
+    if (!isFemale && profileId != null) {
       const rowOfViewer = publication.publicationAuthors.find(
         (a) => a.profileId != null && sameNumericId(a.profileId, profileId)
       )
@@ -171,7 +162,7 @@ export default class KpisController {
       type: 'PUBLICATION' as const,
       publication: {
         id: toFinitePositiveInt(publication.id)!,
-        ownerProfileId: ownerPubProfileId,
+        ownerProfileId: ownerPubProfileId ?? profileId ?? 0,
         researchOutputTypeId: publication.researchOutputTypeId,
         hdgsnnScore: publication.hdgsnnScore != null ? Number(publication.hdgsnnScore) : null,
       },
@@ -185,7 +176,7 @@ export default class KpisController {
       })),
     }
     const result = await KpiEngineService.calculateOutputHours(output, {
-      profileId,
+      profileId: profileId ?? 0,
       academicYear: '',
       isFemale,
       profileFullName: profile?.fullName ?? null,
@@ -217,9 +208,10 @@ export default class KpisController {
       .sort((a, b) => a.authorOrder - b.authorOrder)
       .map((a) => {
         const isViewerRow =
-          (a.profileId != null && sameNumericId(a.profileId, profileId)) ||
-          (matchedFullName.length > 0 &&
-            a.fullName.trim().toLowerCase() === matchedFullName.trim().toLowerCase())
+          profileId != null &&
+          ((a.profileId != null && sameNumericId(a.profileId, profileId)) ||
+            (matchedFullName.length > 0 &&
+              a.fullName.trim().toLowerCase() === matchedFullName.trim().toLowerCase()))
         const rowIsFemale = isFemaleGender(genderForPublicationAuthorRow(a))
         let h = 0
         let pts = 0

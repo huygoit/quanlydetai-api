@@ -13,6 +13,10 @@ const TO_ADD: Array<{ code: string; name: string; module: string; action: string
   { code: 'idea.update', name: 'Cập nhật ý tưởng', module: 'idea', action: 'update' },
   { code: 'idea.submit', name: 'Gửi ý tưởng', module: 'idea', action: 'submit' },
   { code: 'idea.delete', name: 'Xóa ý tưởng', module: 'idea', action: 'delete' },
+  { code: 'publication.view', name: 'Xem kết quả NCKH', module: 'publication', action: 'view' },
+  { code: 'publication.create', name: 'Tạo kết quả NCKH', module: 'publication', action: 'create' },
+  { code: 'publication.update', name: 'Cập nhật kết quả NCKH', module: 'publication', action: 'update' },
+  { code: 'publication.delete', name: 'Xóa kết quả NCKH', module: 'publication', action: 'delete' },
 ]
 
 export default class MissingPermissionsSeeder extends BaseSeeder {

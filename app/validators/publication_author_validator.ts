@@ -91,6 +91,26 @@ export function validateAuthorsListRules(
   }
 }
 
+/**
+ * Module quản lý KQNC: ít nhất một tác giả liên kết NCV (publication_authors.profile_id).
+ * Không dùng publications.profile_id — đó là luồng chủ kê khai /profile/me.
+ */
+export function validateAdminAuthorsHaveAtLeastOneNcvLink(authors: AuthorPayloadRow[]): void {
+  const coNcv = authors.some((a) => {
+    const pid = resolvedProfileIdFromRow(a)
+    return pid != null && Number.isFinite(pid) && pid > 0
+  })
+  if (!coNcv) {
+    throw new errors.E_VALIDATION_ERROR([
+      {
+        field: 'authors',
+        message: 'Cần ít nhất một tác giả được liên kết với NCV trong hệ thống.',
+        rule: 'custom',
+      },
+    ])
+  }
+}
+
 /** Một dòng tác giả sau khi validate Vine (snake_case). */
 export type AuthorPayloadRow = {
   id?: number

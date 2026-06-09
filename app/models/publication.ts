@@ -10,7 +10,7 @@ export default class Publication extends BaseModel {
   declare id: number
 
   @column()
-  declare profileId: number
+  declare profileId: number | null
 
   /** Lá danh mục loại kết quả NCKH (quy đổi giờ theo research_output_rules) */
   @column()

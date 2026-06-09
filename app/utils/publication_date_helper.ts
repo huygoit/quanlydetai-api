@@ -73,3 +73,11 @@ export function resolvePublicationDatesForUpdate(
 export function formatPublishedAtForResponse(publishedAt: DateTime | null): string | null {
   return publishedAt ? publishedAt.toISODate() : null
 }
+
+/**
+ * Biểu thức SQL ngày xuất bản hiệu lực khi lọc khoảng:
+ * ưu tiên published_at, fallback 01/01 của year (khớp FE layPublishedAtTuApi).
+ * Cả hai đều null → biểu thức null → bản ghi bị loại khỏi lọc ngày.
+ */
+export const PUBLICATION_EFFECTIVE_DATE_EXPR =
+  'COALESCE(published_at::date, CASE WHEN year IS NOT NULL THEN make_date(year, 1, 1) END)'
