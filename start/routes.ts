@@ -284,6 +284,12 @@ router
     router
       .delete('/:id', [AdminPublicationsController, 'destroy'])
       .use(middleware.permission('publication.delete'))
+    router
+      .post('/:id/request-correction', [AdminPublicationsController, 'requestCorrection'])
+      .use(middleware.permission('publication.review'))
+    router
+      .post('/:id/approve', [AdminPublicationsController, 'approve'])
+      .use(middleware.permission('publication.approve'))
   })
   .prefix('/api/admin/publications')
   .use([middleware.auth()])

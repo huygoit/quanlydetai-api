@@ -70,6 +70,14 @@ export default class Publication extends BaseModel {
   @column()
   declare publicationStatus: string
 
+  /** Trạng thái duyệt nội bộ: NEW | CORRECTION_REQUESTED | CORRECTED | APPROVED */
+  @column()
+  declare reviewStatus: string
+
+  /** Lý do yêu cầu hiệu chỉnh */
+  @column()
+  declare correctionReason: string | null
+
   @column()
   declare academicYear: string | null
 

@@ -11,6 +11,7 @@ import {
   resolvePublicationDatesForUpdate,
 } from '#utils/publication_date_helper'
 import PublicationAccessService from '#services/publication_access_service'
+import NotificationService from '#services/notification_service'
 import { resolvePublicationAuthorsDisplay } from '#utils/publication_authors_display'
 
 /**
@@ -58,6 +59,8 @@ export default class PublicationsController {
       isbn: p.isbn,
       url: p.url,
       publicationStatus: p.publicationStatus,
+      reviewStatus: p.reviewStatus ?? 'NEW',
+      correctionReason: p.correctionReason ?? null,
       source: p.source,
       sourceId: p.sourceId,
       needsIndexConfirmation: p.needsIndexConfirmation,
@@ -170,6 +173,8 @@ export default class PublicationsController {
       isbn: payload.isbn ?? null,
       url: payload.url ?? null,
       publicationStatus: payload.publicationStatus,
+      reviewStatus: 'NEW',
+      correctionReason: null,
       source: payload.source ?? 'INTERNAL',
       sourceId: payload.sourceId ?? null,
       needsIndexConfirmation: payload.needsIndexConfirmation ?? false,
@@ -264,10 +269,28 @@ export default class PublicationsController {
     if (payload.indexMappingReason !== undefined)
       updates.indexMappingReason = payload.indexMappingReason ?? null
     if (payload.attachmentUrl !== undefined) updates.attachmentUrl = payload.attachmentUrl ?? null
+
+    // Người kê khai lưu khi đang bị yêu cầu hiệu chỉnh → chuyển sang Đã hiệu chỉnh
+    const vuaHieuChinh = pub.reviewStatus === 'CORRECTION_REQUESTED'
+    if (vuaHieuChinh) {
+      updates.reviewStatus = 'CORRECTED'
+      updates.correctionReason = null
+    }
+
     pub.merge(updates)
     await pub.save()
     await pub.load('researchOutputType')
     await this.updateProfileCompleteness(profile.id)
+
+    if (vuaHieuChinh) {
+      const title = (updates.title as string | undefined) ?? pub.title
+      await NotificationService.notifyPublicationCorrected(
+        pub.id,
+        title,
+        profile.fullName || 'Người kê khai'
+      )
+    }
+
     return response.ok({ success: true, data: this.serializePublication(pub, profile.id) })
   }
 

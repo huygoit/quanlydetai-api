@@ -93,6 +93,8 @@ export default class ProfilesController {
         researchOutputType: rot ? { id: rot.id, code: rot.code, name: rot.name } : null,
         publicationType: p.publicationType,
         publicationStatus: p.publicationStatus,
+        reviewStatus: p.reviewStatus ?? 'NEW',
+        correctionReason: p.correctionReason ?? null,
       }
     })
     return response.ok({ success: true, data })

@@ -778,6 +778,8 @@ export default class ProfileController {
         publishedAt: formatPublishedAtForResponse(pub.publishedAt),
         published_at: formatPublishedAtForResponse(pub.publishedAt),
         publicationStatus: pub.publicationStatus,
+        reviewStatus: pub.reviewStatus ?? 'NEW',
+        correctionReason: pub.correctionReason ?? null,
         rank: pub.rank,
         quartile: pub.quartile,
         academicYear: pub.academicYear,

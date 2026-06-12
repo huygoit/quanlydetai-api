@@ -17,6 +17,8 @@ const TO_ADD: Array<{ code: string; name: string; module: string; action: string
   { code: 'publication.create', name: 'Tạo kết quả NCKH', module: 'publication', action: 'create' },
   { code: 'publication.update', name: 'Cập nhật kết quả NCKH', module: 'publication', action: 'update' },
   { code: 'publication.delete', name: 'Xóa kết quả NCKH', module: 'publication', action: 'delete' },
+  { code: 'publication.review', name: 'Yêu cầu hiệu chỉnh kết quả NCKH', module: 'publication', action: 'review' },
+  { code: 'publication.approve', name: 'Duyệt kết quả NCKH', module: 'publication', action: 'approve' },
 ]
 
 export default class MissingPermissionsSeeder extends BaseSeeder {

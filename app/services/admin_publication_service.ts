@@ -14,6 +14,7 @@ export type AdminPublicationListFilters = {
   profileId?: number
   publishedFrom?: string
   publishedTo?: string
+  reviewStatus?: string
 }
 
 export default class AdminPublicationService {
@@ -82,6 +83,8 @@ export default class AdminPublicationService {
       isbn: p.isbn,
       url: p.url,
       publicationStatus: p.publicationStatus,
+      reviewStatus: p.reviewStatus ?? 'NEW',
+      correctionReason: p.correctionReason ?? null,
       source: p.source,
       sourceId: p.sourceId,
       needsIndexConfirmation: p.needsIndexConfirmation,
@@ -143,6 +146,11 @@ export default class AdminPublicationService {
       if (to.isValid) {
         q.whereRaw(`${PUBLICATION_EFFECTIVE_DATE_EXPR} <= ?`, [to.toISODate()!])
       }
+    }
+
+    const reviewStatus = filters.reviewStatus?.trim()
+    if (reviewStatus) {
+      q.where('review_status', reviewStatus)
     }
 
     return q

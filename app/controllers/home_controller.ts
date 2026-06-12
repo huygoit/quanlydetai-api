@@ -50,6 +50,8 @@ function notificationTypeForDashboard(type: string): string {
     SYSTEM: 'SYSTEM',
     PROFILE_SUBMITTED: 'INFO',
     PUBLICATION_SYNC: 'INFO',
+    PUBLICATION_CORRECTION_REQUESTED: 'WARNING',
+    PUBLICATION_CORRECTED: 'INFO',
   }
   return map[type] ?? 'INFO'
 }

@@ -110,6 +110,46 @@ export default class NotificationService {
   }
 
   /**
+   * Khi cán bộ yêu cầu hiệu chỉnh KQNC → thông báo người kê khai (chủ hồ sơ)
+   */
+  static async notifyPublicationCorrectionRequested(
+    userId: number,
+    publicationId: number,
+    publicationTitle: string,
+    reason: string
+  ) {
+    await this.push(userId, {
+      type: 'PUBLICATION_CORRECTION_REQUESTED',
+      title: 'Yêu cầu hiệu chỉnh kết quả NCKH',
+      message: `Kết quả NCKH "${publicationTitle}" cần hiệu chỉnh: ${reason}`,
+      link: `/profile/me?tab=publications&pubId=${publicationId}`,
+    })
+  }
+
+  /**
+   * Khi người kê khai lưu sau yêu cầu hiệu chỉnh → thông báo cán bộ review/approve
+   */
+  static async notifyPublicationCorrected(
+    publicationId: number,
+    publicationTitle: string,
+    ownerName: string
+  ) {
+    const [reviewIds, approveIds] = await Promise.all([
+      PermissionService.getUserIdsWithPermission('publication.review'),
+      PermissionService.getUserIdsWithPermission('publication.approve'),
+    ])
+    const userIds = [...new Set([...reviewIds, ...approveIds])]
+    if (userIds.length === 0) return
+
+    await this.pushMany(userIds, {
+      type: 'PUBLICATION_CORRECTED',
+      title: 'Kết quả NCKH đã hiệu chỉnh',
+      message: `${ownerName} đã hiệu chỉnh kết quả NCKH "${publicationTitle}". Vui lòng kiểm tra.`,
+      link: `/research-outputs/edit/${publicationId}`,
+    })
+  }
+
+  /**
    * Khi NCV submit ý tưởng (DRAFT → SUBMITTED) → thông báo users có permission idea.review
    */
   static async notifyIdeaSubmitted(ideaCode: string, ideaTitle: string, ideaId: number, ownerName: string) {

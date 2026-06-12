@@ -11,6 +11,9 @@ import {
   resolvePublicationDatesForUpdate,
 } from '#utils/publication_date_helper'
 import AdminPublicationService from '#services/admin_publication_service'
+import NotificationService from '#services/notification_service'
+import ScientificProfile from '#models/scientific_profile'
+import { requestPublicationCorrectionValidator } from '#validators/publication_review_validator'
 
 /**
  * Admin / cán bộ được phân quyền: quản lý KQNC toàn hệ thống (không chủ kê khai).
@@ -37,6 +40,10 @@ export default class AdminPublicationsController {
       (request.input('publishedTo') as string) ||
       (request.input('published_to') as string) ||
       ''
+    const reviewStatus =
+      (request.input('reviewStatus') as string) ||
+      (request.input('review_status') as string) ||
+      ''
 
     const rootTypeId =
       rootTypeIdRaw != null && rootTypeIdRaw !== '' ? Number(rootTypeIdRaw) : undefined
@@ -56,6 +63,7 @@ export default class AdminPublicationsController {
         profileId: Number.isFinite(profileId) ? profileId : undefined,
         publishedFrom: publishedFrom || undefined,
         publishedTo: publishedTo || undefined,
+        reviewStatus: reviewStatus || undefined,
       },
       rootTypeIds
     )
@@ -183,6 +191,8 @@ export default class AdminPublicationsController {
       isbn: payload.isbn ?? null,
       url: payload.url ?? null,
       publicationStatus: payload.publicationStatus,
+      reviewStatus: 'NEW',
+      correctionReason: null,
       source: payload.source ?? 'INTERNAL',
       sourceId: payload.sourceId ?? null,
       needsIndexConfirmation: payload.needsIndexConfirmation ?? false,
@@ -330,5 +340,69 @@ export default class AdminPublicationsController {
     await AdminPublicationService.updateProfileCompleteness(profileId)
 
     return response.ok({ success: true, message: 'Đã xóa kết quả NCKH.' })
+  }
+
+  /** POST /api/admin/publications/:id/request-correction — yêu cầu hiệu chỉnh */
+  async requestCorrection({ params, request, response }: HttpContext) {
+    const id = Number(params.id)
+    if (!Number.isFinite(id)) {
+      return response.badRequest({ success: false, message: 'id không hợp lệ.' })
+    }
+
+    const pub = await AdminPublicationService.findByIdOrFail(id)
+    if (!pub) {
+      return response.notFound({ success: false, message: 'Không tìm thấy kết quả NCKH.' })
+    }
+
+    const payload = await request.validateUsing(requestPublicationCorrectionValidator)
+
+    pub.reviewStatus = 'CORRECTION_REQUESTED'
+    pub.correctionReason = payload.reason.trim()
+    await pub.save()
+    await pub.load('researchOutputType')
+    await pub.load('profile')
+
+    if (pub.profileId != null) {
+      const profile = await ScientificProfile.find(pub.profileId)
+      if (profile?.userId) {
+        await NotificationService.notifyPublicationCorrectionRequested(
+          profile.userId,
+          pub.id,
+          pub.title,
+          pub.correctionReason
+        )
+      }
+    }
+
+    return response.ok({
+      success: true,
+      message: 'Đã gửi yêu cầu hiệu chỉnh.',
+      data: AdminPublicationService.serializeAdminPublication(pub),
+    })
+  }
+
+  /** POST /api/admin/publications/:id/approve — duyệt kết quả NCKH */
+  async approve({ params, response }: HttpContext) {
+    const id = Number(params.id)
+    if (!Number.isFinite(id)) {
+      return response.badRequest({ success: false, message: 'id không hợp lệ.' })
+    }
+
+    const pub = await AdminPublicationService.findByIdOrFail(id)
+    if (!pub) {
+      return response.notFound({ success: false, message: 'Không tìm thấy kết quả NCKH.' })
+    }
+
+    pub.reviewStatus = 'APPROVED'
+    pub.correctionReason = null
+    await pub.save()
+    await pub.load('researchOutputType')
+    await pub.load('profile')
+
+    return response.ok({
+      success: true,
+      message: 'Đã duyệt kết quả NCKH.',
+      data: AdminPublicationService.serializeAdminPublication(pub),
+    })
   }
 }
