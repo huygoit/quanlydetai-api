@@ -57,6 +57,8 @@ const authorSchema = vine.object({
   is_corresponding: vine.boolean(),
   affiliation_type: vine.enum(AFFILIATION_TYPES),
   is_multi_affiliation_outside_udn: vine.boolean(),
+  /** Tỉ lệ % đóng góp (QĐ 1883 điều 1.4) — dùng cho sách/đề tài/sáng kiến. */
+  contribution_percent: vine.number().min(0).max(100).nullable().optional(),
 })
 
 /**
@@ -126,6 +128,7 @@ export type AuthorPayloadRow = {
   is_corresponding: boolean
   affiliation_type: (typeof AFFILIATION_TYPES)[number]
   is_multi_affiliation_outside_udn: boolean
+  contribution_percent?: number | null
 }
 
 /** Bắt buộc gender khi tác giả nhập tay (không profile_id / student_id). */

@@ -58,6 +58,8 @@ export default class PublicationsController {
       issn: p.issn,
       isbn: p.isbn,
       url: p.url,
+      qRankUrl: p.qRankUrl,
+      reputableListUrl: p.reputableListUrl,
       publicationStatus: p.publicationStatus,
       reviewStatus: p.reviewStatus ?? 'NEW',
       correctionReason: p.correctionReason ?? null,
@@ -172,6 +174,8 @@ export default class PublicationsController {
       issn: payload.issn ?? null,
       isbn: payload.isbn ?? null,
       url: payload.url ?? null,
+      qRankUrl: payload.qRankUrl ?? null,
+      reputableListUrl: payload.reputableListUrl ?? null,
       publicationStatus: payload.publicationStatus,
       reviewStatus: 'NEW',
       correctionReason: null,
@@ -260,6 +264,9 @@ export default class PublicationsController {
     if (payload.issn !== undefined) updates.issn = payload.issn ?? null
     if (payload.isbn !== undefined) updates.isbn = payload.isbn ?? null
     if (payload.url !== undefined) updates.url = payload.url ?? null
+    if (payload.qRankUrl !== undefined) updates.qRankUrl = payload.qRankUrl ?? null
+    if (payload.reputableListUrl !== undefined)
+      updates.reputableListUrl = payload.reputableListUrl ?? null
     if (payload.publicationStatus !== undefined) updates.publicationStatus = payload.publicationStatus
     if (payload.source !== undefined) updates.source = payload.source
     if (payload.sourceId !== undefined) updates.sourceId = payload.sourceId ?? null

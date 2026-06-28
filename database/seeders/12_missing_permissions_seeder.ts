@@ -19,6 +19,14 @@ const TO_ADD: Array<{ code: string; name: string; module: string; action: string
   { code: 'publication.delete', name: 'Xóa kết quả NCKH', module: 'publication', action: 'delete' },
   { code: 'publication.review', name: 'Yêu cầu hiệu chỉnh kết quả NCKH', module: 'publication', action: 'review' },
   { code: 'publication.approve', name: 'Duyệt kết quả NCKH', module: 'publication', action: 'approve' },
+  { code: 'field.view', name: 'Xem danh mục lĩnh vực', module: 'field', action: 'view' },
+  { code: 'field.create', name: 'Tạo lĩnh vực', module: 'field', action: 'create' },
+  { code: 'field.update', name: 'Cập nhật lĩnh vực', module: 'field', action: 'update' },
+  { code: 'field.delete', name: 'Xóa lĩnh vực', module: 'field', action: 'delete' },
+  { code: 'specialization.view', name: 'Xem danh mục chuyên ngành', module: 'specialization', action: 'view' },
+  { code: 'specialization.create', name: 'Tạo chuyên ngành', module: 'specialization', action: 'create' },
+  { code: 'specialization.update', name: 'Cập nhật chuyên ngành', module: 'specialization', action: 'update' },
+  { code: 'specialization.delete', name: 'Xóa chuyên ngành', module: 'specialization', action: 'delete' },
 ]
 
 export default class MissingPermissionsSeeder extends BaseSeeder {

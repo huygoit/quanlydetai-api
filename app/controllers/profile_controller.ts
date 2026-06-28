@@ -428,6 +428,7 @@ export default class ProfileController {
         isActive: boolean
         hasRule: boolean
         ruleKind: string | null
+        evidenceRequirements: string | null
         children: unknown[]
       }>
     )
@@ -444,6 +445,7 @@ export default class ProfileController {
       isActive: boolean
       hasRule: boolean
       ruleKind: string | null
+      evidenceRequirements: string | null
       children: unknown[]
     }>
   ): Array<{
@@ -455,6 +457,7 @@ export default class ProfileController {
     isActive: boolean
     hasRule: boolean
     ruleKind: string | null
+    evidenceRequirements: string | null
     children: ReturnType<ProfileController['filterActiveResearchOutputTree']>
   }> {
     return nodes
@@ -468,6 +471,7 @@ export default class ProfileController {
         isActive: n.isActive,
         hasRule: n.hasRule,
         ruleKind: n.ruleKind,
+        evidenceRequirements: n.evidenceRequirements,
         children: this.filterActiveResearchOutputTree(
           (n.children ?? []) as Parameters<ProfileController['filterActiveResearchOutputTree']>[0]
         ),
@@ -785,6 +789,8 @@ export default class ProfileController {
         academicYear: pub.academicYear,
         hdgsnnScore: pub.hdgsnnScore != null ? Number(pub.hdgsnnScore) : null,
         doi: pub.doi,
+        qRankUrl: pub.qRankUrl,
+        reputableListUrl: pub.reputableListUrl,
         volume: pub.volume,
         issue: pub.issue,
         pages: pub.pages,

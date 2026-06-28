@@ -82,6 +82,8 @@ export default class AdminPublicationService {
       issn: p.issn,
       isbn: p.isbn,
       url: p.url,
+      qRankUrl: p.qRankUrl,
+      reputableListUrl: p.reputableListUrl,
       publicationStatus: p.publicationStatus,
       reviewStatus: p.reviewStatus ?? 'NEW',
       correctionReason: p.correctionReason ?? null,

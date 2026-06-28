@@ -129,6 +129,7 @@ export default class AdminPublicationAuthorsController {
           author.isCorresponding = a.is_corresponding
           author.affiliationType = effectiveAffType
           author.isMultiAffiliationOutsideUdn = effectiveMulti
+          author.contributionPercent = a.contribution_percent ?? null
           author.gender = nextGender
           if (nextProfileId !== undefined) {
             author.profileId = nextProfileId
@@ -153,6 +154,7 @@ export default class AdminPublicationAuthorsController {
         isCorresponding: a.is_corresponding,
         affiliationType: effectiveAffType,
         isMultiAffiliationOutsideUdn: effectiveMulti,
+        contributionPercent: a.contribution_percent ?? null,
       })
     }
 

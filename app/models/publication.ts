@@ -67,6 +67,14 @@ export default class Publication extends BaseModel {
   @column()
   declare url: string | null
 
+  /** Link minh chứng mức xếp hạng Q (Scimago/WoS) — bài báo WoS/Scopus */
+  @column()
+  declare qRankUrl: string | null
+
+  /** Link danh mục tạp chí uy tín (HĐGSNN/WoS/Scopus) */
+  @column()
+  declare reputableListUrl: string | null
+
   @column()
   declare publicationStatus: string
 

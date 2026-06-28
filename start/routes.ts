@@ -32,6 +32,10 @@ import AdminResearchOutputTypesController from '#controllers/admin/research_outp
 import AdminResearchOutputRulesController from '#controllers/admin/research_output_rules_controller'
 import AdminDepartmentsController from '#controllers/admin/departments_controller'
 import DepartmentsController from '#controllers/departments_controller'
+import AdminFieldsController from '#controllers/admin/fields_controller'
+import FieldsController from '#controllers/fields_controller'
+import AdminSpecializationsController from '#controllers/admin/specializations_controller'
+import SpecializationsController from '#controllers/specializations_controller'
 import ScientificProfileCatalogController from '#controllers/scientific_profile_catalog_controller'
 import AdminRolesController from '#controllers/admin/roles_controller'
 import AdminPermissionsController from '#controllers/admin/permissions_controller'
@@ -130,6 +134,62 @@ router
     router.get('/:id', [DepartmentsController, 'show'])
   })
   .prefix('/api/departments')
+  .middleware([middleware.auth()])
+
+// --- Admin: fields CRUD (danh mục lĩnh vực, permission-based)
+router
+  .group(() => {
+    router.get('/', [AdminFieldsController, 'index']).use(middleware.permission('field.view'))
+    router.get('/:id', [AdminFieldsController, 'show']).use(middleware.permission('field.view'))
+    router.post('/', [AdminFieldsController, 'store']).use(middleware.permission('field.create'))
+    router.put('/:id', [AdminFieldsController, 'update']).use(middleware.permission('field.update'))
+    router
+      .patch('/:id/status', [AdminFieldsController, 'changeStatus'])
+      .use(middleware.permission('field.update'))
+  })
+  .prefix('/api/admin/fields')
+  .use([middleware.auth()])
+
+// --- Catalog lĩnh vực (đọc, chỉ cần đăng nhập)
+router
+  .group(() => {
+    router.get('/options', [FieldsController, 'options'])
+    router.get('/', [FieldsController, 'index'])
+    router.get('/:id', [FieldsController, 'show'])
+  })
+  .prefix('/api/fields')
+  .middleware([middleware.auth()])
+
+// --- Admin: specializations CRUD (danh mục chuyên ngành, permission-based)
+router
+  .group(() => {
+    router
+      .get('/', [AdminSpecializationsController, 'index'])
+      .use(middleware.permission('specialization.view'))
+    router
+      .get('/:id', [AdminSpecializationsController, 'show'])
+      .use(middleware.permission('specialization.view'))
+    router
+      .post('/', [AdminSpecializationsController, 'store'])
+      .use(middleware.permission('specialization.create'))
+    router
+      .put('/:id', [AdminSpecializationsController, 'update'])
+      .use(middleware.permission('specialization.update'))
+    router
+      .patch('/:id/status', [AdminSpecializationsController, 'changeStatus'])
+      .use(middleware.permission('specialization.update'))
+  })
+  .prefix('/api/admin/specializations')
+  .use([middleware.auth()])
+
+// --- Catalog chuyên ngành (đọc, chỉ cần đăng nhập)
+router
+  .group(() => {
+    router.get('/options', [SpecializationsController, 'options'])
+    router.get('/', [SpecializationsController, 'index'])
+    router.get('/:id', [SpecializationsController, 'show'])
+  })
+  .prefix('/api/specializations')
   .middleware([middleware.auth()])
 
 // --- Admin: IAM Roles (permission-based)
@@ -530,6 +590,8 @@ router
   .group(() => {
     router.get('/teachers/:profileId', [KpisController, 'teachersShow'])
     router.get('/publications/:id/breakdown', [KpisController, 'publicationsBreakdown'])
+    router.get('/nckh-hours-report', [KpisController, 'nckhHoursReport'])
+    router.get('/nckh-data-report', [KpisController, 'nckhDataReport'])
     router.post('/recalculate', [KpisController, 'recalculate'])
   })
   .prefix('/api/kpis')

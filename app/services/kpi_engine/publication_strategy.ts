@@ -102,7 +102,7 @@ type AExplanation = {
 }
 
 /** Cách mô tả tập tác giả khi giải thích hệ số a trong lý do trả về. */
-type LoaiMoTaTapTinhA = 'toan_bo_tac_gia' | 'nhom_tac_gia_chinh'
+type LoaiMoTaTapTinhA = 'toan_bo_tac_gia' | 'tac_gia_lien_he'
 
 function giaiThichHeSoATrenTapTacGia(
   authors: Array<{ affiliationType: string }>,
@@ -118,8 +118,8 @@ function giaiThichHeSoATrenTapTacGia(
   const tatCaThuocDhDn = authors.every((a) => a.affiliationType === 'UDN_ONLY')
   const tatCaNgoaiDhDn = authors.every((a) => a.affiliationType !== 'UDN_ONLY')
   const moTaTapTacGia =
-    loaiMoTa === 'nhom_tac_gia_chinh'
-      ? 'tập tác giả chính (tác giả đầu ∪ tác giả liên hệ)'
+    loaiMoTa === 'tac_gia_lien_he'
+      ? 'tập tác giả liên hệ'
       : 'toàn bộ tác giả'
 
   if (tatCaThuocDhDn) {
@@ -144,9 +144,9 @@ function giaiThichHeSoATrenTapTacGia(
 export type PhamViHeSoA1883 = 'authors' | 'chiTacGiaChinh'
 
 /**
- * Bài báo mục 1–2 (phạm vi chiTacGiaChinh): hệ số a nhìn **tập tác giả chính**
- * = tác giả đầu ∪ tác giả liên hệ (theo cờ trên từng dòng).
- * Không ai thuộc tập đó → không áp (a)/(b) → **khoản (c)**: **a = 1**.
+ * Bài báo mục 1–2 (phạm vi chiTacGiaChinh): theo QĐ 1883 mục 1.1(a)(b), hệ số a
+ * chỉ xét **tập tác giả liên hệ** (isCorresponding), KHÔNG tính tác giả đầu.
+ * Không có tác giả liên hệ nào → không áp (a)/(b) → **khoản (c)**: **a = 1**.
  * Phạm vi `authors`: (a)/(b)/(c) trên **toàn bộ** tác giả (mục 3).
  */
 export function heSoAQdCongBoMuc12(
@@ -164,18 +164,18 @@ export function giaiThichHeSoAQdCongBoMuc12(
     return giaiThichHeSoATrenTapTacGia(authors, 'toan_bo_tac_gia')
   }
 
-  const tapTacGiaChinh = authors.filter((a) => a.isTopAuthor || a.isCorresponding)
-  if (tapTacGiaChinh.length === 0) {
+  const tapTacGiaLienHe = authors.filter((a) => a.isCorresponding)
+  if (tapTacGiaLienHe.length === 0) {
     if (!authors.length) {
       return { a: 1, reason: 'Không có tác giả trong bài — dùng mặc định a = 1.' }
     }
     return {
       a: 1,
       reason:
-        'Không có ai trong nhóm tác giả chính (chưa đánh dấu tác giả đầu hoặc tác giả liên hệ): không áp được nhánh (a)/(b) trên tập này — theo khoản (c) các trường hợp khác, a = 1.',
+        'Chưa đánh dấu tác giả liên hệ: theo QĐ 1883 mục 1.1, hệ số a ở mục 1, 2 chỉ xét tác giả liên hệ — không có tác giả liên hệ thì áp khoản (c), a = 1.',
     }
   }
-  return giaiThichHeSoATrenTapTacGia(tapTacGiaChinh, 'nhom_tac_gia_chinh')
+  return giaiThichHeSoATrenTapTacGia(tapTacGiaLienHe, 'tac_gia_lien_he')
 }
 
 function baseHoursFromRule(
@@ -356,35 +356,9 @@ export async function publicationStrategyCalculate(
   // Điểm quy đổi tổng công trình lấy trực tiếp từ tổng giờ: P = B / 600.
   const P = B / 600
 
-  if (authorForProfile.affiliationType === 'OUTSIDE') {
-    warnings.push(
-      'Tác giả chỉ ghi đơn vị ngoài ĐHĐN nên không được tính giờ/điểm quy đổi theo mục 1.5.'
-    )
-    return {
-      hours: 0,
-      points: 0,
-      warnings,
-      details: {
-        publicationId: publication.id,
-        typeId,
-        B0: rawB0,
-        P0: rawP0,
-        aExcel,
-        aReason: lyDoHeSoA,
-        aFactor,
-        B,
-        P,
-        n,
-        p,
-        tongTacGia,
-        isTopAuthor: false,
-        multiAffiliationDivide: false,
-        femaleBonus: context.isFemale ?? false,
-        ruleKind: kind,
-        matchedFullName: authorForProfile.fullName,
-      },
-    }
-  }
+  // Trước đây tác giả "Đơn vị khác" (OUTSIDE) bị trả về 0 giờ/điểm theo mục 1.5.
+  // Theo yêu cầu nghiệp vụ mới: vẫn tính giờ/điểm quy đổi cho tác giả OUTSIDE
+  // theo công thức chuẩn như các tác giả khác (OUTSIDE thuần không phải đa cơ quan nên không chia đôi).
 
   /** Thuộc nhóm nhận 1/3 chia đều + phần 2/3 chia p: tác giả đầu (chính) hoặc tác giả liên hệ. */
   const trongNhomChinhTheoQD =

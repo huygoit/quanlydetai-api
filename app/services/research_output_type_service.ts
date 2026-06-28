@@ -19,6 +19,8 @@ export default class ResearchOutputTypeService {
       hasRule: boolean
       /** rule_kind của leaf (null nếu chưa có rule hoặc không phải lá) */
       ruleKind: string | null
+      /** QĐ 1883: yêu cầu minh chứng cho loại này (text, từ rule của leaf) */
+      evidenceRequirements: string | null
       /** QĐ 1883: phạm vi tính hệ số a (leaf, nếu có) */
       phamViHeSoA1883: 'authors' | 'chiTacGiaChinh' | null
       children: Array<unknown>
@@ -42,12 +44,14 @@ export default class ResearchOutputTypeService {
     isActive: boolean
     hasRule: boolean
     ruleKind: string | null
+    evidenceRequirements: string | null
     phamViHeSoA1883: 'authors' | 'chiTacGiaChinh' | null
     children: Array<unknown>
   }> {
     const rule = await ResearchOutputRule.query().where('type_id', node.id).first()
     const hasRule = !!rule
     const ruleKind = rule?.ruleKind ? String(rule.ruleKind).toUpperCase() : null
+    const evidenceRequirements = rule?.evidenceRequirements ?? null
     const children = await ResearchOutputType.query()
       .where('parent_id', node.id)
       .orderBy('sort_order', 'asc')
@@ -62,6 +66,7 @@ export default class ResearchOutputTypeService {
       isActive: node.isActive,
       hasRule,
       ruleKind,
+      evidenceRequirements,
       phamViHeSoA1883: node.phamViHeSoA1883 ?? null,
       children: childNodes,
     }

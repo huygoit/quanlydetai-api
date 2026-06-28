@@ -2,6 +2,8 @@ import type { HttpContext } from '@adonisjs/core/http'
 import Publication from '#models/publication'
 import ScientificProfile from '#models/scientific_profile'
 import KpiResult from '#models/kpi_result'
+import ResearchOutputType from '#models/research_output_type'
+import ProjectProposal from '#models/project_proposal'
 import KpiEngineService from '#services/kpi_engine_service'
 import PermissionService from '#services/permission_service'
 import { resolveKpiPeriodRange } from '#utils/kpi_period_helper'
@@ -68,9 +70,99 @@ function gioMotTacGiaTheoQD(
   return Math.round(raw * 100) / 100
 }
 
-/** Chỉ tác giả có đơn vị trong ĐHĐN (UDN_ONLY) hoặc kiêm nhiệm trong/ngoài (MIXED) mới được tính. */
+/**
+ * Tác giả được tính giờ: trong ĐHĐN (UDN_ONLY), kiêm nhiệm trong/ngoài (MIXED)
+ * và cả Đơn vị khác (OUTSIDE) — theo yêu cầu nghiệp vụ vẫn quy đổi giờ/điểm cho tác giả ngoài.
+ */
 function duocTinhTheoMuc15(affiliationType: string): boolean {
-  return affiliationType === 'UDN_ONLY' || affiliationType === 'MIXED'
+  return (
+    affiliationType === 'UDN_ONLY' ||
+    affiliationType === 'MIXED' ||
+    affiliationType === 'OUTSIDE'
+  )
+}
+
+/** Tách họ tên: phần "tên" là từ cuối cùng, phần còn lại là họ - tên đệm. */
+function tachHoTen(fullName: string): { hoTenDem: string; ten: string } {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { hoTenDem: '', ten: '' }
+  if (parts.length === 1) return { hoTenDem: '', ten: parts[0] }
+  const ten = parts[parts.length - 1]
+  const hoTenDem = parts.slice(0, -1).join(' ')
+  return { hoTenDem, ten }
+}
+
+const COLLATOR_VI = new Intl.Collator('vi', { sensitivity: 'base' })
+
+/** Các "ô" đếm trong biểu mẫu DỮ LIỆU NCKH theo Khoa. */
+type NckhBucket =
+  | 'wos_scopus'
+  | 'intl_other'
+  | 'isbn_proc'
+  | 'sv_nckh'
+  | 'textbook'
+  | 'monograph'
+  | 'reference'
+  | 'training_doc'
+  | 'ip'
+
+/** Một dòng số liệu của 1 giảng viên (chưa có STT/tách tên). */
+function emptyNckhRow(fullName: string) {
+  return {
+    fullName,
+    wos_scopus: 0,
+    intl_other: 0,
+    isbn_proc: 0,
+    dt_nha_nuoc: 0,
+    dt_bo: 0,
+    dt_truong: 0,
+    dt_co_so: 0,
+    sv_nckh: 0,
+    hours: 0,
+    textbook: 0,
+    monograph: 0,
+    reference: 0,
+    training_doc: 0,
+    ip: 0,
+    note: '',
+  }
+}
+
+function emptyNckhTotals() {
+  return {
+    wos_scopus: 0,
+    intl_other: 0,
+    isbn_proc: 0,
+    dt_nha_nuoc: 0,
+    dt_bo: 0,
+    dt_truong: 0,
+    dt_co_so: 0,
+    sv_nckh: 0,
+    hours: 0,
+    textbook: 0,
+    monograph: 0,
+    reference: 0,
+    training_doc: 0,
+    ip: 0,
+  }
+}
+
+/** Map cấp đề tài (project_proposals.level) -> cột trong biểu mẫu. */
+function projectLevelToKey(
+  level: string | null
+): 'dt_nha_nuoc' | 'dt_bo' | 'dt_truong' | 'dt_co_so' | null {
+  switch ((level || '').trim()) {
+    case 'NHA_NUOC':
+      return 'dt_nha_nuoc'
+    case 'BO':
+      return 'dt_bo'
+    case 'TRUONG':
+      return 'dt_truong'
+    case 'CO_SO':
+      return 'dt_co_so'
+    default:
+      return null
+  }
 }
 
 /**
@@ -312,6 +404,288 @@ export default class KpisController {
       success: true,
       message: `Đã cập nhật KPI cho ${updated} hồ sơ trong năm học ${academicYear}.`,
       data: { academicYear, updated },
+    })
+  }
+
+  /**
+   * GET /api/kpis/nckh-hours-report
+   * Query: academic_year (VD: 2024-2025). Lấy giờ NCKH từ cache kpi_results, gom theo Khoa/đơn vị,
+   * sắp xếp theo tên (từ cuối). Phục vụ biểu mẫu thống kê giờ NCKH (in/PDF).
+   */
+  async nckhHoursReport({ request, response, auth }: HttpContext) {
+    const user = auth.use('api').user!
+    const reportPerms = [
+      'report.view',
+      'report.view_department',
+      'report.view_all',
+      'report.export',
+      'dashboard.view_department',
+      'dashboard.view_all',
+    ]
+    let allowed = false
+    for (const code of reportPerms) {
+      if (await PermissionService.userHasPermission(user.id, code)) {
+        allowed = true
+        break
+      }
+    }
+    if (!allowed) {
+      return response.forbidden({
+        success: false,
+        message: 'Bạn không có quyền xem báo cáo thống kê.',
+      })
+    }
+
+    const academicYear = String(request.input('academic_year', '')).trim()
+    if (!academicYear) {
+      return response.badRequest({
+        success: false,
+        message: 'Thiếu academic_year (VD: 2024-2025).',
+      })
+    }
+
+    const rows = await KpiResult.query()
+      .where('academic_year', academicYear)
+      .preload('profile')
+
+    const UNIT_FALLBACK = 'Chưa phân đơn vị'
+    const grouped = new Map<
+      string,
+      Array<{ fullName: string; hoTenDem: string; ten: string; hours: number }>
+    >()
+
+    for (const r of rows) {
+      const profile = r.profile
+      if (!profile) continue
+      const unit = (profile.faculty || '').trim() || UNIT_FALLBACK
+      const hours = Number(r.totalHours) || 0
+      const { hoTenDem, ten } = tachHoTen(profile.fullName || '')
+      if (!grouped.has(unit)) grouped.set(unit, [])
+      grouped.get(unit)!.push({ fullName: profile.fullName || '', hoTenDem, ten, hours })
+    }
+
+    const units = Array.from(grouped.entries())
+      .map(([unit, members]) => {
+        const sorted = members.sort((a, b) => {
+          const byTen = COLLATOR_VI.compare(a.ten, b.ten)
+          if (byTen !== 0) return byTen
+          return COLLATOR_VI.compare(a.hoTenDem, b.hoTenDem)
+        })
+        const subtotal = sorted.reduce((s, m) => s + m.hours, 0)
+        return {
+          unit,
+          subtotal: Math.round(subtotal * 100) / 100,
+          rows: sorted.map((m, i) => ({
+            stt: i + 1,
+            fullName: m.fullName,
+            hoTenDem: m.hoTenDem,
+            ten: m.ten,
+            hours: Math.round(m.hours * 100) / 100,
+            note: '',
+          })),
+        }
+      })
+      .sort((a, b) => {
+        // Đẩy nhóm "Chưa phân đơn vị" xuống cuối, còn lại sắp theo tên đơn vị
+        if (a.unit === UNIT_FALLBACK) return 1
+        if (b.unit === UNIT_FALLBACK) return -1
+        return COLLATOR_VI.compare(a.unit, b.unit)
+      })
+
+    const grandTotal = units.reduce((s, u) => s + u.subtotal, 0)
+    const totalPeople = units.reduce((s, u) => s + u.rows.length, 0)
+
+    return response.ok({
+      success: true,
+      data: {
+        academic_year: academicYear,
+        generated_at: new Date().toISOString(),
+        total_people: totalPeople,
+        grand_total: Math.round(grandTotal * 100) / 100,
+        units,
+      },
+    })
+  }
+
+  /**
+   * GET /api/kpis/nckh-data-report
+   * Query: academic_year (cho cột giờ NCKH), faculty (Khoa cần xem).
+   * Trả ma trận "DỮ LIỆU NCKH CỦA KHOA": mỗi giảng viên 1 dòng, đếm số công trình theo loại.
+   */
+  async nckhDataReport({ request, response, auth }: HttpContext) {
+    const user = auth.use('api').user!
+    const reportPerms = [
+      'report.view',
+      'report.view_department',
+      'report.view_all',
+      'report.export',
+      'dashboard.view_department',
+      'dashboard.view_all',
+    ]
+    let allowed = false
+    for (const code of reportPerms) {
+      if (await PermissionService.userHasPermission(user.id, code)) {
+        allowed = true
+        break
+      }
+    }
+    if (!allowed) {
+      return response.forbidden({ success: false, message: 'Bạn không có quyền xem báo cáo thống kê.' })
+    }
+
+    const academicYear = String(request.input('academic_year', '')).trim()
+    const facultyParam = String(request.input('faculty', '')).trim()
+
+    // Danh sách các Khoa/đơn vị có hồ sơ (để FE đổ vào ô chọn)
+    const facultyRows = await ScientificProfile.query()
+      .whereNotNull('faculty')
+      .distinct('faculty')
+      .select('faculty')
+    const faculties = facultyRows
+      .map((r) => (r.faculty || '').trim())
+      .filter((f) => f.length > 0)
+      .sort((a, b) => COLLATOR_VI.compare(a, b))
+
+    const faculty = facultyParam || faculties[0] || ''
+    if (!faculty) {
+      return response.ok({
+        success: true,
+        data: { academic_year: academicYear, faculty: '', generated_at: new Date().toISOString(), faculties, rows: [], totals: emptyNckhTotals() },
+      })
+    }
+
+    // Map loại KQNC -> "ô" thống kê dựa trên cây phân cấp
+    const types = await ResearchOutputType.query().select('id', 'parentId')
+    const parentMap = new Map<number, number | null>()
+    types.forEach((t) => parentMap.set(Number(t.id), t.parentId != null ? Number(t.parentId) : null))
+    const ancestorsInclusive = (id: number): Set<number> => {
+      const set = new Set<number>()
+      let cur: number | null = id
+      let guard = 0
+      while (cur != null && guard < 10) {
+        set.add(cur)
+        cur = parentMap.get(cur) ?? null
+        guard++
+      }
+      return set
+    }
+    const bucketOfType = (typeId: number | null): NckhBucket | null => {
+      if (typeId == null) return null
+      const anc = ancestorsInclusive(typeId)
+      if (typeId === 22) return 'monograph'
+      if (typeId === 23) return 'reference'
+      if (typeId === 25) return 'training_doc'
+      if (typeId === 26 || typeId === 27) return 'textbook'
+      if (anc.has(2) || anc.has(8)) return 'wos_scopus'
+      if (anc.has(17)) return 'intl_other'
+      if (anc.has(19)) return 'isbn_proc'
+      if (anc.has(43)) return 'sv_nckh'
+      if (anc.has(50)) return 'ip'
+      return null
+    }
+
+    // Hồ sơ trong Khoa
+    const profiles = await ScientificProfile.query()
+      .where('faculty', faculty)
+      .select('id', 'fullName', 'userId')
+    const profileIds = profiles.map((p) => Number(p.id))
+    const userIdToProfileId = new Map<number, number>()
+    profiles.forEach((p) => {
+      if (p.userId != null) userIdToProfileId.set(Number(p.userId), Number(p.id))
+    })
+
+    // Khởi tạo dòng cho từng hồ sơ
+    const rowByProfile = new Map<number, ReturnType<typeof emptyNckhRow>>()
+    profiles.forEach((p) => {
+      rowByProfile.set(Number(p.id), emptyNckhRow(p.fullName || ''))
+    })
+
+    // Đếm publications theo người kê khai (profile_id)
+    if (profileIds.length > 0) {
+      const pubs = await Publication.query()
+        .whereIn('profile_id', profileIds)
+        .select('profileId', 'researchOutputTypeId')
+      for (const pub of pubs) {
+        const pid = pub.profileId != null ? Number(pub.profileId) : null
+        if (pid == null) continue
+        const row = rowByProfile.get(pid)
+        if (!row) continue
+        const bucket = bucketOfType(pub.researchOutputTypeId != null ? Number(pub.researchOutputTypeId) : null)
+        if (bucket) row[bucket] += 1
+      }
+
+      // Giờ NCKH từ kpi_results theo năm học
+      if (academicYear) {
+        const kpis = await KpiResult.query()
+          .where('academic_year', academicYear)
+          .whereIn('profile_id', profileIds)
+          .select('profileId', 'totalHours')
+        for (const k of kpis) {
+          const row = rowByProfile.get(Number(k.profileId))
+          if (row) row.hours = Math.round((Number(k.totalHours) || 0) * 100) / 100
+        }
+      }
+
+      // Đề tài KHCN theo cấp (project_proposals.owner_id = user_id)
+      const userIds = Array.from(userIdToProfileId.keys())
+      if (userIds.length > 0) {
+        const proposals = await ProjectProposal.query()
+          .whereIn('owner_id', userIds)
+          .select('ownerId', 'level')
+        for (const pr of proposals) {
+          const pid = userIdToProfileId.get(Number(pr.ownerId))
+          if (pid == null) continue
+          const row = rowByProfile.get(pid)
+          if (!row) continue
+          const key = projectLevelToKey(pr.level)
+          if (key) row[key] += 1
+        }
+      }
+    }
+
+    // Sắp xếp theo tên (từ cuối)
+    const rows = Array.from(rowByProfile.values())
+      .map((r) => {
+        const { hoTenDem, ten } = tachHoTen(r.fullName)
+        return { ...r, hoTenDem, ten }
+      })
+      .sort((a, b) => {
+        const byTen = COLLATOR_VI.compare(a.ten, b.ten)
+        if (byTen !== 0) return byTen
+        return COLLATOR_VI.compare(a.hoTenDem, b.hoTenDem)
+      })
+      .map((r, i) => ({ stt: i + 1, ...r }))
+
+    // Cộng các cột
+    const totals = emptyNckhTotals()
+    for (const r of rows) {
+      totals.wos_scopus += r.wos_scopus
+      totals.intl_other += r.intl_other
+      totals.isbn_proc += r.isbn_proc
+      totals.dt_nha_nuoc += r.dt_nha_nuoc
+      totals.dt_bo += r.dt_bo
+      totals.dt_truong += r.dt_truong
+      totals.dt_co_so += r.dt_co_so
+      totals.sv_nckh += r.sv_nckh
+      totals.hours += r.hours
+      totals.textbook += r.textbook
+      totals.monograph += r.monograph
+      totals.reference += r.reference
+      totals.training_doc += r.training_doc
+      totals.ip += r.ip
+    }
+    totals.hours = Math.round(totals.hours * 100) / 100
+
+    return response.ok({
+      success: true,
+      data: {
+        academic_year: academicYear,
+        faculty,
+        generated_at: new Date().toISOString(),
+        faculties,
+        rows,
+        totals,
+      },
     })
   }
 }

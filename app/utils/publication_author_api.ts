@@ -44,5 +44,6 @@ export function mapPublicationAuthorToApi(
     isCorresponding: a.isCorresponding,
     affiliationType: a.affiliationType,
     isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
+    contributionPercent: a.contributionPercent != null ? Number(a.contributionPercent) : null,
   }
 }
