@@ -25,6 +25,38 @@ type PublicationAuthorRow = {
   isCorresponding: boolean
   affiliationType: string
   isMultiAffiliationOutsideUdn: boolean
+  contributionPercent?: number | null
+}
+
+/**
+ * QĐ 1883 mục 1.4: sản phẩm khoa học KHÁC (ngoài bài báo mục 1,2,3) — giáo trình, đề tài,
+ * sáng kiến, SHTT/chuyển giao, hướng dẫn, khen thưởng… — chia giờ theo % đóng góp.
+ * Bài báo (WoS/Scopus, trong nước, kỷ yếu/báo cáo) vẫn dùng công thức n/p (mục 1.2–1.3).
+ * Phân loại theo mã catalog QD_R<n> (đồng bộ với FE researchOutputFormSchema).
+ */
+export function dungChiaTheoPhanTramDongGop(
+  leafCode?: string | null,
+  ruleKind?: string | null
+): boolean {
+  const c = String(leafCode ?? '').trim().toUpperCase()
+  if (!c) return false
+  // Bài báo trong nước / kỷ yếu / mã cũ → công thức n/p.
+  if (c.startsWith('QD_R14_P') || c === 'QD_R24' || c === 'QD_R15') return false
+  if (c.startsWith('PUB_WOS_') || c.startsWith('PUB_SCOPUS_') || c === 'PUB_DOMESTIC_HDGNN') {
+    return false
+  }
+  if (c === 'PUB_CONF_ISBN') return false
+  if (c.startsWith('PROJECT_')) return true
+  const m = /^QD_R(\d+)/.exec(c)
+  const n = m ? Number(m[1]) : null
+  if (n != null) {
+    // 2–11: bài báo quốc tế; 12–13: báo cáo/tham luận (mục 3) → công thức.
+    if (n >= 2 && n <= 13) return false
+    // 16 trở đi: sách, đề tài, sáng kiến, SHTT, hướng dẫn, khen thưởng → chia %.
+    if (n >= 16) return true
+  }
+  if ((ruleKind ?? '').toUpperCase() === 'HDGSNN_POINTS_TO_HOURS') return false
+  return false
 }
 
 /**
@@ -267,13 +299,36 @@ export async function publicationStrategyCalculate(
     )
   }
 
-  // Không có tác giả chính (n=0) → công thức QĐ không chạy; thường do quên tick trên UI hoặc dữ liệu cũ.
+  let phamViHeSoA1883: PhamViHeSoA1883 = 'chiTacGiaChinh'
+  let leafCode: string | null = null
+  try {
+    const type = await ResearchOutputType.find(typeId)
+    leafCode = type?.code ?? null
+    if (type?.phamViHeSoA1883 === 'authors' || type?.phamViHeSoA1883 === 'chiTacGiaChinh') {
+      phamViHeSoA1883 = type.phamViHeSoA1883
+    } else {
+      warnings.push(
+        'Chưa cấu hình phamViHeSoA1883 cho loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
+      )
+    }
+  } catch {
+    warnings.push(
+      'Không đọc được cấu hình phamViHeSoA1883 của loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
+    )
+  }
+
+  // Mục 1.4: sản phẩm KH khác chia theo % đóng góp — không phụ thuộc nhóm tác giả chính (n).
+  const dungPhanTram = dungChiaTheoPhanTramDongGop(leafCode, null)
+
+  // Không có tác giả chính (n=0) → công thức n/p không chạy; loại chia % thì bỏ qua ràng buộc này.
   if (n < 1) {
     if (tongTacGia === 1) {
       n = 1
       warnings.push(
         'Chỉ có một tác giả nhưng chưa đánh dấu tác giả chính — tạm dùng n=1 để tính giờ quy đổi.'
       )
+    } else if (dungPhanTram) {
+      n = 1
     } else {
       warnings.push(
         'Chưa có ai trong nhóm tác giả chính (n≥1): cần ít nhất một tác giả đầu (chính) hoặc tác giả liên hệ — tick đúng trên danh sách tác giả.'
@@ -288,22 +343,6 @@ export async function publicationStrategyCalculate(
   if (n > tongTacGia) {
     warnings.push('Số tác giả trong nhóm chính (n) không được lớn hơn tổng số tác giả')
     return { hours: 0, points: 0, warnings, details: { n, p, tongTacGia } }
-  }
-
-  let phamViHeSoA1883: PhamViHeSoA1883 = 'chiTacGiaChinh'
-  try {
-    const type = await ResearchOutputType.find(typeId)
-    if (type?.phamViHeSoA1883 === 'authors' || type?.phamViHeSoA1883 === 'chiTacGiaChinh') {
-      phamViHeSoA1883 = type.phamViHeSoA1883
-    } else {
-      warnings.push(
-        'Chưa cấu hình phamViHeSoA1883 cho loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
-      )
-    }
-  } catch {
-    warnings.push(
-      'Không đọc được cấu hình phamViHeSoA1883 của loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
-    )
   }
 
   const aInfo = giaiThichHeSoAQdCongBoMuc12(authors, phamViHeSoA1883)
@@ -364,7 +403,27 @@ export async function publicationStrategyCalculate(
   const trongNhomChinhTheoQD =
     authorForProfile.isTopAuthor || authorForProfile.isCorresponding
   const isMain = trongNhomChinhTheoQD || tongTacGia === 1
-  let hours = isMain ? B / (3 * n) + (2 * B) / (3 * p) : (2 * B) / (3 * p)
+
+  // Mục 1.4: sản phẩm KH khác (sách, đề tài, sáng kiến…) chia giờ theo % đóng góp.
+  let hours: number
+  if (dungPhanTram) {
+    const pct = authorForProfile.contributionPercent
+    const tongPct = authors.reduce(
+      (s, a) => s + (a.contributionPercent != null ? Number(a.contributionPercent) : 0),
+      0
+    )
+    const pctHopLe = pct != null && Number(pct) > 0 && Math.abs(tongPct - 100) < 0.01
+    if (pctHopLe) {
+      hours = B * (Number(pct) / 100)
+    } else {
+      hours = B / tongTacGia
+      warnings.push(
+        'Mục 1.4: chưa nhập đủ % đóng góp (tổng các tác giả phải = 100). Tạm chia đều cho các tác giả — cần cập nhật % để tính đúng.'
+      )
+    }
+  } else {
+    hours = isMain ? B / (3 * n) + (2 * B) / (3 * p) : (2 * B) / (3 * p)
+  }
   let points = 0
 
   if (authorForProfile.isMultiAffiliationOutsideUdn) {

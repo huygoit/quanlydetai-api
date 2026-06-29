@@ -104,6 +104,7 @@ export default class KpiEngineService {
         isCorresponding: a.isCorresponding,
         affiliationType: a.affiliationType,
         isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
+        contributionPercent: a.contributionPercent != null ? Number(a.contributionPercent) : null,
       }))
       outputs.push({
         type: 'PUBLICATION',

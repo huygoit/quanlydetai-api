@@ -46,6 +46,8 @@ export type KpiOutput =
         isCorresponding: boolean
         affiliationType: string
         isMultiAffiliationOutsideUdn: boolean
+        /** % đóng góp (mục 1.4) — dùng chia giờ cho sản phẩm KH khác (sách, đề tài, sáng kiến…). */
+        contributionPercent?: number | null
       }>
     }
   | {

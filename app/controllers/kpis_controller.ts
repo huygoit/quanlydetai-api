@@ -8,6 +8,7 @@ import KpiEngineService from '#services/kpi_engine_service'
 import PermissionService from '#services/permission_service'
 import { resolveKpiPeriodRange } from '#utils/kpi_period_helper'
 import { genderForPublicationAuthorRow } from '#utils/publication_author_api'
+import { dungChiaTheoPhanTramDongGop } from '#services/kpi_engine/publication_strategy'
 
 /** Lucid/Postgres bigInteger có thể là bigint — Number.isFinite(bigint) là false, phải ép về number. */
 function toFinitePositiveInt(v: unknown): number | null {
@@ -222,6 +223,7 @@ export default class KpisController {
 
     const publication = await Publication.query()
       .where('id', pubId)
+      .preload('researchOutputType')
       .preload('publicationAuthors', (q) => q.preload('profile').preload('student'))
       .first()
     if (!publication) {
@@ -265,6 +267,7 @@ export default class KpisController {
         isCorresponding: a.isCorresponding,
         affiliationType: a.affiliationType,
         isMultiAffiliationOutsideUdn: a.isMultiAffiliationOutsideUdn,
+        contributionPercent: a.contributionPercent != null ? Number(a.contributionPercent) : null,
       })),
     }
     const result = await KpiEngineService.calculateOutputHours(output, {
@@ -290,6 +293,14 @@ export default class KpisController {
     const B = typeof details.B === 'number' ? details.B : 0
     const Ppool = typeof details.P === 'number' ? details.P : 0
     const tongTacGia = publication.publicationAuthors.length
+    // Mục 1.4: sản phẩm KH khác chia giờ theo % đóng góp thay vì công thức n/p.
+    const leafCode = publication.researchOutputType?.code ?? null
+    const dungPhanTram = dungChiaTheoPhanTramDongGop(leafCode, ruleKind)
+    const tongPhanTram = publication.publicationAuthors.reduce(
+      (s, a) => s + (a.contributionPercent != null ? Number(a.contributionPercent) : 0),
+      0
+    )
+    const phanTramHopLe = Math.abs(tongPhanTram - 100) < 0.01
     const nTopAuthorsOnly = publication.publicationAuthors.filter((a) => a.isTopAuthor).length
     const nCorrespondingAuthors = publication.publicationAuthors.filter((a) => a.isCorresponding).length
     const nPrimaryOrCorrespondingAuthors = publication.publicationAuthors.filter(
@@ -308,7 +319,17 @@ export default class KpisController {
         let h = 0
         let pts = 0
         if (duocTinhTheoMuc15(a.affiliationType)) {
-          h = gioMotTacGiaTheoQD(B, n, p, tongTacGia, a.isTopAuthor, a.isCorresponding)
+          if (dungPhanTram) {
+            const pct = a.contributionPercent != null ? Number(a.contributionPercent) : null
+            const pctRowHopLe = pct != null && pct > 0 && phanTramHopLe
+            h = pctRowHopLe
+              ? Math.round(B * (pct / 100) * 100) / 100
+              : tongTacGia > 0
+                ? Math.round((B / tongTacGia) * 100) / 100
+                : 0
+          } else {
+            h = gioMotTacGiaTheoQD(B, n, p, tongTacGia, a.isTopAuthor, a.isCorresponding)
+          }
           if (a.isMultiAffiliationOutsideUdn) {
             h = Math.round((h / 2) * 100) / 100
           }
