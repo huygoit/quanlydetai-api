@@ -259,6 +259,7 @@ export default class KpisController {
         ownerProfileId: ownerPubProfileId ?? profileId ?? 0,
         researchOutputTypeId: publication.researchOutputTypeId,
         hdgsnnScore: publication.hdgsnnScore != null ? Number(publication.hdgsnnScore) : null,
+        acceptanceGrade: publication.acceptanceGrade ?? null,
       },
       authors: publication.publicationAuthors.map((a) => ({
         profileId: a.profileId != null ? toFinitePositiveInt(a.profileId) : null,

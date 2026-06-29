@@ -7,6 +7,8 @@ import ProfileLanguage from '#models/profile_language'
 import ProfileAttachment from '#models/profile_attachment'
 import Publication from '#models/publication'
 import Catalog from '#models/catalog'
+import Field from '#models/field'
+import Specialization from '#models/specialization'
 import db from '@adonisjs/lucid/services/db'
 import NotificationService from '#services/notification_service'
 import ResearchOutputTypeService from '#services/research_output_type_service'
@@ -366,6 +368,23 @@ export default class ProfileController {
     if (payload.degreeInstitution !== undefined) updates.degreeInstitution = payload.degreeInstitution ?? null
     if (payload.degreeCountry !== undefined) updates.degreeCountry = payload.degreeCountry ?? null
     if (payload.mainResearchArea !== undefined) updates.mainResearchArea = payload.mainResearchArea ?? null
+    if (payload.researchFieldId !== undefined) {
+      updates.researchFieldId = payload.researchFieldId ?? null
+      // Đồng bộ nhãn hiển thị từ danh mục lĩnh vực.
+      if (payload.researchFieldId) {
+        const field = await Field.find(payload.researchFieldId)
+        if (field) updates.mainResearchArea = field.name
+      }
+    }
+    if (payload.specialization !== undefined) updates.specialization = payload.specialization ?? null
+    if (payload.specializationId !== undefined) {
+      updates.specializationId = payload.specializationId ?? null
+      // Đồng bộ nhãn hiển thị từ danh mục chuyên ngành.
+      if (payload.specializationId) {
+        const spec = await Specialization.find(payload.specializationId)
+        if (spec) updates.specialization = spec.name
+      }
+    }
     if (payload.subResearchAreas !== undefined) updates.subResearchAreas = payload.subResearchAreas ?? []
     if (payload.keywords !== undefined) updates.keywords = payload.keywords ?? []
     await db.transaction(async (trx) => {
@@ -742,6 +761,9 @@ export default class ProfileController {
       degreeInstitution: p.degreeInstitution,
       degreeCountry: p.degreeCountry,
       mainResearchArea: p.mainResearchArea,
+      researchFieldId: p.researchFieldId ?? null,
+      specialization: p.specialization ?? null,
+      specializationId: p.specializationId ?? null,
       subResearchAreas: p.subResearchAreas ?? [],
       keywords: p.keywords ?? [],
       status: p.status,
@@ -791,6 +813,7 @@ export default class ProfileController {
         doi: pub.doi,
         qRankUrl: pub.qRankUrl,
         reputableListUrl: pub.reputableListUrl,
+        acceptanceGrade: pub.acceptanceGrade ?? null,
         volume: pub.volume,
         issue: pub.issue,
         pages: pub.pages,

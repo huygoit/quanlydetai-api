@@ -84,6 +84,7 @@ export default class AdminPublicationService {
       url: p.url,
       qRankUrl: p.qRankUrl,
       reputableListUrl: p.reputableListUrl,
+      acceptanceGrade: p.acceptanceGrade ?? null,
       publicationStatus: p.publicationStatus,
       reviewStatus: p.reviewStatus ?? 'NEW',
       correctionReason: p.correctionReason ?? null,

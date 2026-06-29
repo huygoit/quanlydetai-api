@@ -161,8 +161,10 @@ export default class PublicationAuthorsController {
           const isOwnerRow =
             author.profileId != null && Number(author.profileId) === Number(profile.id)
           if (isOwnerRow && !isAdminKeKhai) {
+            // Dòng chủ hồ sơ: chỉ cho đổi vai trò + tỉ lệ % đóng góp.
             author.isTopAuthor = a.is_top_author
             author.isCorresponding = a.is_corresponding
+            author.contributionPercent = a.contribution_percent ?? null
             await author.save()
             continue
           }
@@ -173,6 +175,7 @@ export default class PublicationAuthorsController {
           author.isCorresponding = a.is_corresponding
           author.affiliationType = effectiveAffType
           author.isMultiAffiliationOutsideUdn = effectiveMulti
+          author.contributionPercent = a.contribution_percent ?? null
           author.gender = nextGender
           if (nextProfileId !== undefined) {
             author.profileId = nextProfileId
@@ -196,6 +199,7 @@ export default class PublicationAuthorsController {
         isCorresponding: a.is_corresponding,
         affiliationType: effectiveAffType,
         isMultiAffiliationOutsideUdn: effectiveMulti,
+        contributionPercent: a.contribution_percent ?? null,
       })
     }
 

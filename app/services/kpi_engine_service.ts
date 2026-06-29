@@ -113,6 +113,7 @@ export default class KpiEngineService {
           ownerProfileId: pub.profileId,
           researchOutputTypeId: pub.researchOutputTypeId,
           hdgsnnScore: pub.hdgsnnScore != null ? Number(pub.hdgsnnScore) : null,
+          acceptanceGrade: pub.acceptanceGrade ?? null,
         },
         authors,
       })

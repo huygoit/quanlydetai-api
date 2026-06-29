@@ -6,6 +6,7 @@ const RANKS = ['ISI', 'SCOPUS', 'DOMESTIC', 'OTHER'] as const
 const QUARTILES = ['Q1', 'Q2', 'Q3', 'Q4', 'NO_Q'] as const
 const DOMESTIC_RULE_TYPES = ['HDGSNN_SCORE', 'CONFERENCE_ISBN'] as const
 const PUB_STATUSES = ['PUBLISHED', 'ACCEPTED', 'UNDER_REVIEW'] as const
+const ACCEPTANCE_GRADES = ['EXCELLENT', 'PASS_ON_TIME', 'PASS_LATE'] as const
 const MY_ROLES = ['CHU_TRI', 'DONG_TAC_GIA'] as const
 const SOURCES = ['INTERNAL', 'GOOGLE_SCHOLAR', 'SCV_DHDN', 'OPENALEX'] as const
 
@@ -46,6 +47,7 @@ export const createPublicationValidator = vine.compile(
     url: vine.string().trim().url().optional(),
     qRankUrl: vine.string().trim().maxLength(500).nullable().optional(),
     reputableListUrl: vine.string().trim().maxLength(500).nullable().optional(),
+    acceptanceGrade: vine.enum(ACCEPTANCE_GRADES).nullable().optional(),
     publicationStatus: vine.enum(PUB_STATUSES),
     source: vine.enum(SOURCES).optional(),
     sourceId: vine.string().trim().maxLength(100).optional(),
@@ -82,6 +84,7 @@ export const updatePublicationValidator = vine.compile(
     url: vine.string().trim().url().optional(),
     qRankUrl: vine.string().trim().maxLength(500).nullable().optional(),
     reputableListUrl: vine.string().trim().maxLength(500).nullable().optional(),
+    acceptanceGrade: vine.enum(ACCEPTANCE_GRADES).nullable().optional(),
     publicationStatus: vine.enum(PUB_STATUSES).optional(),
     source: vine.enum(SOURCES).optional(),
     sourceId: vine.string().trim().maxLength(100).optional(),

@@ -39,24 +39,20 @@ export function dungChiaTheoPhanTramDongGop(
   ruleKind?: string | null
 ): boolean {
   const c = String(leafCode ?? '').trim().toUpperCase()
-  if (!c) return false
-  // Bài báo trong nước / kỷ yếu / mã cũ → công thức n/p.
-  if (c.startsWith('QD_R14_P') || c === 'QD_R24' || c === 'QD_R15') return false
-  if (c.startsWith('PUB_WOS_') || c.startsWith('PUB_SCOPUS_') || c === 'PUB_DOMESTIC_HDGNN') {
-    return false
+  if (!c) {
+    // Không xác định mã: chỉ mục 4 (HĐGSNN) chắc chắn là sản phẩm khác → chia %.
+    return (ruleKind ?? '').toUpperCase() === 'HDGSNN_POINTS_TO_HOURS'
   }
-  if (c === 'PUB_CONF_ISBN') return false
-  if (c.startsWith('PROJECT_')) return true
+  // CHỈ mục 1, 2, 3 dùng công thức n/p (mục 1.2–1.3 QĐ 1883):
+  // - Mục 1, 2: bài báo quốc tế WoS/Scopus.
+  if (c.startsWith('PUB_WOS_') || c.startsWith('PUB_SCOPUS_')) return false
+  // - Mục 1, 2, 3 theo mã QĐ: QD_R2..QD_R13 (2–11 quốc tế, 12–13 báo cáo/tham luận).
   const m = /^QD_R(\d+)/.exec(c)
   const n = m ? Number(m[1]) : null
-  if (n != null) {
-    // 2–11: bài báo quốc tế; 12–13: báo cáo/tham luận (mục 3) → công thức.
-    if (n >= 2 && n <= 13) return false
-    // 16 trở đi: sách, đề tài, sáng kiến, SHTT, hướng dẫn, khen thưởng → chia %.
-    if (n >= 16) return true
-  }
-  if ((ruleKind ?? '').toUpperCase() === 'HDGSNN_POINTS_TO_HOURS') return false
-  return false
+  if (n != null && n >= 2 && n <= 13) return false
+  // Tất cả còn lại (mục 4, 5 và sản phẩm khoa học khác: sách, đề tài, sáng kiến,
+  // SHTT, chuyển giao, hướng dẫn, khen thưởng…) → chia theo % đóng góp (điều 1.4).
+  return true
 }
 
 /**
@@ -193,7 +189,23 @@ export function giaiThichHeSoAQdCongBoMuc12(
   phamViHeSoA1883: PhamViHeSoA1883
 ): AExplanation {
   if (phamViHeSoA1883 === 'authors') {
-    return giaiThichHeSoATrenTapTacGia(authors, 'toan_bo_tac_gia')
+    // Mục 3 (báo cáo/tham luận): theo QĐ 1883 chỉ có 2 trường hợp, không có mức 1.5.
+    // - Tất cả tác giả đều thuộc trường thành viên / đơn vị thuộc - trực thuộc ĐHĐN → a = 2
+    // - Còn lại (có bất kỳ tác giả ngoài ĐHĐN) → a = 1
+    if (!authors.length) {
+      return { a: 1, reason: 'Không có tác giả trong bài — dùng mặc định a = 1.' }
+    }
+    const tatCaThuocDhDn = authors.every((a) => a.affiliationType === 'UDN_ONLY')
+    return tatCaThuocDhDn
+      ? {
+          a: 2,
+          reason: 'Mục 3: tất cả tác giả đều thuộc đơn vị trong ĐHĐN nên a = 2.',
+        }
+      : {
+          a: 1,
+          reason:
+            'Mục 3: có tác giả ngoài ĐHĐN nên a = 1 (chỉ đạt a = 2 khi toàn bộ tác giả thuộc ĐHĐN).',
+        }
   }
 
   const tapTacGiaLienHe = authors.filter((a) => a.isCorresponding)
@@ -210,13 +222,49 @@ export function giaiThichHeSoAQdCongBoMuc12(
   return giaiThichHeSoATrenTapTacGia(tapTacGiaLienHe, 'tac_gia_lien_he')
 }
 
+/** Hệ số c mặc định theo QĐ 1883 khi loại kết quả chưa cấu hình meta.c_map. */
+const HE_SO_C_MAC_DINH: Record<string, number> = {
+  EXCELLENT: 1.1,
+  PASS_ON_TIME: 1.0,
+  PASS_LATE: 0.5,
+}
+
+/**
+ * Hệ số c (rule MULTIPLY_C — nghiệm thu đề tài) theo xếp loại nghiệm thu.
+ * Ưu tiên giá trị cấu hình trong danh mục (meta.c_map), fallback mức mặc định.
+ */
+function heSoCNghiemThu(
+  rule: ResearchOutputRule,
+  acceptanceGrade: string | null,
+  warnings: string[]
+): number {
+  const grade = (acceptanceGrade ?? '').trim().toUpperCase()
+  if (!grade) {
+    warnings.push('MULTIPLY_C: thiếu xếp loại nghiệm thu — không tính được hệ số c.')
+    return 0
+  }
+  const cMap = (rule.meta?.c_map ?? null) as Record<string, unknown> | null
+  const cCauHinh = cMap ? Number(cMap[grade]) : Number.NaN
+  if (Number.isFinite(cCauHinh) && cCauHinh > 0) return cCauHinh
+  const cMacDinh = HE_SO_C_MAC_DINH[grade]
+  if (cMacDinh != null) {
+    warnings.push(
+      `MULTIPLY_C: chưa cấu hình hệ số c cho xếp loại ${grade} trong danh mục — tạm dùng mặc định ${cMacDinh}.`
+    )
+    return cMacDinh
+  }
+  warnings.push(`MULTIPLY_C: xếp loại nghiệm thu không hợp lệ (${grade}).`)
+  return 0
+}
+
 function baseHoursFromRule(
   kind: string,
   rule: ResearchOutputRule,
   _authors: Array<{ affiliationType: string }>,
   hdgsnnScore: number | null,
   /** Giữ tham số để mở rộng sau; hiện không dùng trong nhánh B0. */
-  _aQuyDinh: number
+  _aQuyDinh: number,
+  acceptanceGrade: string | null
 ): { B0: number; warnings: string[] } {
   const warnings: string[] = []
   const k = kind.toUpperCase()
@@ -242,8 +290,9 @@ function baseHoursFromRule(
 
   if (k === 'MULTIPLY_C') {
     if (hv <= 0) warnings.push('MULTIPLY_C: hours_value không hợp lệ')
-    // Công bố: không có xếp loại nghiệm thu — dùng c = 1
-    return { B0: hv, warnings }
+    // Đề tài nghiệm thu: B0 = giờ chuẩn × hệ số c (theo xếp loại nghiệm thu, cấu hình meta.c_map).
+    const c = heSoCNghiemThu(rule, acceptanceGrade, warnings)
+    return { B0: Math.round(hv * c * 100) / 100, warnings }
   }
 
   if (k === 'BONUS_ADD') {
@@ -301,20 +350,20 @@ export async function publicationStrategyCalculate(
 
   let phamViHeSoA1883: PhamViHeSoA1883 = 'chiTacGiaChinh'
   let leafCode: string | null = null
+  // Lùi cảnh báo cấu hình hệ số a đến khi biết a có thực sự tham gia công thức hay không
+  // (loại chia % hoặc rule không phải MULTIPLY_A thì không dùng a → không cảnh báo).
+  let phamViChuaCauHinh = false
+  let phamViLoiDoc = false
   try {
     const type = await ResearchOutputType.find(typeId)
     leafCode = type?.code ?? null
     if (type?.phamViHeSoA1883 === 'authors' || type?.phamViHeSoA1883 === 'chiTacGiaChinh') {
       phamViHeSoA1883 = type.phamViHeSoA1883
     } else {
-      warnings.push(
-        'Chưa cấu hình phamViHeSoA1883 cho loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
-      )
+      phamViChuaCauHinh = true
     }
   } catch {
-    warnings.push(
-      'Không đọc được cấu hình phamViHeSoA1883 của loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
-    )
+    phamViLoiDoc = true
   }
 
   // Mục 1.4: sản phẩm KH khác chia theo % đóng góp — không phụ thuộc nhóm tác giả chính (n).
@@ -362,7 +411,8 @@ export async function publicationStrategyCalculate(
     rule,
     authors,
     publication.hdgsnnScore ?? null,
-    aQd
+    aQd,
+    publication.acceptanceGrade ?? null
   )
   warnings.push(...w2)
   if (rawB0 <= 0) {
@@ -381,6 +431,18 @@ export async function publicationStrategyCalculate(
    * Loại cố định (FIXED), nhân c (MULTIPLY_C), cộng thưởng (BONUS_ADD), HĐGSNN…: B = B0, không có a trong công thức — trả aExcel = null để UI hiển thị NA.
    */
   const coHeSoATrongCongThuc = kind === 'MULTIPLY_A'
+  // Chỉ cảnh báo thiếu cấu hình phạm vi hệ số a khi a thực sự tham gia (MULTIPLY_A) và không phải loại chia %.
+  if (coHeSoATrongCongThuc && !dungPhanTram) {
+    if (phamViLoiDoc) {
+      warnings.push(
+        'Không đọc được cấu hình phamViHeSoA1883 của loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
+      )
+    } else if (phamViChuaCauHinh) {
+      warnings.push(
+        'Chưa cấu hình phamViHeSoA1883 cho loại kết quả: mặc định tính hệ số a theo nhóm tác giả chính — đầu ∪ liên hệ (mục 1–2).'
+      )
+    }
+  }
   const aExcel: number | null = coHeSoATrongCongThuc ? aQd : null
   const lyDoHeSoA = coHeSoATrongCongThuc
     ? aInfo.reason

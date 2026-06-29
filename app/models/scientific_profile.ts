@@ -3,6 +3,8 @@ import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
 import Department from '#models/department'
+import Field from '#models/field'
+import Specialization from '#models/specialization'
 import type { UdnAffiliationUnitKey } from '#constants/udn_affiliation_units'
 import ProfileLanguage from '#models/profile_language'
 import ProfileAttachment from '#models/profile_attachment'
@@ -108,6 +110,18 @@ export default class ScientificProfile extends BaseModel {
   @column()
   declare mainResearchArea: string | null
 
+  /** FK fields — lĩnh vực nghiên cứu (danh mục). */
+  @column()
+  declare researchFieldId: number | null
+
+  /** Chuyên ngành đào tạo (nguồn: nv_chuyennganh). */
+  @column()
+  declare specialization: string | null
+
+  /** FK specializations — chuyên ngành (danh mục). */
+  @column()
+  declare specializationId: number | null
+
   @column({
     prepare: (v: string[] | null) => (v == null ? '[]' : JSON.stringify(v)),
     consume: (v: string | unknown) => (typeof v === 'string' ? JSON.parse(v) : Array.isArray(v) ? v : []),
@@ -146,6 +160,12 @@ export default class ScientificProfile extends BaseModel {
 
   @belongsTo(() => Department, { foreignKey: 'departmentId' })
   declare departmentUnit: BelongsTo<typeof Department>
+
+  @belongsTo(() => Field, { foreignKey: 'researchFieldId' })
+  declare researchField: BelongsTo<typeof Field>
+
+  @belongsTo(() => Specialization, { foreignKey: 'specializationId' })
+  declare specializationRef: BelongsTo<typeof Specialization>
 
   @hasMany(() => ProfileLanguage, { foreignKey: 'profileId' })
   declare languages: HasMany<typeof ProfileLanguage>

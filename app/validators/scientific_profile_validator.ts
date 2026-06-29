@@ -59,6 +59,9 @@ export const updateProfileValidator = vine.compile(
     degreeInstitution: vine.string().trim().maxLength(255).optional(),
     degreeCountry: vine.string().trim().maxLength(100).optional(),
     mainResearchArea: vine.string().trim().maxLength(255).optional(),
+    researchFieldId: vine.number().withoutDecimals().positive().nullable().optional(),
+    specialization: vine.string().trim().maxLength(255).nullable().optional(),
+    specializationId: vine.number().withoutDecimals().positive().nullable().optional(),
     subResearchAreas: vine.array(vine.string()).optional(),
     keywords: vine.array(vine.string()).optional(),
 

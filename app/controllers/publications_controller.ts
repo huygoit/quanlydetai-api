@@ -60,6 +60,7 @@ export default class PublicationsController {
       url: p.url,
       qRankUrl: p.qRankUrl,
       reputableListUrl: p.reputableListUrl,
+      acceptanceGrade: p.acceptanceGrade ?? null,
       publicationStatus: p.publicationStatus,
       reviewStatus: p.reviewStatus ?? 'NEW',
       correctionReason: p.correctionReason ?? null,
@@ -176,6 +177,7 @@ export default class PublicationsController {
       url: payload.url ?? null,
       qRankUrl: payload.qRankUrl ?? null,
       reputableListUrl: payload.reputableListUrl ?? null,
+      acceptanceGrade: payload.acceptanceGrade ?? null,
       publicationStatus: payload.publicationStatus,
       reviewStatus: 'NEW',
       correctionReason: null,
@@ -267,6 +269,7 @@ export default class PublicationsController {
     if (payload.qRankUrl !== undefined) updates.qRankUrl = payload.qRankUrl ?? null
     if (payload.reputableListUrl !== undefined)
       updates.reputableListUrl = payload.reputableListUrl ?? null
+    if (payload.acceptanceGrade !== undefined) updates.acceptanceGrade = payload.acceptanceGrade ?? null
     if (payload.publicationStatus !== undefined) updates.publicationStatus = payload.publicationStatus
     if (payload.source !== undefined) updates.source = payload.source
     if (payload.sourceId !== undefined) updates.sourceId = payload.sourceId ?? null

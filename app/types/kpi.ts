@@ -38,6 +38,8 @@ export type KpiOutput =
         ownerProfileId: number
         researchOutputTypeId: number | null
         hdgsnnScore?: number | null
+        /** Xếp loại nghiệm thu (đề tài rule MULTIPLY_C): EXCELLENT | PASS_ON_TIME | PASS_LATE */
+        acceptanceGrade?: string | null
       }
       authors: Array<{
         profileId: number | null

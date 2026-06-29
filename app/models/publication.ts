@@ -75,6 +75,10 @@ export default class Publication extends BaseModel {
   @column()
   declare reputableListUrl: string | null
 
+  /** Xếp loại nghiệm thu đề tài (rule MULTIPLY_C): EXCELLENT | PASS_ON_TIME | PASS_LATE */
+  @column()
+  declare acceptanceGrade: string | null
+
   @column()
   declare publicationStatus: string
 

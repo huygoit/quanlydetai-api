@@ -192,6 +192,7 @@ export default class AdminPublicationsController {
       url: payload.url ?? null,
       qRankUrl: payload.qRankUrl ?? null,
       reputableListUrl: payload.reputableListUrl ?? null,
+      acceptanceGrade: payload.acceptanceGrade ?? null,
       publicationStatus: payload.publicationStatus,
       reviewStatus: 'NEW',
       correctionReason: null,
@@ -299,6 +300,7 @@ export default class AdminPublicationsController {
     if (payload.qRankUrl !== undefined) updates.qRankUrl = payload.qRankUrl ?? null
     if (payload.reputableListUrl !== undefined)
       updates.reputableListUrl = payload.reputableListUrl ?? null
+    if (payload.acceptanceGrade !== undefined) updates.acceptanceGrade = payload.acceptanceGrade ?? null
     if (payload.publicationStatus !== undefined)
       updates.publicationStatus = payload.publicationStatus
     if (payload.source !== undefined) updates.source = payload.source
