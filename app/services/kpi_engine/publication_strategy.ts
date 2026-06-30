@@ -355,7 +355,8 @@ export async function publicationStrategyCalculate(
   let phamViChuaCauHinh = false
   let phamViLoiDoc = false
   try {
-    const type = await ResearchOutputType.find(typeId)
+    const cachedType = context.ruleCache?.typeById.get(Number(typeId))
+    const type = cachedType ?? (await ResearchOutputType.find(typeId))
     leafCode = type?.code ?? null
     if (type?.phamViHeSoA1883 === 'authors' || type?.phamViHeSoA1883 === 'chiTacGiaChinh') {
       phamViHeSoA1883 = type.phamViHeSoA1883
@@ -398,11 +399,18 @@ export async function publicationStrategyCalculate(
   const aQd = aInfo.a
 
   let rule: ResearchOutputRule
-  try {
-    rule = await ResearchOutputRule.query().where('type_id', typeId).firstOrFail()
-  } catch {
-    warnings.push(`Không tìm thấy rule cho type_id=${typeId}`)
-    return { hours: 0, points: 0, warnings, details: { publicationId: publication.id, typeId } }
+  const cachedRule = context.ruleCache?.ruleByTypeId.get(Number(typeId)) as
+    | ResearchOutputRule
+    | undefined
+  if (cachedRule) {
+    rule = cachedRule
+  } else {
+    try {
+      rule = await ResearchOutputRule.query().where('type_id', typeId).firstOrFail()
+    } catch {
+      warnings.push(`Không tìm thấy rule cho type_id=${typeId}`)
+      return { hours: 0, points: 0, warnings, details: { publicationId: publication.id, typeId } }
+    }
   }
 
   const kind = (rule.ruleKind || '').toUpperCase()

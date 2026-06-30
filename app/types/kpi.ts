@@ -20,12 +20,23 @@ export interface KpiRuleRow {
   hoursBonus: number | null
 }
 
+/**
+ * Cache preload type/rule để tránh query lặp khi tính KPI hàng loạt (báo cáo nhiều hồ sơ).
+ * `ruleByTypeId` giữ nguyên instance ResearchOutputRule để strategy đọc meta/hoursValue như cũ.
+ */
+export interface KpiEngineCache {
+  typeById: Map<number, { code: string | null; phamViHeSoA1883: string | null }>
+  ruleByTypeId: Map<number, unknown>
+}
+
 export interface KpiContext {
   profileId: number
   academicYear: string
   isFemale?: boolean
   /** Họ tên hồ sơ — dùng khớp tác giả khi bảng tác giả chưa có profile_id */
   profileFullName?: string | null
+  /** Cache type/rule dùng chung khi tính hàng loạt; không có thì strategy tự query DB. */
+  ruleCache?: KpiEngineCache
 }
 
 /** Output có thể là publication, project, book, ... */

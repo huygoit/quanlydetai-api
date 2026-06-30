@@ -227,6 +227,12 @@ router
       .post('/sync-missing', [AdminPermissionsController, 'syncMissing'])
       .use(middleware.permission('permission.view'))
     router
+      .get('/module-labels', [AdminPermissionsController, 'moduleLabels'])
+      .use(middleware.permission('permission.view'))
+    router
+      .put('/module-labels/:code', [AdminPermissionsController, 'updateModuleLabel'])
+      .use(middleware.permission('permission.view'))
+    router
       .get('/', [AdminPermissionsController, 'index'])
       .use(middleware.permission('permission.view'))
     router

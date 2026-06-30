@@ -29,11 +29,18 @@ export async function projectStrategyCalculate(
   }
 
   let rule: ResearchOutputRule
-  try {
-    rule = await ResearchOutputRule.query().where('type_id', typeId).firstOrFail()
-  } catch {
-    warnings.push(`Không tìm thấy rule cho type_id=${typeId}`)
-    return { hours: 0, points: 0, warnings, details: { projectId: project.id, typeId } }
+  const cachedRule = _context.ruleCache?.ruleByTypeId.get(Number(typeId)) as
+    | ResearchOutputRule
+    | undefined
+  if (cachedRule) {
+    rule = cachedRule
+  } else {
+    try {
+      rule = await ResearchOutputRule.query().where('type_id', typeId).firstOrFail()
+    } catch {
+      warnings.push(`Không tìm thấy rule cho type_id=${typeId}`)
+      return { hours: 0, points: 0, warnings, details: { projectId: project.id, typeId } }
+    }
   }
 
   const kind = (rule.ruleKind || '').toUpperCase()

@@ -1,5 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Permission from '#models/permission'
+import Catalog from '#models/catalog'
 import PermissionService from '#services/permission_service'
 import { createPermissionValidator } from '#validators/create_permission_validator'
 import { updatePermissionValidator } from '#validators/update_permission_validator'
@@ -139,6 +140,70 @@ export default class AdminPermissionsController {
         permissions: result.permissions.map((p) => this.serializePermission(p)),
       },
     })
+  }
+
+  /** Loại catalog dùng để lưu nhãn hiển thị của module quyền. */
+  private static readonly MODULE_LABEL_TYPE = 'PERMISSION_MODULE'
+
+  /**
+   * GET /api/admin/permissions/module-labels
+   * Danh sách nhãn hiển thị module đã tùy biến (lưu trong bảng catalogs).
+   */
+  async moduleLabels({ response }: HttpContext) {
+    const rows = await Catalog.query().where(
+      'type',
+      AdminPermissionsController.MODULE_LABEL_TYPE
+    )
+    return response.ok({
+      success: true,
+      data: rows.map((r) => ({ code: r.code, name: r.name })),
+    })
+  }
+
+  /**
+   * PUT /api/admin/permissions/module-labels/:code
+   * Cập nhật/đặt nhãn hiển thị cho một module quyền (không đụng mã code logic).
+   */
+  async updateModuleLabel({ auth, params, request, response }: HttpContext) {
+    // Chỉ Super Admin được sửa nhãn module.
+    const userId = auth.user?.id
+    const perms = userId ? await PermissionService.getUserPermissions(userId) : []
+    if (!perms.includes('*')) {
+      return response.forbidden({
+        success: false,
+        message: 'Chỉ Super Admin được sửa tên module.',
+      })
+    }
+
+    const code = String(params.code ?? '').trim()
+    if (!code) {
+      return response.badRequest({ success: false, message: 'Thiếu mã module.' })
+    }
+    const name = String(request.input('name', '')).trim()
+    if (!name) {
+      return response.badRequest({ success: false, message: 'Tên module không được để trống.' })
+    }
+
+    let row = await Catalog.query()
+      .where('type', AdminPermissionsController.MODULE_LABEL_TYPE)
+      .where('code', code)
+      .first()
+    if (!row) {
+      row = await Catalog.create({
+        type: AdminPermissionsController.MODULE_LABEL_TYPE,
+        code,
+        name,
+        description: null,
+        sortOrder: 0,
+        isActive: true,
+        parentId: null,
+        metadata: null,
+      })
+    } else {
+      row.name = name
+      await row.save()
+    }
+    return response.ok({ success: true, data: { code: row.code, name: row.name } })
   }
 
   async changeStatus({ params, request, response }: HttpContext) {

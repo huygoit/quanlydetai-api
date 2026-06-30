@@ -39,6 +39,27 @@ function wrapRange(from: DateTime, to: DateTime): KpiPeriodRange {
   }
 }
 
+/** Tháng bắt đầu năm học (khớp FE: từ tháng 8). */
+export const THANG_BAT_DAU_NAM_HOC = 8
+
+/**
+ * Khoảng năm học từ chuỗi "2024-2025": 01/08/2024 → 31/07/2025.
+ * Nếu chuỗi không hợp lệ thì trả về null.
+ */
+export function khoangNamHoc(academicYear?: string | null): KpiPeriodRange | null {
+  const str = String(academicYear ?? '').trim()
+  const m = str.match(/^(\d{4})\s*-\s*(\d{4})$/)
+  const startYear = m ? Number(m[1]) : Number(str)
+  if (!Number.isFinite(startYear) || startYear < 1900) return null
+  const from = DateTime.fromObject({
+    year: startYear,
+    month: THANG_BAT_DAU_NAM_HOC,
+    day: 1,
+  }).startOf('day')
+  const to = from.plus({ years: 1 }).minus({ days: 1 }).endOf('day')
+  return wrapRange(from, to)
+}
+
 /** Parse query from_date / to_date; mặc định năm tài chính hiện tại. */
 export function resolveKpiPeriodRange(
   fromDateRaw?: string | null,

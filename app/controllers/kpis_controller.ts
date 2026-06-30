@@ -6,7 +6,7 @@ import ResearchOutputType from '#models/research_output_type'
 import ProjectProposal from '#models/project_proposal'
 import KpiEngineService from '#services/kpi_engine_service'
 import PermissionService from '#services/permission_service'
-import { resolveKpiPeriodRange } from '#utils/kpi_period_helper'
+import { resolveKpiPeriodRange, khoangNamHoc, publicationTrongKhoangKy } from '#utils/kpi_period_helper'
 import { genderForPublicationAuthorRow } from '#utils/publication_author_api'
 import { dungChiaTheoPhanTramDongGop } from '#services/kpi_engine/publication_strategy'
 
@@ -466,9 +466,13 @@ export default class KpisController {
       })
     }
 
-    const rows = await KpiResult.query()
-      .where('academic_year', academicYear)
-      .preload('profile')
+    // Tính trực tiếp theo ngày xuất bản trong năm học (không đọc cache kpi_results)
+    const hoursMap = await KpiEngineService.hoursByProfileForAcademicYear(academicYear)
+    const profileIds = Array.from(hoursMap.keys())
+    const profileRows = profileIds.length
+      ? await ScientificProfile.query().whereIn('id', profileIds).select('id', 'fullName', 'faculty')
+      : []
+    const profileById = new Map(profileRows.map((p) => [Number(p.id), p]))
 
     const UNIT_FALLBACK = 'Chưa phân đơn vị'
     const grouped = new Map<
@@ -476,11 +480,12 @@ export default class KpisController {
       Array<{ fullName: string; hoTenDem: string; ten: string; hours: number }>
     >()
 
-    for (const r of rows) {
-      const profile = r.profile
+    for (const [pid, hours] of hoursMap) {
+      // Chỉ liệt kê người có giờ NCKH trong năm học đã chọn
+      if (!(hours > 0)) continue
+      const profile = profileById.get(pid)
       if (!profile) continue
       const unit = (profile.faculty || '').trim() || UNIT_FALLBACK
-      const hours = Number(r.totalHours) || 0
       const { hoTenDem, ten } = tachHoTen(profile.fullName || '')
       if (!grouped.has(unit)) grouped.set(unit, [])
       grouped.get(unit)!.push({ fullName: profile.fullName || '', hoTenDem, ten, hours })
@@ -622,29 +627,32 @@ export default class KpisController {
       rowByProfile.set(Number(p.id), emptyNckhRow(p.fullName || ''))
     })
 
-    // Đếm publications theo người kê khai (profile_id)
+    // Đếm publications theo người kê khai (profile_id), lọc theo ngày xuất bản trong năm học đã chọn
+    const namHocRange = khoangNamHoc(academicYear)
     if (profileIds.length > 0) {
       const pubs = await Publication.query()
         .whereIn('profile_id', profileIds)
-        .select('profileId', 'researchOutputTypeId')
+        .select('profileId', 'researchOutputTypeId', 'publishedAt', 'year')
       for (const pub of pubs) {
         const pid = pub.profileId != null ? Number(pub.profileId) : null
         if (pid == null) continue
+        // Có chọn năm học thì chỉ đếm KQNC có ngày xuất bản nằm trong khoảng năm học đó
+        if (namHocRange && !publicationTrongKhoangKy(pub, namHocRange)) continue
         const row = rowByProfile.get(pid)
         if (!row) continue
         const bucket = bucketOfType(pub.researchOutputTypeId != null ? Number(pub.researchOutputTypeId) : null)
         if (bucket) row[bucket] += 1
       }
 
-      // Giờ NCKH từ kpi_results theo năm học
+      // Giờ NCKH tính trực tiếp theo ngày xuất bản trong năm học (không đọc cache)
       if (academicYear) {
-        const kpis = await KpiResult.query()
-          .where('academic_year', academicYear)
-          .whereIn('profile_id', profileIds)
-          .select('profileId', 'totalHours')
-        for (const k of kpis) {
-          const row = rowByProfile.get(Number(k.profileId))
-          if (row) row.hours = Math.round((Number(k.totalHours) || 0) * 100) / 100
+        const hoursMap = await KpiEngineService.hoursByProfileForAcademicYear(
+          academicYear,
+          profileIds
+        )
+        for (const [pid, hours] of hoursMap) {
+          const row = rowByProfile.get(Number(pid))
+          if (row) row.hours = Math.round((Number(hours) || 0) * 100) / 100
         }
       }
 

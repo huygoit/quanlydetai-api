@@ -13,12 +13,12 @@ const TO_ADD: Array<{ code: string; name: string; module: string; action: string
   { code: 'idea.update', name: 'Cập nhật ý tưởng', module: 'idea', action: 'update' },
   { code: 'idea.submit', name: 'Gửi ý tưởng', module: 'idea', action: 'submit' },
   { code: 'idea.delete', name: 'Xóa ý tưởng', module: 'idea', action: 'delete' },
-  { code: 'publication.view', name: 'Xem kết quả NCKH', module: 'publication', action: 'view' },
-  { code: 'publication.create', name: 'Tạo kết quả NCKH', module: 'publication', action: 'create' },
-  { code: 'publication.update', name: 'Cập nhật kết quả NCKH', module: 'publication', action: 'update' },
-  { code: 'publication.delete', name: 'Xóa kết quả NCKH', module: 'publication', action: 'delete' },
-  { code: 'publication.review', name: 'Yêu cầu hiệu chỉnh kết quả NCKH', module: 'publication', action: 'review' },
-  { code: 'publication.approve', name: 'Duyệt kết quả NCKH', module: 'publication', action: 'approve' },
+  { code: 'publication.view', name: 'Xem kết quả nghiên cứu khoa học', module: 'publication', action: 'view' },
+  { code: 'publication.create', name: 'Tạo kết quả nghiên cứu khoa học', module: 'publication', action: 'create' },
+  { code: 'publication.update', name: 'Cập nhật kết quả nghiên cứu khoa học', module: 'publication', action: 'update' },
+  { code: 'publication.delete', name: 'Xóa kết quả nghiên cứu khoa học', module: 'publication', action: 'delete' },
+  { code: 'publication.review', name: 'Yêu cầu hiệu chỉnh kết quả nghiên cứu khoa học', module: 'publication', action: 'review' },
+  { code: 'publication.approve', name: 'Duyệt kết quả nghiên cứu khoa học', module: 'publication', action: 'approve' },
   { code: 'field.view', name: 'Xem danh mục lĩnh vực', module: 'field', action: 'view' },
   { code: 'field.create', name: 'Tạo lĩnh vực', module: 'field', action: 'create' },
   { code: 'field.update', name: 'Cập nhật lĩnh vực', module: 'field', action: 'update' },
@@ -42,6 +42,10 @@ export default class MissingPermissionsSeeder extends BaseSeeder {
           description: null,
           status: 'ACTIVE',
         })
+      } else if (exists.name !== p.name) {
+        // Đồng bộ lại nhãn theo tên chuẩn mới nhất (vd "công bố" → "kết quả nghiên cứu khoa học").
+        exists.name = p.name
+        await exists.save()
       }
     }
   }
