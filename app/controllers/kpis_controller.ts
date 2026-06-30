@@ -3,7 +3,6 @@ import Publication from '#models/publication'
 import ScientificProfile from '#models/scientific_profile'
 import KpiResult from '#models/kpi_result'
 import ResearchOutputType from '#models/research_output_type'
-import ProjectProposal from '#models/project_proposal'
 import KpiEngineService from '#services/kpi_engine_service'
 import PermissionService from '#services/permission_service'
 import { resolveKpiPeriodRange, khoangNamHoc, publicationTrongKhoangKy } from '#utils/kpi_period_helper'
@@ -100,6 +99,9 @@ type NckhBucket =
   | 'wos_scopus'
   | 'intl_other'
   | 'isbn_proc'
+  | 'dt_nha_nuoc'
+  | 'dt_bo'
+  | 'dt_truong'
   | 'sv_nckh'
   | 'textbook'
   | 'monograph'
@@ -117,7 +119,6 @@ function emptyNckhRow(fullName: string) {
     dt_nha_nuoc: 0,
     dt_bo: 0,
     dt_truong: 0,
-    dt_co_so: 0,
     sv_nckh: 0,
     hours: 0,
     textbook: 0,
@@ -137,7 +138,6 @@ function emptyNckhTotals() {
     dt_nha_nuoc: 0,
     dt_bo: 0,
     dt_truong: 0,
-    dt_co_so: 0,
     sv_nckh: 0,
     hours: 0,
     textbook: 0,
@@ -145,24 +145,6 @@ function emptyNckhTotals() {
     reference: 0,
     training_doc: 0,
     ip: 0,
-  }
-}
-
-/** Map cấp đề tài (project_proposals.level) -> cột trong biểu mẫu. */
-function projectLevelToKey(
-  level: string | null
-): 'dt_nha_nuoc' | 'dt_bo' | 'dt_truong' | 'dt_co_so' | null {
-  switch ((level || '').trim()) {
-    case 'NHA_NUOC':
-      return 'dt_nha_nuoc'
-    case 'BO':
-      return 'dt_bo'
-    case 'TRUONG':
-      return 'dt_truong'
-    case 'CO_SO':
-      return 'dt_co_so'
-    default:
-      return null
   }
 }
 
@@ -466,8 +448,30 @@ export default class KpisController {
       })
     }
 
-    // Tính trực tiếp theo ngày xuất bản trong năm học (không đọc cache kpi_results)
-    const hoursMap = await KpiEngineService.hoursByProfileForAcademicYear(academicYear)
+    const facultyParam = String(request.input('faculty', '')).trim()
+
+    // Danh sách đơn vị có hồ sơ (để FE đổ vào ô chọn)
+    const facultyRows = await ScientificProfile.query()
+      .whereNotNull('faculty')
+      .distinct('faculty')
+      .select('faculty')
+    const faculties = facultyRows
+      .map((r) => (r.faculty || '').trim())
+      .filter((f) => f.length > 0)
+      .sort((a, b) => COLLATOR_VI.compare(a, b))
+
+    // Tính trực tiếp theo ngày xuất bản trong năm học (không đọc cache kpi_results).
+    // Chọn đơn vị thì chỉ tính cho hồ sơ thuộc đơn vị đó (nhanh hơn).
+    let hoursMap: Map<number, number>
+    if (facultyParam) {
+      const fp = await ScientificProfile.query().where('faculty', facultyParam).select('id')
+      const onlyIds = fp.map((p) => Number(p.id))
+      hoursMap = onlyIds.length
+        ? await KpiEngineService.hoursByProfileForAcademicYear(academicYear, onlyIds)
+        : new Map<number, number>()
+    } else {
+      hoursMap = await KpiEngineService.hoursByProfileForAcademicYear(academicYear)
+    }
     const profileIds = Array.from(hoursMap.keys())
     const profileRows = profileIds.length
       ? await ScientificProfile.query().whereIn('id', profileIds).select('id', 'fullName', 'faculty')
@@ -526,6 +530,8 @@ export default class KpisController {
       success: true,
       data: {
         academic_year: academicYear,
+        faculty: facultyParam,
+        faculties,
         generated_at: new Date().toISOString(),
         total_people: totalPeople,
         grand_total: Math.round(grandTotal * 100) / 100,
@@ -581,45 +587,63 @@ export default class KpisController {
       })
     }
 
-    // Map loại KQNC -> "ô" thống kê dựa trên cây phân cấp
-    const types = await ResearchOutputType.query().select('id', 'parentId')
+    // Map loại KQNC -> "ô" thống kê theo MÃ (code) — bền vững khi ID danh mục đổi giữa các môi trường.
+    const types = await ResearchOutputType.query().select('id', 'parentId', 'code')
     const parentMap = new Map<number, number | null>()
-    types.forEach((t) => parentMap.set(Number(t.id), t.parentId != null ? Number(t.parentId) : null))
-    const ancestorsInclusive = (id: number): Set<number> => {
-      const set = new Set<number>()
+    const codeById = new Map<number, string>()
+    types.forEach((t) => {
+      parentMap.set(Number(t.id), t.parentId != null ? Number(t.parentId) : null)
+      codeById.set(Number(t.id), (t.code || '').trim().toUpperCase())
+    })
+    // Tập mã của chính loại + tất cả tổ tiên (để nhận diện theo nhánh cha)
+    const ancestorCodes = (id: number): Set<string> => {
+      const set = new Set<string>()
       let cur: number | null = id
       let guard = 0
       while (cur != null && guard < 10) {
-        set.add(cur)
+        const code = codeById.get(cur)
+        if (code) set.add(code)
         cur = parentMap.get(cur) ?? null
         guard++
       }
       return set
     }
+    // Mã loại lá (sách/giáo trình) -> ô thống kê.
+    // QD_R18/R22 (sách hướng dẫn, sách phục vụ đào tạo) tạm xếp vào "Tài liệu tham khảo";
+    // QD_R23 (chương sách tiếng nước ngoài) tạm xếp vào "Sách chuyên khảo" — kiểm tra lại nếu cần.
+    const LEAF_BUCKET: Record<string, NckhBucket> = {
+      QD_R16: 'monograph', // 6.1 Sách chuyên khảo
+      QD_R23: 'monograph', // 6.8 Chương sách tiếng nước ngoài
+      QD_R17: 'reference', // 6.2 Sách tham khảo, sách giáo khoa
+      QD_R18: 'reference', // 6.3 Sách hướng dẫn, sách bài tập
+      QD_R22: 'reference', // 6.7 Sách phục vụ đào tạo
+      QD_R19: 'training_doc', // 6.4 Tài liệu bồi dưỡng
+      QD_R20: 'textbook', // 6.5 Giáo trình
+      QD_R21: 'textbook', // 6.6 Giáo trình tái bản
+      // Đề tài KHCN (mục 9) — đếm theo KQNC khai dạng đề tài
+      QD_R27: 'dt_nha_nuoc', // 9.1 Cấp Nhà nước
+      QD_R28: 'dt_bo', // 9.2 Cấp Bộ/ĐHĐN/Trường
+      QD_R29: 'dt_truong', // 9.3 Cấp Trường
+    }
     const bucketOfType = (typeId: number | null): NckhBucket | null => {
       if (typeId == null) return null
-      const anc = ancestorsInclusive(typeId)
-      if (typeId === 22) return 'monograph'
-      if (typeId === 23) return 'reference'
-      if (typeId === 25) return 'training_doc'
-      if (typeId === 26 || typeId === 27) return 'textbook'
-      if (anc.has(2) || anc.has(8)) return 'wos_scopus'
-      if (anc.has(17)) return 'intl_other'
-      if (anc.has(19)) return 'isbn_proc'
-      if (anc.has(43)) return 'sv_nckh'
-      if (anc.has(50)) return 'ip'
+      const selfCode = codeById.get(Number(typeId)) ?? ''
+      if (LEAF_BUCKET[selfCode]) return LEAF_BUCKET[selfCode]
+      const anc = ancestorCodes(Number(typeId))
+      // Bài báo: theo nhánh cha
+      if (anc.has('QD_L2_1_1') || anc.has('QD_L2_1_2')) return 'wos_scopus' // SCIE/SSCI/AHCI + Scopus/ESCI
+      if (anc.has('QD_L2_1_4')) return 'intl_other' // Mục 4: Tạp chí KH&CN ("Tạp chí quốc tế khác")
+      if (anc.has('QD_L2_1_5')) return 'isbn_proc' // Báo cáo/Kỉ yếu hội thảo
+      if (anc.has('QD_L2_32_11')) return 'sv_nckh' // Hướng dẫn SV NCKH
+      if (anc.has('QD_L1_III')) return 'ip' // Sở hữu trí tuệ, chuyển giao
       return null
     }
 
     // Hồ sơ trong Khoa
     const profiles = await ScientificProfile.query()
       .where('faculty', faculty)
-      .select('id', 'fullName', 'userId')
+      .select('id', 'fullName')
     const profileIds = profiles.map((p) => Number(p.id))
-    const userIdToProfileId = new Map<number, number>()
-    profiles.forEach((p) => {
-      if (p.userId != null) userIdToProfileId.set(Number(p.userId), Number(p.id))
-    })
 
     // Khởi tạo dòng cho từng hồ sơ
     const rowByProfile = new Map<number, ReturnType<typeof emptyNckhRow>>()
@@ -655,22 +679,7 @@ export default class KpisController {
           if (row) row.hours = Math.round((Number(hours) || 0) * 100) / 100
         }
       }
-
-      // Đề tài KHCN theo cấp (project_proposals.owner_id = user_id)
-      const userIds = Array.from(userIdToProfileId.keys())
-      if (userIds.length > 0) {
-        const proposals = await ProjectProposal.query()
-          .whereIn('owner_id', userIds)
-          .select('ownerId', 'level')
-        for (const pr of proposals) {
-          const pid = userIdToProfileId.get(Number(pr.ownerId))
-          if (pid == null) continue
-          const row = rowByProfile.get(pid)
-          if (!row) continue
-          const key = projectLevelToKey(pr.level)
-          if (key) row[key] += 1
-        }
-      }
+      // Đề tài KHCN (mục 9.1/9.2/9.3) đã được đếm trong vòng lặp publications ở trên qua bucketOfType.
     }
 
     // Sắp xếp theo tên (từ cuối)
@@ -695,7 +704,6 @@ export default class KpisController {
       totals.dt_nha_nuoc += r.dt_nha_nuoc
       totals.dt_bo += r.dt_bo
       totals.dt_truong += r.dt_truong
-      totals.dt_co_so += r.dt_co_so
       totals.sv_nckh += r.sv_nckh
       totals.hours += r.hours
       totals.textbook += r.textbook

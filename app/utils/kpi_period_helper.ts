@@ -78,10 +78,8 @@ export function resolveKpiPeriodRange(
 }
 
 export function publicationTrongKhoangKy(pub: Publication, range: KpiPeriodRange): boolean {
-  let d: DateTime | null = pub.publishedAt ?? null
-  if (!d && pub.year != null && Number.isFinite(Number(pub.year))) {
-    d = DateTime.fromObject({ year: Number(pub.year), month: 12, day: 31 }).startOf('day')
-  }
+  // Chặt chẽ: chỉ tính KQNC có ngày xuất bản thật; bản ghi chỉ có năm (thiếu published_at) bị bỏ qua.
+  const d: DateTime | null = pub.publishedAt ?? null
   if (!d?.isValid) return false
   const day = d.startOf('day')
   return day >= range.from && day <= range.to
