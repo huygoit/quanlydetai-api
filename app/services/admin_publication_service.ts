@@ -125,7 +125,9 @@ export default class AdminPublicationService {
       }
     }
 
-    const kw = filters.keyword?.trim()
+    // keyword có thể tới dạng mảng (?keyword[]=...) hoặc số — ép an toàn về chuỗi.
+    const kwRaw = Array.isArray(filters.keyword) ? filters.keyword[0] : filters.keyword
+    const kw = kwRaw == null ? '' : String(kwRaw).trim()
     if (kw) {
       const like = `%${kw}%`
       q.where((b) => {

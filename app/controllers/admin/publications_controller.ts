@@ -26,10 +26,8 @@ export default class AdminPublicationsController {
       Number(request.input('perPage') ?? request.input('per_page', 10)) || 10,
       100
     )
-    const keyword =
-      (request.input('keyword', '') as string) ||
-      (request.input('q', '') as string) ||
-      ''
+    const keywordRaw = request.input('keyword') ?? request.input('q') ?? ''
+    const keyword = String(Array.isArray(keywordRaw) ? (keywordRaw[0] ?? '') : keywordRaw)
     const rootTypeIdRaw = request.input('rootTypeId') ?? request.input('root_type_id')
     const profileIdRaw = request.input('profileId') ?? request.input('profile_id')
     const publishedFrom =
