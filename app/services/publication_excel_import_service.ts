@@ -461,6 +461,7 @@ export default class PublicationExcelImportService {
           myRole: firstAuthor ? 'CHU_TRI' : 'DONG_TAC_GIA',
           publicationType: 'JOURNAL',
           journalOrConference,
+          publisher: row.nhaXuatBan || null,
           year: row.namXuatBan,
           rank: leafCode.startsWith('QD_R2') || leafCode.startsWith('QD_R3') || leafCode.startsWith('QD_R4') || leafCode.startsWith('QD_R5') || leafCode.startsWith('QD_R6') ? 'ISI' : 'SCOPUS',
           quartile:

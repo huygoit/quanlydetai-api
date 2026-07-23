@@ -36,6 +36,7 @@ export function mapPublicationAuthorToApi(
     id: a.id,
     profileId: a.profileId,
     studentId: a.studentId,
+    departmentId: a.departmentId,
     gender: resolveGenderForApiDisplay(a),
     fullName: a.fullName,
     affiliationUnits: a.affiliationUnits ?? [],

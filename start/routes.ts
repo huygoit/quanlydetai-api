@@ -26,6 +26,7 @@ import SessionMembersController from '#controllers/session_members_controller'
 import SessionIdeasController from '#controllers/session_ideas_controller'
 import IdeaCouncilScoresController from '#controllers/idea_council_scores_controller'
 import ProjectProposalsController from '#controllers/project_proposals_controller'
+import CallForProposalsController from '#controllers/call_for_proposals_controller'
 import HomeController from '#controllers/home_controller'
 import KpisController from '#controllers/kpis_controller'
 import AdminResearchOutputTypesController from '#controllers/admin/research_output_types_controller'
@@ -553,6 +554,34 @@ router
     router.get('/:sessionId/stats', [IdeaCouncilScoresController, 'stats'])
   })
   .prefix('/api/council-sessions')
+  .middleware([middleware.auth()])
+
+// --- Thông báo tuyển chọn đề tài (CFP)
+router
+  .group(() => {
+    // Static paths trước /:id
+    router
+      .get('/published', [CallForProposalsController, 'published'])
+      .use(middleware.permission('cfp.view'))
+    router
+      .get('/published/:id', [CallForProposalsController, 'publishedShow'])
+      .use(middleware.permission('cfp.view'))
+    router
+      .get('/active-period', [CallForProposalsController, 'activePeriod'])
+      .use(middleware.permission('cfp.view,project.create,project.submit,project.view'))
+    router.get('/', [CallForProposalsController, 'index']).use(middleware.permission('cfp.view'))
+    router.get('/:id/audits', [CallForProposalsController, 'audits']).use(middleware.permission('cfp.view'))
+    router.get('/:id', [CallForProposalsController, 'show']).use(middleware.permission('cfp.view'))
+    router.post('/', [CallForProposalsController, 'store']).use(middleware.permission('cfp.create'))
+    router.put('/:id', [CallForProposalsController, 'update']).use(middleware.permission('cfp.update'))
+    router.post('/:id/submit', [CallForProposalsController, 'submit']).use(middleware.permission('cfp.submit'))
+    router.post('/:id/approve', [CallForProposalsController, 'approve']).use(middleware.permission('cfp.approve'))
+    router.post('/:id/return', [CallForProposalsController, 'return']).use(middleware.permission('cfp.approve'))
+    router.post('/:id/publish', [CallForProposalsController, 'publish']).use(middleware.permission('cfp.publish'))
+    router.post('/:id/extend', [CallForProposalsController, 'extend']).use(middleware.permission('cfp.extend'))
+    router.post('/:id/close', [CallForProposalsController, 'close']).use(middleware.permission('cfp.close'))
+  })
+  .prefix('/api/call-for-proposals')
   .middleware([middleware.auth()])
 
 // --- Đăng ký đề xuất đề tài (Project Proposals)

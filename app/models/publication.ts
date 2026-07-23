@@ -35,6 +35,9 @@ export default class Publication extends BaseModel {
   declare journalOrConference: string
 
   @column()
+  declare publisher: string | null
+
+  @column()
   declare year: number | null
 
   @column.date()

@@ -67,6 +67,7 @@ export default class AdminPublicationService {
         : null,
       publicationType: p.publicationType,
       journalOrConference: p.journalOrConference,
+      publisher: p.publisher,
       year: p.year,
       publishedAt: formatPublishedAtForResponse(p.publishedAt),
       published_at: formatPublishedAtForResponse(p.publishedAt),

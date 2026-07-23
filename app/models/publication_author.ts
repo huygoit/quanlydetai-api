@@ -4,6 +4,7 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Publication from '#models/publication'
 import ScientificProfile from '#models/scientific_profile'
 import Student from '#models/student'
+import Department from '#models/department'
 
 /** Loại affiliation tác giả */
 export type AffiliationType = 'UDN_ONLY' | 'MIXED' | 'OUTSIDE'
@@ -29,6 +30,9 @@ export default class PublicationAuthor extends BaseModel {
 
   @column()
   declare studentId: number | null
+
+  @column()
+  declare departmentId: number | null
 
   @column()
   declare gender: AuthorGender | null
@@ -85,4 +89,7 @@ export default class PublicationAuthor extends BaseModel {
 
   @belongsTo(() => Student, { foreignKey: 'studentId' })
   declare student: BelongsTo<typeof Student>
+
+  @belongsTo(() => Department, { foreignKey: 'departmentId' })
+  declare department: BelongsTo<typeof Department>
 }

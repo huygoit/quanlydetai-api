@@ -116,11 +116,10 @@ function chonTacGiaChoProfile(
  */
 export function compositeAffiliationFactorA(authors: Array<{ affiliationType: string }>): number {
   if (!authors.length) return 1
-  const laDaiHocDaNang = (a: { affiliationType: string }) => a.affiliationType === 'UDN_ONLY'
-  const tatCaThuocDhDn = authors.every(laDaiHocDaNang)
-  const tatCaLaKhac = authors.every((a) => !laDaiHocDaNang(a))
+  const tatCaThuocDhDn = authors.every((a) => a.affiliationType === 'UDN_ONLY')
+  const tatCaNgoaiDhDn = authors.every((a) => a.affiliationType === 'OUTSIDE')
   if (tatCaThuocDhDn) return 2
-  if (tatCaLaKhac) return 1
+  if (tatCaNgoaiDhDn) return 1
   return 1.5
 }
 
@@ -144,7 +143,7 @@ function giaiThichHeSoATrenTapTacGia(
     }
   }
   const tatCaThuocDhDn = authors.every((a) => a.affiliationType === 'UDN_ONLY')
-  const tatCaNgoaiDhDn = authors.every((a) => a.affiliationType !== 'UDN_ONLY')
+  const tatCaNgoaiDhDn = authors.every((a) => a.affiliationType === 'OUTSIDE')
   const moTaTapTacGia =
     loaiMoTa === 'tac_gia_lien_he'
       ? 'tập tác giả liên hệ'

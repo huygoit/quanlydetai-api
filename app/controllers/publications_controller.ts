@@ -43,6 +43,7 @@ export default class PublicationsController {
         : null,
       publicationType: p.publicationType,
       journalOrConference: p.journalOrConference,
+      publisher: p.publisher,
       year: p.year,
       publishedAt: formatPublishedAtForResponse(p.publishedAt),
       published_at: formatPublishedAtForResponse(p.publishedAt),
@@ -161,6 +162,7 @@ export default class PublicationsController {
       myRole: payload.myRole ?? null,
       publicationType: payload.publicationType ?? 'JOURNAL',
       journalOrConference: payload.journalOrConference,
+      publisher: payload.publisher ?? null,
       year: publicationDates.year,
       publishedAt: publicationDates.publishedAt,
       volume: payload.volume ?? null,
@@ -252,6 +254,7 @@ export default class PublicationsController {
     if (payload.myRole !== undefined) updates.myRole = payload.myRole ?? null
     if (payload.publicationType !== undefined) updates.publicationType = payload.publicationType
     if (payload.journalOrConference !== undefined) updates.journalOrConference = payload.journalOrConference
+    if (payload.publisher !== undefined) updates.publisher = payload.publisher ?? null
     if (dateUpdates.publishedAt !== undefined) updates.publishedAt = dateUpdates.publishedAt
     if (dateUpdates.year !== undefined) updates.year = dateUpdates.year
     if (payload.volume !== undefined) updates.volume = payload.volume ?? null

@@ -3,6 +3,7 @@ import ProjectProposal from '#models/project_proposal'
 import AuditLogService from '#services/audit_log_service'
 import NotificationService from '#services/notification_service'
 import PermissionService from '#services/permission_service'
+import CallForProposalService from '#services/call_for_proposal_service'
 import {
   createProjectProposalValidator,
   updateProjectProposalValidator,
@@ -229,6 +230,16 @@ export default class ProjectProposalsController {
     }
     if (proposal.ownerId !== user.id) {
       return response.forbidden({ success: false, message: 'Bạn không có quyền gửi đề xuất này.' })
+    }
+
+    // AC4: chỉ nộp khi có kỳ tiếp nhận OPEN còn hạn khớp cấp đề tài
+    const active = await CallForProposalService.findActivePeriodForLevel(proposal.level)
+    if (!active) {
+      return response.unprocessableEntity({
+        success: false,
+        message:
+          'Hiện không có kỳ tiếp nhận hồ sơ đang mở cho cấp đề tài này. Vui lòng chờ Thông báo tuyển chọn được phát hành hoặc liên hệ Phòng Khoa học.',
+      })
     }
 
     proposal.status = 'SUBMITTED'
