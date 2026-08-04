@@ -53,4 +53,25 @@ export default await Env.create(new URL('../', import.meta.url), {
   UPLOAD_STORAGE_ROOT: Env.schema.string.optional(),
   UPLOAD_PROFILE_ATTACHMENTS_DIR: Env.schema.string.optional(),
   UPLOAD_PUBLIC_BASE_PATH: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | SMTP (Office 365 / SMTP chung)
+  |----------------------------------------------------------
+  | Office 365 khuyến nghị:
+  |   SMTP_HOST=smtp.office365.com
+  |   SMTP_PORT=587
+  |   SMTP_SECURE=false   (STARTTLS)
+  |   SMTP_USER=user@domain.com
+  |   SMTP_PASSWORD=...
+  |   SMTP_FROM=user@domain.com  (tuỳ chọn, mặc định = SMTP_USER)
+  |   SMTP_ENABLED=true
+  */
+  SMTP_ENABLED: Env.schema.boolean.optional(),
+  SMTP_HOST: Env.schema.string.optional(),
+  SMTP_PORT: Env.schema.number.optional(),
+  SMTP_SECURE: Env.schema.boolean.optional(),
+  SMTP_USER: Env.schema.string.optional(),
+  SMTP_PASSWORD: Env.schema.string.optional(),
+  SMTP_FROM: Env.schema.string.optional(),
 })

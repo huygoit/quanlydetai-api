@@ -47,6 +47,19 @@ export default class AdminPermissionsController {
     })
   }
 
+  /** GET /api/admin/permissions/all — đủ catalog (không cắt trang) */
+  async all({ request, response }: HttpContext) {
+    const rows = await PermissionService.listAll({
+      status: request.input('status', 'ACTIVE') || undefined,
+      module: request.input('module', '') || undefined,
+    })
+    return response.ok({
+      success: true,
+      message: 'Permissions fetched successfully',
+      data: rows.map((p) => this.serializePermission(p)),
+    })
+  }
+
   async show({ params, response }: HttpContext) {
     const id = Number(params.id)
     if (!Number.isFinite(id)) {

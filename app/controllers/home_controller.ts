@@ -26,7 +26,7 @@ const IDEA_STATUS_LABELS: Record<string, string> = {
 const PROPOSAL_STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Nháp',
   SUBMITTED: 'Chờ duyệt',
-  UNIT_REVIEWED: 'Đơn vị đã duyệt',
+  CHO_PKH: 'Chờ PKH',
   APPROVED: 'Đang thực hiện',
   REJECTED: 'Không phê duyệt',
   WITHDRAWN: 'Đã rút',
@@ -205,7 +205,7 @@ export default class HomeController {
       const [myProposalsRow, myIdeasRow, unreadRow] = await Promise.all([
         ProjectProposal.query()
           .where('owner_id', user.id)
-          .whereIn('status', ['SUBMITTED', 'UNIT_REVIEWED', 'APPROVED'])
+          .whereIn('status', ['SUBMITTED', 'CHO_PKH', 'APPROVED'])
           .count('*', 'total')
           .first(),
         Idea.query().where('owner_id', user.id).count('*', 'total').first(),
@@ -289,7 +289,7 @@ export default class HomeController {
     if (hasPhongKH) {
       const ideasPending = await Idea.query().where('status', 'SUBMITTED').limit(5)
       const proposalsPending = await ProjectProposal.query()
-        .whereIn('status', ['SUBMITTED', 'UNIT_REVIEWED'])
+        .whereIn('status', ['SUBMITTED', 'CHO_PKH'])
         .limit(3)
       const sessionsOpen = await CouncilSession.query().where('status', 'OPEN').limit(2)
       data = [
@@ -378,7 +378,7 @@ export default class HomeController {
       // NCV, CNDT
       const myProposals = await ProjectProposal.query()
         .where('owner_id', user.id)
-        .whereIn('status', ['SUBMITTED', 'UNIT_REVIEWED', 'APPROVED'])
+        .whereIn('status', ['SUBMITTED', 'CHO_PKH', 'APPROVED'])
         .orderBy('updated_at', 'desc')
         .limit(3)
       const myIdeas = await Idea.query()
@@ -476,7 +476,7 @@ export default class HomeController {
     const user = auth.use('api').user!
     const list = await ProjectProposal.query()
       .where('owner_id', user.id)
-      .whereIn('status', ['SUBMITTED', 'UNIT_REVIEWED', 'APPROVED'])
+      .whereIn('status', ['SUBMITTED', 'CHO_PKH', 'APPROVED'])
       .orderBy('updated_at', 'desc')
       .limit(20)
 
@@ -548,7 +548,7 @@ export default class HomeController {
     const [ideasSubmittedRow, proposalsUnitRow, councilOpenRow, approvedRow, approvedCountRow] =
       await Promise.all([
         Idea.query().where('status', 'SUBMITTED').count('*', 'total').first(),
-        ProjectProposal.query().where('status', 'UNIT_REVIEWED').count('*', 'total').first(),
+        ProjectProposal.query().where('status', 'CHO_PKH').count('*', 'total').first(),
         CouncilSession.query().where('status', 'OPEN').count('*', 'total').first(),
         ProjectProposal.query().where('status', 'APPROVED').limit(15),
         ProjectProposal.query().where('status', 'APPROVED').count('*', 'total').first(),
@@ -616,7 +616,7 @@ export default class HomeController {
       return response.forbidden({ success: false, message: 'Chỉ người có quyền duyệt được xem.' })
     }
     const list = await ProjectProposal.query()
-      .whereIn('status', ['SUBMITTED', 'UNIT_REVIEWED'])
+      .whereIn('status', ['SUBMITTED', 'CHO_PKH'])
       .orderBy('updated_at', 'desc')
       .limit(20)
     const data = list.map((p) => ({

@@ -8,6 +8,8 @@ import CfpEmailJob from '#models/cfp_email_job'
 import Staff from '#models/staff'
 import NotificationService from '#services/notification_service'
 import PermissionService from '#services/permission_service'
+import EmailLogService from '#services/email_log_service'
+import MailService from '#services/mail_service'
 import type { ProjectProposalLevel } from '#models/project_proposal'
 import db from '@adonisjs/lucid/services/db'
 
@@ -177,15 +179,12 @@ export default class CallForProposalService {
     await cfp.save()
     await this.writeAudit(cfp.id, userId, 'SUBMIT')
 
-    const bghIds = await PermissionService.getUserIdsWithPermission('cfp.approve')
-    if (bghIds.length) {
-      await NotificationService.pushMany(bghIds, {
-        type: 'SYSTEM',
-        title: 'Thông báo tuyển chọn chờ duyệt',
-        message: `"${cfp.title}" đã được trình duyệt.`,
-        link: LINK_DETAIL(cfp.id),
-      })
-    }
+    await NotificationService.pushToPermission('cfp.approve', {
+      type: 'SYSTEM',
+      title: 'Thông báo tuyển chọn chờ duyệt',
+      message: `"${cfp.title}" đã được trình duyệt.`,
+      link: LINK_DETAIL(cfp.id),
+    })
     return cfp
   }
 
@@ -198,15 +197,12 @@ export default class CallForProposalService {
     await cfp.save()
     await this.writeAudit(cfp.id, userId, 'APPROVE')
 
-    const hcIds = await PermissionService.getUserIdsWithPermission('cfp.publish')
-    if (hcIds.length) {
-      await NotificationService.pushMany(hcIds, {
-        type: 'SYSTEM',
-        title: 'Thông báo tuyển chọn chờ phát hành',
-        message: `"${cfp.title}" đã được BGH duyệt — cần xác nhận phát hành.`,
-        link: LINK_DETAIL(cfp.id),
-      })
-    }
+    await NotificationService.pushToPermission('cfp.publish', {
+      type: 'SYSTEM',
+      title: 'Thông báo tuyển chọn chờ phát hành',
+      message: `"${cfp.title}" đã được BGH duyệt — cần xác nhận phát hành.`,
+      link: LINK_DETAIL(cfp.id),
+    })
     return cfp
   }
 
@@ -265,14 +261,13 @@ export default class CallForProposalService {
       )
     })
 
-    // Gửi thông báo + ghi nhận job email (MVP: chưa có SMTP — in-app cho staff có userId)
+    // Gửi thông báo in-app + email SMTP (nếu đã cấu hình .env)
     void this.enqueueBroadcast(cfp).catch(() => undefined)
     return cfp
   }
 
   /**
-   * Broadcast: đếm staff có email, gửi in-app cho staff đã gắn user_id.
-   * Email thật sẽ bổ sung khi có mailer.
+   * Broadcast phát hành CFP: in-app cho staff có userId + email SMTP nếu đã cấu hình.
    */
   static async enqueueBroadcast(cfp: CallForProposal) {
     const job = await CfpEmailJob.create({
@@ -301,12 +296,42 @@ export default class CallForProposalService {
           message: `${cfp.title} — hạn nộp: ${cfp.deadlineAt.toFormat('dd/MM/yyyy')}`,
           link: `/projects/call-for-proposals/news/${cfp.id}`,
         })
-        job.sent = userIds.length
       }
-      // Ghi chú: tổng email staff đã ghi nhận; SMTP chưa cấu hình
-      job.status = 'DONE'
-      job.error =
-        'MVP: đã gửi thông báo nội bộ cho staff có tài khoản. SMTP email hàng loạt chưa cấu hình.'
+
+      let mailSent = 0
+      let mailFailed = 0
+      if (MailService.isConfigured()) {
+        const subject = `[KH&CN] ${cfp.title}`
+        const body = `Thông báo tuyển chọn đề tài đã phát hành.\n\n${cfp.title}\nHạn nộp: ${cfp.deadlineAt.toFormat('dd/MM/yyyy')}\nSố VB: ${cfp.officialDocNo || '—'}\n\nVui lòng đăng nhập hệ thống để xem chi tiết.`
+        const seen = new Set<string>()
+        for (const s of withEmail) {
+          const to = String(s.email || '')
+            .trim()
+            .toLowerCase()
+          if (!to || seen.has(to)) continue
+          seen.add(to)
+          const log = await EmailLogService.send({
+            toEmail: to,
+            subject,
+            body,
+            relatedType: 'call_for_proposal',
+            relatedId: cfp.id,
+          })
+          if (log?.status === 'SENT') mailSent++
+          else if (log?.status === 'FAILED') mailFailed++
+        }
+        job.sent = mailSent
+        job.status = 'DONE'
+        job.error =
+          mailFailed > 0
+            ? `Đã gửi ${mailSent}/${seen.size} email SMTP; thất bại ${mailFailed}. In-app: ${userIds.length} user.`
+            : `Đã gửi ${mailSent} email SMTP + in-app ${userIds.length} user.`
+      } else {
+        job.sent = userIds.length
+        job.status = 'DONE'
+        job.error =
+          'SMTP chưa cấu hình — chỉ gửi thông báo nội bộ. Điền SMTP_* trong .env để gửi email thật.'
+      }
       await job.save()
     } catch (e) {
       job.status = 'FAILED'

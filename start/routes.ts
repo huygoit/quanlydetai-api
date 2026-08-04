@@ -26,6 +26,8 @@ import SessionMembersController from '#controllers/session_members_controller'
 import SessionIdeasController from '#controllers/session_ideas_controller'
 import IdeaCouncilScoresController from '#controllers/idea_council_scores_controller'
 import ProjectProposalsController from '#controllers/project_proposals_controller'
+import ProjectProposalMembersController from '#controllers/project_proposal_members_controller'
+import ProposalSelectionSessionsController from '#controllers/proposal_selection_sessions_controller'
 import CallForProposalsController from '#controllers/call_for_proposals_controller'
 import HomeController from '#controllers/home_controller'
 import KpisController from '#controllers/kpis_controller'
@@ -37,6 +39,8 @@ import AdminFieldsController from '#controllers/admin/fields_controller'
 import FieldsController from '#controllers/fields_controller'
 import AdminSpecializationsController from '#controllers/admin/specializations_controller'
 import SpecializationsController from '#controllers/specializations_controller'
+import AdminProjectProcessTypesController from '#controllers/admin/project_process_types_controller'
+import ProjectProcessTypesController from '#controllers/project_process_types_controller'
 import ScientificProfileCatalogController from '#controllers/scientific_profile_catalog_controller'
 import AdminRolesController from '#controllers/admin/roles_controller'
 import AdminPermissionsController from '#controllers/admin/permissions_controller'
@@ -47,6 +51,8 @@ import AdminStaffsController from '#controllers/admin/staffs_controller'
 import AdminPublicationsController from '#controllers/admin/publications_controller'
 import AdminPublicationAuthorsController from '#controllers/admin/publication_authors_controller'
 import path from 'node:path'
+import { access } from 'node:fs/promises'
+import app from '@adonisjs/core/services/app'
 import { findAttachmentFilePath } from '#utils/upload_storage_helper'
 
 // --- Auth (login, register không cần token)
@@ -70,6 +76,23 @@ router.get('/storage/profile-attachments/:filename', async ({ params, response }
     return response.download(foundPath)
   } catch {
     return response.notFound({ success: false, message: 'Không tìm thấy file.' })
+  }
+})
+
+// --- Public: biên bản phiên xét chọn (HTML UTF-8)
+router.get('/uploads/selection-minutes/:filename', async ({ params, response }) => {
+  const filename = String(params.filename || '')
+  if (!filename || filename !== path.basename(filename) || !filename.endsWith('.html')) {
+    return response.badRequest({ success: false, message: 'Tên file không hợp lệ.' })
+  }
+  const filePath = path.join(app.makePath('public'), 'uploads', 'selection-minutes', filename)
+  try {
+    await access(filePath)
+    response.header('Content-Type', 'text/html; charset=utf-8')
+    response.header('Content-Disposition', `inline; filename="${filename}"`)
+    return response.download(filePath)
+  } catch {
+    return response.notFound({ success: false, message: 'Không tìm thấy biên bản.' })
   }
 })
 
@@ -193,6 +216,38 @@ router
   .prefix('/api/specializations')
   .middleware([middleware.auth()])
 
+// --- Admin: loại quy trình đề tài CRUD
+router
+  .group(() => {
+    router
+      .get('/', [AdminProjectProcessTypesController, 'index'])
+      .use(middleware.permission('project_process_type.view'))
+    router
+      .get('/:id', [AdminProjectProcessTypesController, 'show'])
+      .use(middleware.permission('project_process_type.view'))
+    router
+      .post('/', [AdminProjectProcessTypesController, 'store'])
+      .use(middleware.permission('project_process_type.create'))
+    router
+      .put('/:id', [AdminProjectProcessTypesController, 'update'])
+      .use(middleware.permission('project_process_type.update'))
+    router
+      .patch('/:id/status', [AdminProjectProcessTypesController, 'changeStatus'])
+      .use(middleware.permission('project_process_type.update'))
+  })
+  .prefix('/api/admin/project-process-types')
+  .use([middleware.auth()])
+
+// --- Catalog loại quy trình đề tài (đọc, chỉ cần đăng nhập)
+router
+  .group(() => {
+    router.get('/options', [ProjectProcessTypesController, 'options'])
+    router.get('/', [ProjectProcessTypesController, 'index'])
+    router.get('/:id', [ProjectProcessTypesController, 'show'])
+  })
+  .prefix('/api/project-process-types')
+  .middleware([middleware.auth()])
+
 // --- Admin: IAM Roles (permission-based)
 router
   .group(() => {
@@ -232,6 +287,9 @@ router
       .use(middleware.permission('permission.view'))
     router
       .put('/module-labels/:code', [AdminPermissionsController, 'updateModuleLabel'])
+      .use(middleware.permission('permission.view'))
+    router
+      .get('/all', [AdminPermissionsController, 'all'])
       .use(middleware.permission('permission.view'))
     router
       .get('/', [AdminPermissionsController, 'index'])
@@ -318,17 +376,20 @@ router
   .prefix('/api/admin/staffs')
   .use([middleware.auth()])
 
+// --- Lookup dùng chung (NCV / sinh viên) — chỉ cần đăng nhập
+router
+  .group(() => {
+    router.get('/author-profiles', [ProfileController, 'authorProfilesLookup'])
+    router.get('/author-students', [ProfileController, 'authorStudentsLookup'])
+  })
+  .prefix('/api/lookup')
+  .middleware([middleware.auth()])
+
 // --- Admin: kết quả NCKH toàn hệ thống (permission: publication.*)
 router
   .group(() => {
     router
       .get('/', [AdminPublicationsController, 'index'])
-      .use(middleware.permission('publication.view'))
-    router
-      .get('/lookup/author-profiles', [ProfileController, 'authorProfilesLookup'])
-      .use(middleware.permission('publication.view'))
-    router
-      .get('/lookup/author-students', [ProfileController, 'authorStudentsLookup'])
       .use(middleware.permission('publication.view'))
     router
       .get('/research-output-types/tree', [ProfileController, 'researchOutputTypesTree'])
@@ -426,8 +487,6 @@ router
   .group(() => {
     router.get('/', [ProfileController, 'me'])
     router.get('/suggestions', [ProfileController, 'suggestions'])
-    router.get('/author-profiles-lookup', [ProfileController, 'authorProfilesLookup'])
-    router.get('/author-students-lookup', [ProfileController, 'authorStudentsLookup'])
     router.get('/openalex/publication-drafts', [ProfileController, 'openAlexPublicationDrafts'])
     router.get('/research-output-types/tree', [ProfileController, 'researchOutputTypesTree'])
     router.post('/', [ProfileController, 'storeMe'])
@@ -464,8 +523,6 @@ router
   .group(() => {
     router.get('/', [ProfileController, 'me'])
     router.get('/suggestions', [ProfileController, 'suggestions'])
-    router.get('/author-profiles-lookup', [ProfileController, 'authorProfilesLookup'])
-    router.get('/author-students-lookup', [ProfileController, 'authorStudentsLookup'])
     router.get('/openalex/publication-drafts', [ProfileController, 'openAlexPublicationDrafts'])
     router.get('/research-output-types/tree', [ProfileController, 'researchOutputTypesTree'])
     router.post('/', [ProfileController, 'storeMe'])
@@ -587,7 +644,13 @@ router
 // --- Đăng ký đề xuất đề tài (Project Proposals)
 router
   .group(() => {
+    router.get('/pending-unit-count', [ProjectProposalsController, 'pendingUnitCount'])
+    router.get('/pkh/stats', [ProjectProposalsController, 'pkhStats'])
+    router.get('/pkh/export-excel', [ProjectProposalsController, 'exportPkhExcel'])
     router.get('/', [ProjectProposalsController, 'index'])
+    router.get('/:id/audits', [ProjectProposalsController, 'audits'])
+    router.get('/:id/members', [ProjectProposalMembersController, 'index'])
+    router.put('/:id/members', [ProjectProposalMembersController, 'update'])
     router.get('/:id', [ProjectProposalsController, 'show'])
     router.post('/', [ProjectProposalsController, 'store'])
     router.put('/:id', [ProjectProposalsController, 'update'])
@@ -595,9 +658,38 @@ router
     router.post('/:id/submit', [ProjectProposalsController, 'submit'])
     router.post('/:id/withdraw', [ProjectProposalsController, 'withdraw'])
     router.post('/:id/unit-review', [ProjectProposalsController, 'unitReview'])
-    router.post('/:id/sci-dept-review', [ProjectProposalsController, 'sciDeptReview'])
+    router.post('/:id/unit-return', [ProjectProposalsController, 'unitReturn'])
+    router.post('/:id/mark-valid', [ProjectProposalsController, 'markValid'])
+    router.post('/:id/request-supplement', [ProjectProposalsController, 'requestSupplement'])
+    router.post('/:id/resubmit-to-pkh', [ProjectProposalsController, 'resubmitToPkh'])
+    router.post('/:id/extend-supplement', [ProjectProposalsController, 'extendSupplement'])
+    router.post('/:id/reject-by-pkh', [ProjectProposalsController, 'rejectByPkh'])
+    router.post('/:id/submit-council-adjustment', [
+      ProjectProposalsController,
+      'submitCouncilAdjustment',
+    ])
+    router.get('/:id/adjustment-versions', [ProjectProposalsController, 'adjustmentVersions'])
+    router.post('/:id/extend-adjustment', [ProjectProposalsController, 'extendAdjustment'])
   })
   .prefix('/api/project-proposals')
+  .middleware([middleware.auth()])
+
+// --- Phiên xét chọn đề tài (US-03-03 tạo phiên + US-03-04 kết quả/BGH)
+router
+  .group(() => {
+    router.get('/', [ProposalSelectionSessionsController, 'index'])
+    router.post('/', [ProposalSelectionSessionsController, 'store'])
+    router.get('/:id', [ProposalSelectionSessionsController, 'show'])
+    router.put('/:id', [ProposalSelectionSessionsController, 'updateMeta'])
+    router.put('/:id/results', [ProposalSelectionSessionsController, 'upsertResults'])
+    router.post('/:id/save-minutes', [ProposalSelectionSessionsController, 'saveMinutes'])
+    router.post('/:id/submit-bgh', [ProposalSelectionSessionsController, 'submitBgh'])
+    router.post('/:id/bgh-approve', [ProposalSelectionSessionsController, 'bghApprove'])
+    router.post('/:id/bgh-reject', [ProposalSelectionSessionsController, 'bghReject'])
+    router.get('/:id/summary', [ProposalSelectionSessionsController, 'summary'])
+    router.put('/:id/admin-edit', [ProposalSelectionSessionsController, 'adminEditLocked'])
+  })
+  .prefix('/api/proposal-selection-sessions')
   .middleware([middleware.auth()])
 
 // --- Dashboard / Home (theo role)

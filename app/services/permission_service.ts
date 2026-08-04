@@ -22,7 +22,8 @@ export interface PermissionFilters {
 export default class PermissionService {
   static async paginate(filters: PermissionFilters = {}): Promise<ModelPaginatorContract<Permission>> {
     const page = filters.page ?? 1
-    const perPage = Math.min(filters.perPage ?? 10, 100)
+    // Màn phân quyền vai trò cần tải đủ catalog — cho phép tối đa 1000
+    const perPage = Math.min(Math.max(1, Number(filters.perPage) || 10), 1000)
     const sortBy = filters.sortBy ?? 'module'
     const order = filters.order ?? 'asc'
 
@@ -37,9 +38,17 @@ export default class PermissionService {
 
     const validSort = ['code', 'name', 'module', 'action', 'status', 'created_at']
     const col = validSort.includes(sortBy) ? sortBy : 'module'
-    q.orderBy(col, order === 'desc' ? 'desc' : 'asc')
+    q.orderBy(col, order === 'desc' ? 'desc' : 'asc').orderBy('code', 'asc')
 
     return q.paginate(page, perPage)
+  }
+
+  /** Toàn bộ quyền (không phân trang) — dùng màn phân quyền vai trò */
+  static async listAll(filters: { status?: string; module?: string } = {}): Promise<Permission[]> {
+    const q = Permission.query().orderBy('module', 'asc').orderBy('code', 'asc')
+    if (filters.status) q.where('status', filters.status)
+    if (filters.module) q.where('module', filters.module)
+    return q
   }
 
   static async findById(id: number): Promise<Permission> {
@@ -100,8 +109,8 @@ export default class PermissionService {
   }
 
   /**
-   * Bổ sung các quyền chuẩn còn thiếu (profile, idea cơ bản).
-   * Chỉ tạo nếu chưa tồn tại. Trả về số quyền đã thêm.
+   * Bổ sung quyền chuẩn còn thiếu — Admin sync / seeder dùng chung.
+   * Chỉ tạo nếu chưa tồn tại. Module 3: cfp.*, project.*, selection.*
    */
   static readonly STANDARD_MISSING: Array<{ code: string; name: string; module: string; action: string }> = [
     { code: 'profile.view_own', name: 'Xem hồ sơ của mình', module: 'profile', action: 'view_own' },
@@ -111,6 +120,74 @@ export default class PermissionService {
     { code: 'idea.update', name: 'Cập nhật ý tưởng', module: 'idea', action: 'update' },
     { code: 'idea.submit', name: 'Gửi ý tưởng', module: 'idea', action: 'submit' },
     { code: 'idea.delete', name: 'Xóa ý tưởng', module: 'idea', action: 'delete' },
+    // US-03-01 — Thông báo tuyển chọn (CFP)
+    { code: 'cfp.view', name: 'Xem thông báo tuyển chọn', module: 'cfp', action: 'view' },
+    { code: 'cfp.create', name: 'Tạo thông báo tuyển chọn', module: 'cfp', action: 'create' },
+    { code: 'cfp.update', name: 'Sửa thông báo tuyển chọn', module: 'cfp', action: 'update' },
+    { code: 'cfp.submit', name: 'Trình duyệt thông báo tuyển chọn', module: 'cfp', action: 'submit' },
+    { code: 'cfp.approve', name: 'Duyệt / trả về thông báo tuyển chọn', module: 'cfp', action: 'approve' },
+    { code: 'cfp.publish', name: 'Phát hành thông báo tuyển chọn', module: 'cfp', action: 'publish' },
+    { code: 'cfp.extend', name: 'Gia hạn kỳ nộp hồ sơ', module: 'cfp', action: 'extend' },
+    { code: 'cfp.close', name: 'Đóng sớm kỳ nộp hồ sơ', module: 'cfp', action: 'close' },
+    // US-03-02 / 03-03 — Đề xuất đề tài
+    { code: 'project.view', name: 'Xem đề xuất / đề tài', module: 'project', action: 'view' },
+    { code: 'project.create', name: 'Tạo đề xuất đề tài', module: 'project', action: 'create' },
+    { code: 'project.update', name: 'Cập nhật đề xuất đề tài', module: 'project', action: 'update' },
+    { code: 'project.submit', name: 'Nộp đề xuất đề tài', module: 'project', action: 'submit' },
+    {
+      code: 'project.assign_reviewer',
+      name: 'Khoa xác nhận / trả lại đề xuất',
+      module: 'project',
+      action: 'assign_reviewer',
+    },
+    { code: 'project.review', name: 'PKH kiểm tra / tổng hợp đề xuất', module: 'project', action: 'review' },
+    { code: 'project.approve', name: 'BGH phê duyệt đề xuất / danh mục', module: 'project', action: 'approve' },
+    { code: 'project.acceptance', name: 'Nghiệm thu đề tài', module: 'project', action: 'acceptance' },
+    { code: 'project.liquidation', name: 'Thanh lý / tài chính đề tài', module: 'project', action: 'liquidation' },
+    // US-03-04 — Phiên xét chọn
+    {
+      code: 'project.selection_manage',
+      name: 'Quản lý phiên xét chọn đề tài (nhập kết quả, biên bản, trình BGH)',
+      module: 'project',
+      action: 'selection_manage',
+    },
+    {
+      code: 'project.selection_approve',
+      name: 'BGH phê duyệt danh mục xét chọn đề tài',
+      module: 'project',
+      action: 'selection_approve',
+    },
+    // US-03-05 — Gia hạn điều chỉnh (PKH)
+    {
+      code: 'project.adjustment_extend',
+      name: 'Gia hạn điều chỉnh đề xuất theo yêu cầu Hội đồng',
+      module: 'project',
+      action: 'adjustment_extend',
+    },
+    {
+      code: 'project_process_type.view',
+      name: 'Xem danh mục loại quy trình đề tài',
+      module: 'project_process_type',
+      action: 'view',
+    },
+    {
+      code: 'project_process_type.create',
+      name: 'Tạo loại quy trình đề tài',
+      module: 'project_process_type',
+      action: 'create',
+    },
+    {
+      code: 'project_process_type.update',
+      name: 'Cập nhật loại quy trình đề tài',
+      module: 'project_process_type',
+      action: 'update',
+    },
+    {
+      code: 'project_process_type.delete',
+      name: 'Xóa loại quy trình đề tài',
+      module: 'project_process_type',
+      action: 'delete',
+    },
   ]
 
   static async syncMissingStandardPermissions(): Promise<{ added: number; permissions: Permission[] }> {
@@ -127,6 +204,9 @@ export default class PermissionService {
           status: 'ACTIVE',
         })
         added.push(perm)
+      } else if (exists.name !== p.name) {
+        exists.name = p.name
+        await exists.save()
       }
     }
     return { added: added.length, permissions: added }
@@ -191,24 +271,48 @@ export default class PermissionService {
 
   /**
    * Lấy danh sách userId có permission (dùng cho thông báo theo quyền).
+   * Khớp code chính xác, hoặc wildcard module.* / * trên role, hoặc SUPER_ADMIN.
    */
   static async getUserIdsWithPermission(permissionCode: string): Promise<number[]> {
-    const perm = await Permission.query().where('code', permissionCode).first()
-    if (!perm) return []
+    const [module] = permissionCode.split('.')
+    const matchingPerms = await Permission.query()
+      .where('status', 'ACTIVE')
+      .where((q) => {
+        q.where('code', permissionCode)
+          .orWhere('code', `${module}.*`)
+          .orWhere('code', '*')
+          .orWhere('code', 'all')
+      })
 
-    const rolePermRows = await RolePermission.query().where('permission_id', perm.id)
-    let rids = [...new Set(rolePermRows.map((r) => r.roleId))]
+    const permIds = matchingPerms.map((p) => p.id)
+    let rids: number[] = []
+    if (permIds.length) {
+      const rolePermRows = await RolePermission.query().whereIn('permission_id', permIds)
+      rids = [...new Set(rolePermRows.map((r) => r.roleId))]
+    }
 
     const superAdminRole = await Role.query().where('code', 'SUPER_ADMIN').first()
     if (superAdminRole) rids = [...new Set([...rids, superAdminRole.id])]
+    if (!rids.length) return []
 
     const assignments = await UserRoleAssignment.query()
       .whereIn('role_id', rids)
       .where('is_active', true)
       .select('user_id')
     const userIds = [...new Set(assignments.map((a) => a.userId))]
+    if (!userIds.length) return []
 
     const activeUsers = await User.query().whereIn('id', userIds).where('is_active', true).select('id')
     return activeUsers.map((u) => u.id)
+  }
+
+  /** Hợp các userId có ít nhất một trong các permission (thông báo đa quyền). */
+  static async getUserIdsWithAnyPermission(permissionCodes: string[]): Promise<number[]> {
+    const set = new Set<number>()
+    for (const code of permissionCodes) {
+      const ids = await this.getUserIdsWithPermission(code)
+      for (const id of ids) set.add(id)
+    }
+    return [...set]
   }
 }

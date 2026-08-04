@@ -27,6 +27,30 @@ const TO_ADD: Array<{ code: string; name: string; module: string; action: string
   { code: 'specialization.create', name: 'Tạo chuyên ngành', module: 'specialization', action: 'create' },
   { code: 'specialization.update', name: 'Cập nhật chuyên ngành', module: 'specialization', action: 'update' },
   { code: 'specialization.delete', name: 'Xóa chuyên ngành', module: 'specialization', action: 'delete' },
+  {
+    code: 'project_process_type.view',
+    name: 'Xem danh mục loại quy trình đề tài',
+    module: 'project_process_type',
+    action: 'view',
+  },
+  {
+    code: 'project_process_type.create',
+    name: 'Tạo loại quy trình đề tài',
+    module: 'project_process_type',
+    action: 'create',
+  },
+  {
+    code: 'project_process_type.update',
+    name: 'Cập nhật loại quy trình đề tài',
+    module: 'project_process_type',
+    action: 'update',
+  },
+  {
+    code: 'project_process_type.delete',
+    name: 'Xóa loại quy trình đề tài',
+    module: 'project_process_type',
+    action: 'delete',
+  },
 ]
 
 export default class MissingPermissionsSeeder extends BaseSeeder {

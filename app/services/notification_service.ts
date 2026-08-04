@@ -2,17 +2,15 @@ import Notification from '#models/notification'
 import User from '#models/user'
 import PermissionService from '#services/permission_service'
 
+type NotifyPayload = { type: string; title: string; message: string; link?: string }
+
 /**
- * Service gửi thông báo để các module khác gọi (push, pushMany, pushToRole, các trigger).
+ * Service gửi thông báo in-app (chuông góc phải).
+ * Broadcast nghiệp vụ buộc theo permission IAM — không theo cột users.role cứng.
  */
 export default class NotificationService {
-  /**
-   * Gửi thông báo đến 1 user
-   */
-  static async push(
-    userId: number,
-    data: { type: string; title: string; message: string; link?: string }
-  ) {
+  /** Gửi thông báo đến 1 user */
+  static async push(userId: number, data: NotifyPayload) {
     return await Notification.create({
       userId,
       type: data.type,
@@ -22,14 +20,11 @@ export default class NotificationService {
     })
   }
 
-  /**
-   * Gửi thông báo đến nhiều users
-   */
-  static async pushMany(
-    userIds: number[],
-    data: { type: string; title: string; message: string; link?: string }
-  ) {
-    const rows = userIds.map((userId) => ({
+  /** Gửi thông báo đến nhiều users */
+  static async pushMany(userIds: number[], data: NotifyPayload) {
+    const unique = [...new Set(userIds.filter((id) => Number.isFinite(id)))]
+    if (!unique.length) return []
+    const rows = unique.map((userId) => ({
       userId,
       type: data.type,
       title: data.title,
@@ -40,44 +35,53 @@ export default class NotificationService {
   }
 
   /**
-   * Gửi thông báo đến tất cả users có role nhất định
+   * Gửi thông báo đến mọi user có permission (IAM role_permissions).
+   * Đây là API chuẩn thay cho pushToRole theo role cứng.
+   */
+  static async pushToPermission(permissionCode: string, data: NotifyPayload) {
+    const userIds = await PermissionService.getUserIdsWithPermission(permissionCode)
+    if (!userIds.length) return []
+    return await this.pushMany(userIds, data)
+  }
+
+  /** Gửi đến user có ít nhất một trong các permission */
+  static async pushToPermissions(permissionCodes: string[], data: NotifyPayload) {
+    const userIds = await PermissionService.getUserIdsWithAnyPermission(permissionCodes)
+    if (!userIds.length) return []
+    return await this.pushMany(userIds, data)
+  }
+
+  /**
+   * @deprecated Không dùng role cứng trên users.role.
+   * Giữ stub để tránh gọi nhầm — chuyển sang pushToPermission.
    */
   static async pushToRole(
-    role: string,
-    data: { type: string; title: string; message: string; link?: string }
-  ) {
-    const users = await User.query().where('role', role).where('is_active', true)
-    const userIds = users.map((u) => u.id)
-    if (userIds.length > 0) {
-      return await this.pushMany(userIds, data)
-    }
+    _role: string,
+    _data: NotifyPayload
+  ): Promise<Notification[]> {
+    console.warn(
+      '[NotificationService.pushToRole] Đã ngưng dùng role cứng. Hãy gọi pushToPermission.'
+    )
     return []
   }
 
   /**
-   * Gửi thông báo đến nhiều roles
+   * @deprecated Không dùng role cứng trên users.role.
    */
   static async pushToRoles(
-    roles: string[],
-    data: { type: string; title: string; message: string; link?: string }
-  ) {
-    const users = await User.query().whereIn('role', roles).where('is_active', true)
-    const userIds = users.map((u) => u.id)
-    if (userIds.length > 0) {
-      return await this.pushMany(userIds, data)
-    }
+    _roles: string[],
+    _data: NotifyPayload
+  ): Promise<Notification[]> {
+    console.warn(
+      '[NotificationService.pushToRoles] Đã ngưng dùng role cứng. Hãy gọi pushToPermissions.'
+    )
     return []
   }
 
   // ============ TRIGGER FUNCTIONS ============
 
-  /**
-   * Khi NCV submit cập nhật hồ sơ → thông báo users có permission profile.verify
-   */
   static async notifyProfileSubmitted(profileId: number, profileName: string) {
-    const userIds = await PermissionService.getUserIdsWithPermission('profile.verify')
-    if (userIds.length === 0) return
-    await this.pushMany(userIds, {
+    await this.pushToPermission('profile.verify', {
       type: 'PROFILE_SUBMITTED',
       title: 'Hồ sơ mới cập nhật',
       message: `Hồ sơ khoa học của ${profileName} đã gửi cập nhật. Vui lòng xem xét.`,
@@ -85,9 +89,6 @@ export default class NotificationService {
     })
   }
 
-  /**
-   * Khi PHONG_KH xác thực hồ sơ → thông báo NCV
-   */
   static async notifyProfileVerified(userId: number) {
     await this.push(userId, {
       type: 'PROFILE_VERIFIED',
@@ -97,9 +98,6 @@ export default class NotificationService {
     })
   }
 
-  /**
-   * Khi PHONG_KH yêu cầu bổ sung → thông báo NCV
-   */
   static async notifyNeedMoreInfo(userId: number, reason: string) {
     await this.push(userId, {
       type: 'PROFILE_NEED_INFO',
@@ -109,9 +107,6 @@ export default class NotificationService {
     })
   }
 
-  /**
-   * Khi cán bộ yêu cầu hiệu chỉnh KQNC → thông báo người kê khai (chủ hồ sơ)
-   */
   static async notifyPublicationCorrectionRequested(
     userId: number,
     publicationId: number,
@@ -126,22 +121,12 @@ export default class NotificationService {
     })
   }
 
-  /**
-   * Khi người kê khai lưu sau yêu cầu hiệu chỉnh → thông báo cán bộ review/approve
-   */
   static async notifyPublicationCorrected(
     publicationId: number,
     publicationTitle: string,
     ownerName: string
   ) {
-    const [reviewIds, approveIds] = await Promise.all([
-      PermissionService.getUserIdsWithPermission('publication.review'),
-      PermissionService.getUserIdsWithPermission('publication.approve'),
-    ])
-    const userIds = [...new Set([...reviewIds, ...approveIds])]
-    if (userIds.length === 0) return
-
-    await this.pushMany(userIds, {
+    await this.pushToPermissions(['publication.review', 'publication.approve'], {
       type: 'PUBLICATION_CORRECTED',
       title: 'Kết quả NCKH đã hiệu chỉnh',
       message: `${ownerName} đã hiệu chỉnh kết quả NCKH "${publicationTitle}". Vui lòng kiểm tra.`,
@@ -149,23 +134,20 @@ export default class NotificationService {
     })
   }
 
-  /**
-   * Khi NCV submit ý tưởng (DRAFT → SUBMITTED) → thông báo users có permission idea.review
-   */
-  static async notifyIdeaSubmitted(ideaCode: string, ideaTitle: string, ideaId: number, ownerName: string) {
-    const data = {
+  static async notifyIdeaSubmitted(
+    ideaCode: string,
+    ideaTitle: string,
+    ideaId: number,
+    ownerName: string
+  ) {
+    await this.pushToPermission('idea.review', {
       type: 'IDEA_SUBMITTED',
       title: 'Ý tưởng mới cần sơ loại',
       message: `${ownerName} đã gửi ý tưởng ${ideaCode}: ${ideaTitle}. Vui lòng xem xét sơ loại.`,
       link: `/ideas/review`,
-    }
-    const userIds = await PermissionService.getUserIdsWithPermission('idea.review')
-    if (userIds.length > 0) await this.pushMany(userIds, data)
+    })
   }
 
-  /**
-   * Khi ý tưởng thay đổi trạng thái → thông báo owner
-   */
   static async notifyIdeaStatusChanged(
     userId: number,
     ideaCode: string,
@@ -189,9 +171,6 @@ export default class NotificationService {
     })
   }
 
-  /**
-   * Khi đề xuất đề tài thay đổi trạng thái → thông báo owner
-   */
   static async notifyProjectProposalStatusChanged(
     userId: number,
     proposalCode: string,
@@ -199,7 +178,16 @@ export default class NotificationService {
     proposalId: number
   ) {
     const statusLabels: Record<string, string> = {
-      UNIT_REVIEWED: 'đã được đơn vị cho ý kiến',
+      CHO_PKH: 'đã được Khoa xác nhận (chờ Phòng KH)',
+      UNIT_REVIEWED: 'đã được Khoa xác nhận (chờ Phòng KH)',
+      RETURNED: 'đã bị Khoa trả lại — vui lòng chỉnh sửa và gửi lại',
+      HOP_LE: 'đã được PKH xác nhận hợp lệ',
+      YEU_CAU_BS: 'cần bổ sung theo yêu cầu PKH — vui lòng cập nhật và gửi lại',
+      YEU_CAU_BS_EXTENDED: 'đã được PKH gia hạn thời gian bổ sung',
+      DA_LOAI: 'đã bị PKH loại',
+      DUOC_CHON: 'đã được Hội đồng tuyển chọn — bạn có thể soạn thuyết minh',
+      DIEU_CHINH: 'được đồng ý có điều chỉnh — vui lòng xem nội dung cần chỉnh sửa',
+      KHONG_CHON: 'không được tuyển chọn trong kỳ này',
       APPROVED: 'đã được phê duyệt',
       REJECTED: 'không được phê duyệt',
     }
@@ -207,30 +195,90 @@ export default class NotificationService {
 
     await this.push(userId, {
       type: 'PROJECT_UPDATE',
-      title: `Đề xuất ${statusLabel}`,
+      title: `Đề xuất ${proposalCode}`,
       message: `Đề xuất ${proposalCode} của bạn ${statusLabel}.`,
-      link: `/projects/register?id=${proposalId}`,
+      link: `/projects/register/form/${proposalId}`,
     })
   }
 
   /**
-   * Khi mở phiên hội đồng → thông báo tất cả thành viên hội đồng của phiên đó
-   * Link dẫn thẳng đến trang chi tiết phiên: /ideas/council/:sessionId
+   * AC3: GV gửi lên Khoa → thông báo user có quyền Khoa (cùng đơn vị).
    */
-  static async notifyCouncilSessionOpened(sessionId: number, sessionTitle: string, userIds: number[]) {
+  static async notifyUnitHeadsProposalSubmitted(proposal: {
+    id: number
+    code: string
+    title: string
+    ownerName: string
+    ownerUnit: string
+  }) {
+    const headIds = await PermissionService.getUserIdsWithPermission('project.assign_reviewer')
+    if (!headIds.length) return
+
+    const heads = await User.query()
+      .whereIn('id', headIds)
+      .where('is_active', true)
+      .where('unit', proposal.ownerUnit)
+
+    const ids = heads.map((u) => u.id).filter((id) => id != null)
+    if (!ids.length) return
+
+    await this.pushMany(ids, {
+      type: 'PROJECT_UPDATE',
+      title: 'Đề xuất mới chờ Khoa xác nhận',
+      message: `${proposal.ownerName} đã gửi đề xuất "${proposal.title}" (${proposal.code}).`,
+      link: `/projects/register?id=${proposal.id}`,
+    })
+  }
+
+  /** Khoa xác nhận → CHO_PKH: báo PKH (project.review) */
+  static async notifyPkhProposalReady(proposal: {
+    id: number
+    code: string
+    title: string
+    ownerName: string
+  }) {
+    await this.pushToPermission('project.review', {
+      type: 'PROJECT_UPDATE',
+      title: 'Đề xuất chờ PKH kiểm tra',
+      message: `${proposal.ownerName} — đề xuất "${proposal.title}" (${proposal.code}) đã được Khoa xác nhận.`,
+      link: `/projects/pkh-review?id=${proposal.id}`,
+    })
+  }
+
+  /** Trình BGH danh mục xét chọn */
+  static async notifyBghSelectionPending(sessionId: number, sessionTitle: string) {
+    await this.pushToPermissions(['project.selection_approve', 'project.approve'], {
+      type: 'PROJECT_UPDATE',
+      title: 'Danh mục xét chọn chờ BGH phê duyệt',
+      message: `${sessionTitle} đã được trình BGH.`,
+      link: `/projects/selection-sessions/${sessionId}`,
+    })
+  }
+
+  /** Tạo phiên xét chọn → thông báo người có quyền quản lý phiên */
+  static async notifySelectionSessionCreated(sessionId: number, message: string) {
+    await this.pushToPermissions(['project.selection_manage', 'project.review'], {
+      type: 'PROJECT_UPDATE',
+      title: 'Phiên xét chọn đề tài mới',
+      message,
+      link: `/projects/selection-sessions/${sessionId}`,
+    })
+  }
+
+  static async notifyCouncilSessionOpened(
+    sessionId: number,
+    sessionTitle: string,
+    userIds: number[]
+  ) {
     if (userIds.length === 0) return
-    const message = `${sessionTitle} đã mở. Xin vui lòng chấm điểm các ý tưởng!`
     await this.pushMany(userIds, {
       type: 'COUNCIL_SESSION_OPENED',
       title: 'Phiên hội đồng đã mở',
-      message,
+      message: `${sessionTitle} đã mở. Xin vui lòng chấm điểm các ý tưởng!`,
       link: `/ideas/council/${sessionId}`,
     })
   }
 
-  /**
-   * Thông báo hệ thống đến tất cả users
-   */
   static async notifySystem(title: string, message: string) {
     const users = await User.query().where('is_active', true)
     const userIds = users.map((u) => u.id)

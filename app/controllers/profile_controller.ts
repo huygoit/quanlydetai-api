@@ -549,9 +549,8 @@ export default class ProfileController {
   }
 
   /**
-   * GET /api/profile/me/author-profiles-lookup?q=&limit=
-   * Gợi ý hồ sơ khoa học nội bộ để gắn profile_id khi khai báo tác giả công bố (không cần quyền profile.view_all).
-   * Response: id, fullName, degree/academicTitle (key catalog), organization, department (nhãn hiển thị).
+   * GET /api/lookup/author-profiles?q=&limit=
+   * Lookup hồ sơ NCV dùng chung (chỉ cần đăng nhập) — gắn profile_id khi kê khai tác giả/thành viên.
    */
   async authorProfilesLookup({ request, response }: HttpContext) {
     const q = String(request.input('q', '')).trim()
@@ -602,8 +601,8 @@ export default class ProfileController {
   }
 
   /**
-   * GET /api/profile/me/author-students-lookup?q=&limit=
-   * Gợi ý sinh viên (bảng students) để gắn student_id khi khai báo tác giả công bố.
+   * GET /api/lookup/author-students?q=&limit=
+   * Lookup sinh viên dùng chung (chỉ cần đăng nhập) — gắn student_id khi kê khai tác giả/thành viên.
    */
   async authorStudentsLookup({ request, response }: HttpContext) {
     const q = String(request.input('q', '')).trim()
