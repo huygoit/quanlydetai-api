@@ -4,6 +4,7 @@ import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
 import CallForProposal from '#models/call_for_proposal'
 import ProposalSelectionSessionItem from '#models/proposal_selection_session_item'
+import ProposalSelectionSessionMember from '#models/proposal_selection_session_member'
 
 /**
  * Trạng thái phiên xét chọn:
@@ -102,4 +103,7 @@ export default class ProposalSelectionSession extends BaseModel {
 
   @hasMany(() => ProposalSelectionSessionItem, { foreignKey: 'sessionId' })
   declare items: HasMany<typeof ProposalSelectionSessionItem>
+
+  @hasMany(() => ProposalSelectionSessionMember, { foreignKey: 'sessionId' })
+  declare members: HasMany<typeof ProposalSelectionSessionMember>
 }

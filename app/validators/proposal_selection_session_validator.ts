@@ -1,6 +1,7 @@
 import vine from '@vinejs/vine'
 
-const COUNCIL_RESULTS = ['DONG_Y', 'DONG_Y_DIEU_CHINH', 'KHONG_DONG_Y'] as const
+/** Chỉ 2 kết quả: Đồng ý / Không đồng ý (góp ý HĐ lưu ở adjustmentNote, không bắt buộc) */
+const COUNCIL_RESULTS = ['DONG_Y', 'KHONG_DONG_Y'] as const
 
 export const upsertSessionResultsValidator = vine.compile(
   vine.object({

@@ -7,7 +7,6 @@ import type ProposalSelectionSessionItem from '#models/proposal_selection_sessio
 
 const RESULT_LABEL: Record<string, string> = {
   DONG_Y: 'Đồng ý',
-  DONG_Y_DIEU_CHINH: 'Đồng ý có điều chỉnh',
   KHONG_DONG_Y: 'Không đồng ý',
 }
 
@@ -74,7 +73,7 @@ export async function generateSelectionMinutesHtml(
     <thead>
       <tr>
         <th>STT</th><th>Mã</th><th>Tên đề tài</th><th>Chủ nhiệm</th><th>Đơn vị</th>
-        <th>Ý kiến HĐ</th><th>Kết quả</th><th>Nội dung điều chỉnh</th>
+        <th>Ý kiến HĐ</th><th>Kết quả</th><th>Góp ý hội đồng</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>

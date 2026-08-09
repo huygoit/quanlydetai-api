@@ -186,7 +186,7 @@ export default class NotificationService {
       YEU_CAU_BS_EXTENDED: 'đã được PKH gia hạn thời gian bổ sung',
       DA_LOAI: 'đã bị PKH loại',
       DUOC_CHON: 'đã được Hội đồng tuyển chọn — bạn có thể soạn thuyết minh',
-      DIEU_CHINH: 'được đồng ý có điều chỉnh — vui lòng xem nội dung cần chỉnh sửa',
+      DIEU_CHINH: 'được đồng ý có điều chỉnh — vui lòng xem nội dung cần chỉnh sửa', // legacy
       KHONG_CHON: 'không được tuyển chọn trong kỳ này',
       APPROVED: 'đã được phê duyệt',
       REJECTED: 'không được phê duyệt',
@@ -257,6 +257,21 @@ export default class NotificationService {
       title: 'Danh mục xét chọn chờ BGH phê duyệt',
       message: `${sessionTitle} đã được trình BGH.`,
       link: `/projects/selection-sessions/${sessionId}`,
+    })
+  }
+
+  /** US-04-01: GV nộp thuyết minh → thông báo PKH */
+  static async notifyPkhOutlineSubmitted(outline: {
+    id: number
+    code: string
+    title: string
+    ownerName: string
+  }) {
+    await this.pushToPermission('project.review', {
+      type: 'PROJECT_UPDATE',
+      title: 'Thuyết minh chờ tiếp nhận',
+      message: `${outline.ownerName} đã nộp thuyết minh "${outline.title}" (${outline.code}).`,
+      link: `/projects/outlines/form/${outline.id}`,
     })
   }
 

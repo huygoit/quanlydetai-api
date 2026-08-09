@@ -5,8 +5,6 @@ import {
   resolvedGenderForSave,
   resolvedProfileIdFromRow,
   resolvedStudentIdFromRow,
-  validateManualAuthorGender,
-  type AuthorPayloadRow,
 } from '#validators/publication_author_validator'
 import {
   PROPOSAL_MEMBER_ROLE_VALUES,
@@ -194,20 +192,9 @@ export function prepareMembersRequestBody(request: {
   })
 }
 
-export function validateManualMemberGender(members: MemberPayloadRow[]): void {
-  // validateManualAuthorGender báo field authors.* — map lại bằng cách cast
-  try {
-    validateManualAuthorGender(members as AuthorPayloadRow[])
-  } catch (e: any) {
-    if (e?.messages && Array.isArray(e.messages)) {
-      for (const m of e.messages) {
-        if (typeof m.field === 'string') {
-          m.field = m.field.replace(/^authors/, 'members')
-        }
-      }
-    }
-    throw e
-  }
+export function validateManualMemberGender(_members: MemberPayloadRow[]): void {
+  // Thành viên đề xuất / thuyết minh: giới tính lấy từ hồ sơ liên kết;
+  // thành viên ngoài hệ thống được để trống — không bắt buộc như tác giả bài báo.
 }
 
 export { resolvedGenderForSave, resolvedProfileIdFromRow, resolvedStudentIdFromRow }

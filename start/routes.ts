@@ -28,6 +28,12 @@ import IdeaCouncilScoresController from '#controllers/idea_council_scores_contro
 import ProjectProposalsController from '#controllers/project_proposals_controller'
 import ProjectProposalMembersController from '#controllers/project_proposal_members_controller'
 import ProposalSelectionSessionsController from '#controllers/proposal_selection_sessions_controller'
+import ProposalSelectionSessionMembersController from '#controllers/proposal_selection_session_members_controller'
+import ProjectOutlinesController from '#controllers/project_outlines_controller'
+import ProjectOutlineReviewsController from '#controllers/project_outline_reviews_controller'
+import ProjectOutlineScoresController from '#controllers/project_outline_scores_controller'
+import ProjectOutlineDefensesController from '#controllers/project_outline_defenses_controller'
+import ProjectOutlineBudgetsController from '#controllers/project_outline_budgets_controller'
 import CallForProposalsController from '#controllers/call_for_proposals_controller'
 import HomeController from '#controllers/home_controller'
 import KpisController from '#controllers/kpis_controller'
@@ -680,8 +686,81 @@ router
     router.post('/:id/bgh-reject', [ProposalSelectionSessionsController, 'bghReject'])
     router.get('/:id/summary', [ProposalSelectionSessionsController, 'summary'])
     router.put('/:id/admin-edit', [ProposalSelectionSessionsController, 'adminEditLocked'])
+    // Thành viên hội đồng (giống council-sessions)
+    router.get('/:id/available-members', [ProposalSelectionSessionMembersController, 'availableMembers'])
+    router.get('/:id/members', [ProposalSelectionSessionMembersController, 'index'])
+    router.post('/:id/members', [ProposalSelectionSessionMembersController, 'store'])
+    router.delete('/:id/members/:memberId', [ProposalSelectionSessionMembersController, 'destroy'])
   })
   .prefix('/api/proposal-selection-sessions')
+  .middleware([middleware.auth()])
+
+// --- Thuyết minh chi tiết (US-04-01) + phân công phản biện kín (US-04-02)
+router
+  .group(() => {
+    router.get('/eligible', [ProjectOutlinesController, 'eligible'])
+    router.get('/pending-review', [ProjectOutlineReviewsController, 'pendingReview'])
+    router.get('/under-review', [ProjectOutlineReviewsController, 'underReview'])
+    router.get('/', [ProjectOutlinesController, 'index'])
+    router.post('/from-proposal/:proposalId', [ProjectOutlinesController, 'fromProposal'])
+    router.get('/:id/available-reviewers', [ProjectOutlineReviewsController, 'availableReviewers'])
+    router.get('/:id/review-assignments', [ProjectOutlineReviewsController, 'listAssignments'])
+    router.post('/:id/assign-reviewers', [ProjectOutlineReviewsController, 'assign'])
+    router.post('/:id/replace-reviewer', [ProjectOutlineReviewsController, 'replace'])
+    router.get('/:id/review-score-summary', [ProjectOutlineScoresController, 'summary'])
+    router.get('/:id/revision-context', [ProjectOutlinesController, 'revisionContext'])
+    router.get('/:id/versions', [ProjectOutlinesController, 'versions'])
+    router.get('/:id/revision-diff', [ProjectOutlinesController, 'revisionDiff'])
+    router.post('/:id/submit-revision', [ProjectOutlinesController, 'submitRevision'])
+    router.post('/:id/extend-revision-deadline', [ProjectOutlinesController, 'extendRevisionDeadline'])
+    router.get('/:id', [ProjectOutlinesController, 'show'])
+    router.put('/:id', [ProjectOutlinesController, 'update'])
+    router.post('/:id/submit', [ProjectOutlinesController, 'submit'])
+    router.post('/:id/withdraw', [ProjectOutlinesController, 'withdraw'])
+  })
+  .prefix('/api/project-outlines')
+  .middleware([middleware.auth()])
+
+// --- Phiếu chấm phản biện kín (US-04-03)
+router
+  .group(() => {
+    router.get('/', [ProjectOutlineScoresController, 'myTasks'])
+    router.get('/:assignmentId', [ProjectOutlineScoresController, 'showTask'])
+    router.put('/:assignmentId/score-draft', [ProjectOutlineScoresController, 'saveDraft'])
+    router.post('/:assignmentId/score-submit', [ProjectOutlineScoresController, 'submit'])
+    router.post('/:assignmentId/score-reopen', [ProjectOutlineScoresController, 'reopen'])
+    router.post('/:assignmentId/extend-deadline', [ProjectOutlineScoresController, 'extendDeadline'])
+  })
+  .prefix('/api/project-outline-review-tasks')
+  .middleware([middleware.auth()])
+
+// --- Tổ chức bảo vệ thuyết minh (US-04-04)
+router
+  .group(() => {
+    router.get('/eligible', [ProjectOutlineDefensesController, 'eligible'])
+    router.get('/', [ProjectOutlineDefensesController, 'index'])
+    router.post('/', [ProjectOutlineDefensesController, 'store'])
+    router.get('/:id/available-members', [ProjectOutlineDefensesController, 'availableMembers'])
+    router.get('/:id', [ProjectOutlineDefensesController, 'show'])
+    router.put('/:id', [ProjectOutlineDefensesController, 'update'])
+    router.post('/:id/confirm', [ProjectOutlineDefensesController, 'confirm'])
+    router.post('/:id/cancel', [ProjectOutlineDefensesController, 'cancel'])
+    router.put('/:id/minutes', [ProjectOutlineDefensesController, 'saveMinutes'])
+    router.post('/:id/finalize', [ProjectOutlineDefensesController, 'finalize'])
+  })
+  .prefix('/api/project-outline-defenses')
+  .middleware([middleware.auth()])
+
+// --- Xác nhận kinh phí & phê duyệt (US-04-06)
+router
+  .group(() => {
+    router.get('/', [ProjectOutlineBudgetsController, 'index'])
+    router.get('/:outlineId', [ProjectOutlineBudgetsController, 'show'])
+    router.post('/:outlineId/pkh-propose', [ProjectOutlineBudgetsController, 'pkhPropose'])
+    router.post('/:outlineId/tc-action', [ProjectOutlineBudgetsController, 'tcAction'])
+    router.post('/:outlineId/ld-decide', [ProjectOutlineBudgetsController, 'ldDecide'])
+  })
+  .prefix('/api/project-outline-budgets')
   .middleware([middleware.auth()])
 
 // --- Dashboard / Home (theo role)

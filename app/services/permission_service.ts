@@ -164,6 +164,56 @@ export default class PermissionService {
       module: 'project',
       action: 'adjustment_extend',
     },
+    // US-04 — Thuyết minh / phản biện kín / bảo vệ
+    {
+      code: 'project.outline_manage',
+      name: 'Soạn / nộp / chỉnh sửa thuyết minh chi tiết',
+      module: 'project',
+      action: 'outline_manage',
+    },
+    {
+      code: 'project.blind_review_assign',
+      name: 'PKH phân công phản biện kín thuyết minh',
+      module: 'project',
+      action: 'blind_review_assign',
+    },
+    {
+      code: 'project.blind_review_score',
+      name: 'Chấm điểm phản biện kín (nhiệm vụ được phân công)',
+      module: 'project',
+      action: 'blind_review_score',
+    },
+    {
+      code: 'project.defense_manage',
+      name: 'PKH tổ chức bảo vệ thuyết minh / biên bản / kết luận',
+      module: 'project',
+      action: 'defense_manage',
+    },
+    {
+      code: 'project.outline_revision_extend',
+      name: 'PKH gia hạn chỉnh sửa thuyết minh sau bảo vệ',
+      module: 'project',
+      action: 'outline_revision_extend',
+    },
+    // US-04-06 — Xác nhận kinh phí & phê duyệt
+    {
+      code: 'project.budget_propose',
+      name: 'PKH đề xuất / gửi thẩm tra kinh phí thuyết minh',
+      module: 'project',
+      action: 'budget_propose',
+    },
+    {
+      code: 'project.budget_confirm',
+      name: 'TC thẩm tra / xác nhận kinh phí thuyết minh',
+      module: 'project',
+      action: 'budget_confirm',
+    },
+    {
+      code: 'project.outline_approve',
+      name: 'Lãnh đạo phê duyệt thuyết minh và mức kinh phí đã xác nhận',
+      module: 'project',
+      action: 'outline_approve',
+    },
     {
       code: 'project_process_type.view',
       name: 'Xem danh mục loại quy trình đề tài',

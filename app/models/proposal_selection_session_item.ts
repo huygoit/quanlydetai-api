@@ -6,7 +6,7 @@ import ProjectProposal from '#models/project_proposal'
 import User from '#models/user'
 
 /** Kết quả HĐ trên từng đề xuất */
-export type CouncilResult = 'DONG_Y' | 'DONG_Y_DIEU_CHINH' | 'KHONG_DONG_Y'
+export type CouncilResult = 'DONG_Y' | 'KHONG_DONG_Y'
 
 export default class ProposalSelectionSessionItem extends BaseModel {
   static table = 'proposal_selection_session_items'
