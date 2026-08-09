@@ -28,11 +28,15 @@ export default class IamUserService {
 
     const q = User.query().preload('department')
 
-    if (filters.keyword) {
+    const keyword = String(filters.keyword ?? '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (keyword) {
+      // Tìm theo họ tên / email / SĐT (ILIKE — không phân biệt hoa thường)
+      const like = `%${keyword}%`
       q.where((b) => {
-        b.whereILike('full_name', `%${filters.keyword}%`)
-          .orWhereILike('email', `%${filters.keyword}%`)
-          .orWhereILike('phone', `%${filters.keyword}%`)
+        b.whereILike('full_name', like).orWhereILike('email', like).orWhereILike('phone', like)
       })
     }
     if (filters.departmentId != null) q.where('department_id', filters.departmentId)
@@ -83,6 +87,13 @@ export default class IamUserService {
       if (!dept) throw new Error('DEPARTMENT_NOT_FOUND')
     }
 
+    // Đồng bộ unit text từ department — dùng cho khớp đơn vị đề xuất / thông báo Khoa
+    let unitLabel: string | null = null
+    if (payload.departmentId != null) {
+      const dept = await Department.find(payload.departmentId)
+      unitLabel = dept?.name ? String(dept.name).trim() : null
+    }
+
     const user = await User.create({
       fullName: payload.fullName,
       email: payload.email,
@@ -93,7 +104,7 @@ export default class IamUserService {
       note: payload.note ?? null,
       role: 'NCV', // legacy - giữ mặc định
       roleLabel: 'Nhà khoa học',
-      unit: null,
+      unit: unitLabel,
     })
 
     const roleIds = payload.roleIds ?? []
@@ -129,8 +140,12 @@ export default class IamUserService {
       if (payload.departmentId != null) {
         const dept = await Department.find(payload.departmentId)
         if (!dept) throw new Error('DEPARTMENT_NOT_FOUND')
+        user.departmentId = payload.departmentId
+        user.unit = dept.name ? String(dept.name).trim() : null
+      } else {
+        user.departmentId = null
+        user.unit = null
       }
-      user.departmentId = payload.departmentId ?? null
     }
     if (payload.isActive !== undefined) user.isActive = payload.isActive
     if (payload.note !== undefined) user.note = payload.note ?? null

@@ -23,6 +23,8 @@ function mapServiceError(response: HttpContext['response'], e: unknown) {
     NO_PERIOD: 'Thông báo chưa có kỳ tiếp nhận.',
     DEADLINE_NOT_LATER: 'Ngày gia hạn phải sau hạn hiện tại.',
     ALREADY_CLOSED: 'Kỳ đã đóng.',
+    INVALID_PROCESS_TYPES: 'Loại quy trình đề tài không hợp lệ hoặc đã ngừng hoạt động.',
+    MISSING_LEVELS: 'Chọn ít nhất một loại / cấp đề tài từ danh mục.',
   }
   if (messages[code]) {
     return response.unprocessableEntity({ success: false, message: messages[code] })
@@ -38,10 +40,8 @@ export default class CallForProposalsController {
       periodLabel: request.input('period_label') || request.input('periodLabel'),
       keyword: request.input('keyword'),
     })
-    return response.ok({
-      success: true,
-      data: rows.map((r) => CallForProposalService.serialize(r)),
-    })
+    const data = await Promise.all(rows.map((r) => CallForProposalService.serialize(r)))
+    return response.ok({ success: true, data })
   }
 
   async published({ response }: HttpContext) {
@@ -49,10 +49,10 @@ export default class CallForProposalsController {
       .where('status', 'PUBLISHED')
       .preload('submissionPeriod')
       .orderBy('published_at', 'desc')
-    return response.ok({
-      success: true,
-      data: rows.map((r) => CallForProposalService.serialize(r, { includePeriod: true })),
-    })
+    const data = await Promise.all(
+      rows.map((r) => CallForProposalService.serialize(r, { includePeriod: true }))
+    )
+    return response.ok({ success: true, data })
   }
 
   async publishedShow({ params, response }: HttpContext) {
@@ -66,7 +66,7 @@ export default class CallForProposalsController {
     }
     return response.ok({
       success: true,
-      data: CallForProposalService.serialize(cfp, { includePeriod: true }),
+      data: await CallForProposalService.serialize(cfp, { includePeriod: true }),
     })
   }
 
@@ -76,7 +76,12 @@ export default class CallForProposalsController {
     if (!allowed.includes(level)) {
       return response.badRequest({ success: false, message: 'level không hợp lệ.' })
     }
-    const found = await CallForProposalService.findActivePeriodForLevel(level)
+    const processTypeIdRaw = request.input('projectProcessTypeId') ?? request.input('project_process_type_id')
+    const processTypeId = processTypeIdRaw != null ? Number(processTypeIdRaw) : null
+    const found = await CallForProposalService.findActivePeriodForLevel(
+      level,
+      Number.isFinite(processTypeId) && processTypeId! > 0 ? processTypeId : null
+    )
     if (!found) {
       return response.ok({ success: true, data: null })
     }
@@ -88,6 +93,7 @@ export default class CallForProposalsController {
         periodId: Number(found.period.id),
         deadlineAt: found.period.deadlineAt.toISO(),
         levels: found.callForProposal.levels,
+        projectProcessTypeIds: found.callForProposal.projectProcessTypeIds ?? [],
       },
     })
   }
@@ -109,7 +115,10 @@ export default class CallForProposalsController {
     }
     return response.ok({
       success: true,
-      data: CallForProposalService.serialize(cfp, { includePeriod: true, includeAudits: true }),
+      data: await CallForProposalService.serialize(cfp, {
+        includePeriod: true,
+        includeAudits: true,
+      }),
     })
   }
 
@@ -141,13 +150,14 @@ export default class CallForProposalsController {
         periodKind: payload.periodKind,
         periodLabel: payload.periodLabel,
         deadlineAt: payload.deadlineAt,
-        levels: payload.levels as ProjectProposalLevel[],
+        projectProcessTypeIds: payload.projectProcessTypeIds,
+        levels: payload.levels as ProjectProposalLevel[] | undefined,
         contentHtml: payload.contentHtml,
         attachmentUrls: payload.attachmentUrls,
       })
       return response.created({
         success: true,
-        data: CallForProposalService.serialize(cfp),
+        data: await CallForProposalService.serialize(cfp),
       })
     } catch (e) {
       return mapServiceError(response, e)
@@ -165,11 +175,15 @@ export default class CallForProposalsController {
         periodKind: payload.periodKind,
         periodLabel: payload.periodLabel,
         deadlineAt: payload.deadlineAt,
+        projectProcessTypeIds: payload.projectProcessTypeIds,
         levels: payload.levels as ProjectProposalLevel[] | undefined,
         contentHtml: payload.contentHtml,
         attachmentUrls: payload.attachmentUrls,
       })
-      return response.ok({ success: true, data: CallForProposalService.serialize(updated) })
+      return response.ok({
+        success: true,
+        data: await CallForProposalService.serialize(updated),
+      })
     } catch (e) {
       return mapServiceError(response, e)
     }
@@ -181,7 +195,10 @@ export default class CallForProposalsController {
     if (!cfp) return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
     try {
       const updated = await CallForProposalService.submit(cfp, user.id)
-      return response.ok({ success: true, data: CallForProposalService.serialize(updated) })
+      return response.ok({
+        success: true,
+        data: await CallForProposalService.serialize(updated),
+      })
     } catch (e) {
       return mapServiceError(response, e)
     }
@@ -193,7 +210,10 @@ export default class CallForProposalsController {
     if (!cfp) return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
     try {
       const updated = await CallForProposalService.approve(cfp, user.id)
-      return response.ok({ success: true, data: CallForProposalService.serialize(updated) })
+      return response.ok({
+        success: true,
+        data: await CallForProposalService.serialize(updated),
+      })
     } catch (e) {
       return mapServiceError(response, e)
     }
@@ -206,7 +226,10 @@ export default class CallForProposalsController {
     const payload = await request.validateUsing(returnCfpValidator)
     try {
       const updated = await CallForProposalService.returnToPkh(cfp, user.id, payload.reason)
-      return response.ok({ success: true, data: CallForProposalService.serialize(updated) })
+      return response.ok({
+        success: true,
+        data: await CallForProposalService.serialize(updated),
+      })
     } catch (e) {
       return mapServiceError(response, e)
     }
@@ -227,7 +250,7 @@ export default class CallForProposalsController {
       return response.ok({
         success: true,
         message: 'Đã phát hành. Đang gửi thông báo đến cán bộ.',
-        data: CallForProposalService.serialize(updated, { includePeriod: true }),
+        data: await CallForProposalService.serialize(updated, { includePeriod: true }),
       })
     } catch (e) {
       return mapServiceError(response, e)
@@ -244,7 +267,7 @@ export default class CallForProposalsController {
       await updated.load('submissionPeriod')
       return response.ok({
         success: true,
-        data: CallForProposalService.serialize(updated, { includePeriod: true }),
+        data: await CallForProposalService.serialize(updated, { includePeriod: true }),
       })
     } catch (e) {
       return mapServiceError(response, e)
@@ -260,7 +283,7 @@ export default class CallForProposalsController {
       await updated.load('submissionPeriod')
       return response.ok({
         success: true,
-        data: CallForProposalService.serialize(updated, { includePeriod: true }),
+        data: await CallForProposalService.serialize(updated, { includePeriod: true }),
       })
     } catch (e) {
       return mapServiceError(response, e)

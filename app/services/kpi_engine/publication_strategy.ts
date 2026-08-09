@@ -29,9 +29,10 @@ type PublicationAuthorRow = {
 }
 
 /**
- * QĐ 1883 mục 1.4: sản phẩm khoa học KHÁC (ngoài bài báo mục 1,2,3) — giáo trình, đề tài,
- * sáng kiến, SHTT/chuyển giao, hướng dẫn, khen thưởng… — chia giờ theo % đóng góp.
- * Bài báo (WoS/Scopus, trong nước, kỷ yếu/báo cáo) vẫn dùng công thức n/p (mục 1.2–1.3).
+ * QĐ 1883 điều 1.4: sản phẩm khoa học KHÁC (từ mục 6 trở đi) — sách, đề tài,
+ * sáng kiến, SHTT/chuyển giao… — chia giờ theo % đóng góp.
+ * Công bố khoa học mục 1–5 (WoS/Scopus, báo cáo, tạp chí trong nước/HĐGSNN, hội thảo ISBN)
+ * vẫn dùng công thức n/p (mục 1.2–1.3) — KHÔNG bắt % đóng góp.
  * Phân loại theo mã catalog QD_R<n> (đồng bộ với FE researchOutputFormSchema).
  */
 export function dungChiaTheoPhanTramDongGop(
@@ -39,19 +40,26 @@ export function dungChiaTheoPhanTramDongGop(
   ruleKind?: string | null
 ): boolean {
   const c = String(leafCode ?? '').trim().toUpperCase()
-  if (!c) {
-    // Không xác định mã: chỉ mục 4 (HĐGSNN) chắc chắn là sản phẩm khác → chia %.
-    return (ruleKind ?? '').toUpperCase() === 'HDGSNN_POINTS_TO_HOURS'
-  }
-  // CHỈ mục 1, 2, 3 dùng công thức n/p (mục 1.2–1.3 QĐ 1883):
-  // - Mục 1, 2: bài báo quốc tế WoS/Scopus.
+  const kind = (ruleKind ?? '').toUpperCase()
+
+  // Mục 4 (điểm HĐGSNN): chia n/p như bài báo — không dùng % đóng góp
+  if (kind === 'HDGSNN_POINTS_TO_HOURS') return false
+
+  if (!c) return false
+
+  // Mục 1–2 mã cũ
   if (c.startsWith('PUB_WOS_') || c.startsWith('PUB_SCOPUS_')) return false
-  // - Mục 1, 2, 3 theo mã QĐ: QD_R2..QD_R13 (2–11 quốc tế, 12–13 báo cáo/tham luận).
+  // Mục 4–5 mã cũ
+  if (c === 'PUB_DOMESTIC_HDGNN' || c === 'PUB_CONF_ISBN') return false
+  // Lá điểm HĐGSNN / tạp chí trong nước (QD_R14_P*, QD_R24)
+  if (c.startsWith('QD_R14') || c === 'QD_R24') return false
+
   const m = /^QD_R(\d+)/.exec(c)
   const n = m ? Number(m[1]) : null
-  if (n != null && n >= 2 && n <= 13) return false
-  // Tất cả còn lại (mục 4, 5 và sản phẩm khoa học khác: sách, đề tài, sáng kiến,
-  // SHTT, chuyển giao, hướng dẫn, khen thưởng…) → chia theo % đóng góp (điều 1.4).
+  // Mục 1–5 (QD_R2..QD_R15): công bố khoa học — chia n/p (1.2–1.3)
+  if (n != null && n >= 2 && n <= 15) return false
+
+  // Mục 6 trở đi: sản phẩm khác — điều 1.4 chia theo % đóng góp
   return true
 }
 
@@ -366,8 +374,11 @@ export async function publicationStrategyCalculate(
     phamViLoiDoc = true
   }
 
-  // Mục 1.4: sản phẩm KH khác chia theo % đóng góp — không phụ thuộc nhóm tác giả chính (n).
-  const dungPhanTram = dungChiaTheoPhanTramDongGop(leafCode, null)
+  // Điều 1.4 (% đóng góp): chỉ mục 6+; mục 1–5 dùng n/p. Rule HĐGSNN cũng lấy từ cache nếu có.
+  const ruleKindHint =
+    (context.ruleCache?.ruleByTypeId.get(Number(typeId)) as ResearchOutputRule | undefined)
+      ?.ruleKind ?? null
+  const dungPhanTram = dungChiaTheoPhanTramDongGop(leafCode, ruleKindHint)
 
   // Không có tác giả chính (n=0) → công thức n/p không chạy; loại chia % thì bỏ qua ràng buộc này.
   if (n < 1) {

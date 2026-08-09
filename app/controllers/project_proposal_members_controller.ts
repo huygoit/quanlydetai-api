@@ -7,6 +7,7 @@ import {
   validateManualMemberGender,
   prepareMembersRequestBody,
   resolvedMemberOrder,
+  resolvedMemberRole,
   resolvedProfileIdFromRow,
   resolvedStudentIdFromRow,
   resolvedGenderForSave,
@@ -94,7 +95,8 @@ export default class ProjectProposalMembersController {
         message: 'Chỉ được sửa thành viên khi đề xuất ở trạng thái Nháp hoặc Khoa trả lại.',
       })
     }
-    if (proposal.ownerId !== user.id) {
+    // owner_id bigint vs user.id number — so sánh Number để tránh 403 nhầm
+    if (Number(proposal.ownerId) !== Number(user.id)) {
       return response.forbidden({ success: false, message: 'Bạn không có quyền sửa đề xuất này.' })
     }
 
@@ -133,6 +135,7 @@ export default class ProjectProposalMembersController {
       const nextStudentId = resolvedStudentIdFromRow(a)
       const nextGender = resolvedGenderForSave(a)
       const order = resolvedMemberOrder(a)
+      const role = resolvedMemberRole(a)
 
       if (a.id != null) {
         const member = await ProjectProposalMember.query()
@@ -143,6 +146,7 @@ export default class ProjectProposalMembersController {
           member.fullName = a.full_name
           member.affiliationUnits = a.affiliation_units ?? []
           member.memberOrder = order
+          member.role = role
           member.affiliationType = effectiveAffType
           member.isMultiAffiliationOutsideUdn = effectiveMulti
           member.contributionPercent = a.contribution_percent ?? null
@@ -162,6 +166,7 @@ export default class ProjectProposalMembersController {
         fullName: a.full_name,
         affiliationUnits: a.affiliation_units ?? [],
         memberOrder: order,
+        role,
         affiliationType: effectiveAffType,
         isMultiAffiliationOutsideUdn: effectiveMulti,
         contributionPercent: a.contribution_percent ?? null,

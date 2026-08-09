@@ -202,24 +202,29 @@ export default class NotificationService {
   }
 
   /**
-   * AC3: GV gửi lên Khoa → thông báo user có quyền Khoa (cùng đơn vị).
+   * AC3: GV gửi lên Khoa → thông báo trưởng đơn vị cùng department_id.
    */
   static async notifyUnitHeadsProposalSubmitted(proposal: {
     id: number
     code: string
     title: string
+    ownerId: number
     ownerName: string
     ownerUnit: string
   }) {
     const headIds = await PermissionService.getUserIdsWithPermission('project.assign_reviewer')
     if (!headIds.length) return
 
+    const owner = await User.find(proposal.ownerId)
+    const ownerDeptId = owner?.departmentId
+    if (ownerDeptId == null) return
+
     const heads = await User.query()
       .whereIn('id', headIds)
       .where('is_active', true)
-      .where('unit', proposal.ownerUnit)
+      .where('department_id', ownerDeptId)
 
-    const ids = heads.map((u) => u.id).filter((id) => id != null)
+    const ids = heads.map((h) => h.id).filter((id) => id !== proposal.ownerId)
     if (!ids.length) return
 
     await this.pushMany(ids, {

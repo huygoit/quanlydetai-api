@@ -55,7 +55,10 @@ export function mapProjectProposalMemberToApi(
     affiliationType: m.affiliationType,
     isMultiAffiliationOutsideUdn: m.isMultiAffiliationOutsideUdn,
     contributionPercent: m.contributionPercent != null ? Number(m.contributionPercent) : null,
-    /** FE AuthorsEditor vẫn đọc 2 cờ này — luôn false */
+    /** Vai trò đề xuất — FE AuthorsEditor đọc proposalMemberRole */
+    role: m.role || 'MEMBER',
+    proposalMemberRole: m.role || 'MEMBER',
+    /** FE AuthorsEditor vẫn đọc 2 cờ này — luôn false (vai trò bài báo) */
     isTopAuthor: false,
     isCorresponding: false,
   }

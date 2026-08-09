@@ -2,11 +2,25 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import Staff from '#models/staff'
 import StaffService from '#services/staff_service'
+import { createStaffValidator, updateStaffValidator } from '#validators/staff_write_validator'
 
 /**
- * Admin: danh sách & chi tiết nhân sự (bảng staffs).
+ * Admin: danh sách / chi tiết / tạo / sửa nhân sự (bảng staffs — master).
  */
 export default class AdminStaffsController {
+  private mapWriteError(code: string): { status: number; message: string } | null {
+    const map: Record<string, { status: number; message: string }> = {
+      STAFF_NOT_FOUND: { status: 404, message: 'Không tìm thấy nhân sự.' },
+      STAFF_CODE_REQUIRED: { status: 422, message: 'Mã nhân viên bắt buộc.' },
+      STAFF_CODE_EXISTS: { status: 422, message: 'Mã nhân viên đã tồn tại.' },
+      FULL_NAME_REQUIRED: { status: 422, message: 'Họ tên bắt buộc.' },
+      DEPARTMENT_NOT_FOUND: { status: 422, message: 'Đơn vị không hợp lệ.' },
+      USER_NOT_FOUND: { status: 422, message: 'Người dùng không tồn tại.' },
+      USER_ALREADY_LINKED: { status: 422, message: 'Tài khoản đã gắn với nhân sự khác.' },
+    }
+    return map[code] || null
+  }
+
   /** Bản ghi rút gọn cho danh sách — đủ chọn GVHD / tìm kiếm nhanh */
   private serializeStaffSummary(s: Staff) {
     return {
@@ -171,8 +185,51 @@ export default class AdminStaffsController {
       request.input('includeSourceData') === 'true'
 
     return response.ok({
+      success: true,
       message: 'Chi tiết nhân sự',
       data: this.serializeStaffDetail(staff, includeSource),
     })
+  }
+
+  /** POST /api/admin/staffs */
+  async store({ request, response }: HttpContext) {
+    const payload = await request.validateUsing(createStaffValidator)
+    try {
+      const staff = await StaffService.create(payload as Record<string, unknown>)
+      return response.created({
+        success: true,
+        message: 'Đã tạo nhân sự',
+        data: this.serializeStaffDetail(staff, false),
+      })
+    } catch (e) {
+      const mapped = this.mapWriteError((e as Error).message)
+      if (mapped) {
+        return response.status(mapped.status).json({ success: false, message: mapped.message })
+      }
+      throw e
+    }
+  }
+
+  /** PUT /api/admin/staffs/:id */
+  async update({ params, request, response }: HttpContext) {
+    const id = Number(params.id)
+    if (!Number.isFinite(id)) {
+      return response.badRequest({ success: false, message: 'ID không hợp lệ.' })
+    }
+    const payload = await request.validateUsing(updateStaffValidator)
+    try {
+      const staff = await StaffService.update(id, payload as Record<string, unknown>)
+      return response.ok({
+        success: true,
+        message: 'Đã cập nhật nhân sự',
+        data: this.serializeStaffDetail(staff, false),
+      })
+    } catch (e) {
+      const mapped = this.mapWriteError((e as Error).message)
+      if (mapped) {
+        return response.status(mapped.status).json({ success: false, message: mapped.message })
+      }
+      throw e
+    }
   }
 }

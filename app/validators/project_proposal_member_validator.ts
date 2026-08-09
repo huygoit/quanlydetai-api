@@ -8,6 +8,11 @@ import {
   validateManualAuthorGender,
   type AuthorPayloadRow,
 } from '#validators/publication_author_validator'
+import {
+  PROPOSAL_MEMBER_ROLE_VALUES,
+  resolveProposalMemberRole,
+  type ProposalMemberRole,
+} from '#constants/proposal_member_role'
 
 const AFFILIATION_TYPES = ['UDN_ONLY', 'MIXED', 'OUTSIDE'] as const
 const AUTHOR_GENDERS = ['MALE', 'FEMALE', 'OTHER'] as const
@@ -25,6 +30,9 @@ const memberSchema = vine.object({
   /** FE tái dùng AuthorsEditor — chấp nhận author_order hoặc member_order */
   member_order: vine.number().min(1).optional(),
   author_order: vine.number().min(1).optional(),
+  role: vine.enum(PROPOSAL_MEMBER_ROLE_VALUES).optional(),
+  /** Alias camelCase từ FE AuthorsEditor */
+  proposalMemberRole: vine.enum(PROPOSAL_MEMBER_ROLE_VALUES).optional(),
   affiliation_type: vine.enum(AFFILIATION_TYPES),
   is_multi_affiliation_outside_udn: vine.boolean(),
   contribution_percent: vine.number().min(0).max(100).nullable().optional(),
@@ -41,9 +49,16 @@ export type MemberPayloadRow = {
   affiliation_units?: string[]
   member_order?: number
   author_order?: number
+  role?: ProposalMemberRole
+  proposalMemberRole?: ProposalMemberRole
   affiliation_type: (typeof AFFILIATION_TYPES)[number]
   is_multi_affiliation_outside_udn: boolean
   contribution_percent?: number | null
+}
+
+/** Lấy role đã chuẩn hoá từ payload dòng thành viên. */
+export function resolvedMemberRole(row: MemberPayloadRow): ProposalMemberRole {
+  return resolveProposalMemberRole(row.role ?? row.proposalMemberRole)
 }
 
 /** Chuẩn hoá thứ tự thành viên từ author_order hoặc member_order */
@@ -52,12 +67,38 @@ export function resolvedMemberOrder(row: MemberPayloadRow): number {
   return Number.isFinite(Number(n)) ? Number(n) : 1
 }
 
-/** member_order duy nhất; danh sách rỗng được phép. */
+/**
+ * member_order duy nhất; danh sách rỗng được phép.
+ * Có thành viên → đúng 1 Chủ nhiệm; Thư ký tối đa 1.
+ */
 export function validateMembersListRules(members: MemberPayloadRow[]): void {
   const orders = members.map((m) => resolvedMemberOrder(m))
   if (new Set(orders).size !== orders.length) {
     throw new errors.E_VALIDATION_ERROR([
       { field: 'members', message: 'member_order phải duy nhất trong danh sách', rule: 'unique' },
+    ])
+  }
+  if (members.length === 0) return
+
+  const roles = members.map((m) => resolvedMemberRole(m))
+  const soChuNhiem = roles.filter((r) => r === 'PRINCIPAL').length
+  const soThuKy = roles.filter((r) => r === 'SECRETARY').length
+  if (soChuNhiem !== 1) {
+    throw new errors.E_VALIDATION_ERROR([
+      {
+        field: 'members',
+        message: 'Danh sách thành viên phải có đúng 1 Chủ nhiệm.',
+        rule: 'proposal_member_role',
+      },
+    ])
+  }
+  if (soThuKy > 1) {
+    throw new errors.E_VALIDATION_ERROR([
+      {
+        field: 'members',
+        message: 'Chỉ được có tối đa 1 Thư ký trong danh sách thành viên.',
+        rule: 'proposal_member_role',
+      },
     ])
   }
 }
@@ -115,6 +156,15 @@ export function prepareMembersRequestBody(request: {
     }
     if (r.contributionPercent !== undefined && r.contribution_percent === undefined) {
       r.contribution_percent = r.contributionPercent
+    }
+    // Vai trò đề xuất: proposalMemberRole / role → role chuẩn
+    if (r.proposalMemberRole !== undefined && r.role === undefined) {
+      r.role = r.proposalMemberRole
+    }
+    if (r.role != null) {
+      r.role = resolveProposalMemberRole(r.role)
+    } else {
+      r.role = 'MEMBER'
     }
 
     if (r.id != null && typeof r.id !== 'number') {

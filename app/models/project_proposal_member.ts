@@ -6,10 +6,11 @@ import ScientificProfile from '#models/scientific_profile'
 import Student from '#models/student'
 import Department from '#models/department'
 import type { AffiliationType, AuthorGender } from '#models/publication_author'
+import type { ProposalMemberRole } from '#constants/proposal_member_role'
 
 /**
  * Thành viên đề xuất đề tài (bảng project_proposal_members).
- * Cấu trúc gần giống publication_authors — không có is_top_author / is_corresponding.
+ * Vai trò: PRINCIPAL | SECRETARY | MEMBER (không dùng is_top_author bài báo).
  */
 export default class ProjectProposalMember extends BaseModel {
   static table = 'project_proposal_members'
@@ -37,6 +38,10 @@ export default class ProjectProposalMember extends BaseModel {
 
   @column()
   declare memberOrder: number
+
+  /** Chủ nhiệm / Thư ký / Thành viên */
+  @column()
+  declare role: ProposalMemberRole
 
   @column()
   declare affiliationType: AffiliationType

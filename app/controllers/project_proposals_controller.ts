@@ -29,6 +29,7 @@ import ProjectProposalAdjustmentVersion from '#models/project_proposal_adjustmen
 import ProposalAdjustmentService from '#services/proposal_adjustment_service'
 import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
+import { resolveUserUnitLabel, sameDepartmentId } from '#utils/user_unit'
 
 /**
  * Ánh xạ mã QT → cấp dùng kiểm tra kỳ CFP.
@@ -133,6 +134,14 @@ export default class ProjectProposalsController {
       createdAt: p.createdAt.toISO(),
       updatedAt: p.updatedAt.toISO(),
     }
+  }
+
+  /**
+   * So khớp chủ hồ sơ: owner_id (bigint PG) và user.id có thể lệch kiểu string/number.
+   * Dùng Number() — tránh `!==` khiến owner bị 403 dù đúng người.
+   */
+  private isProposalOwner(proposal: ProjectProposal, userId: number | string): boolean {
+    return Number(proposal.ownerId) === Number(userId)
   }
 
   /** Resolve loại quy trình ACTIVE → level CFP */
@@ -249,7 +258,18 @@ export default class ProjectProposalsController {
       })
     }
     if (year) q.where('year', year)
-    if (status) q.where('status', status)
+    const statusesRaw = request.input('statuses', '')
+    const statusesList = Array.isArray(statusesRaw)
+      ? statusesRaw.map((s) => String(s).trim()).filter(Boolean)
+      : String(statusesRaw || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+    if (statusesList.length > 0) {
+      q.whereIn('status', statusesList)
+    } else if (status) {
+      q.where('status', status)
+    }
     if (level) q.where('level', level)
     if (field) q.where('field', field)
     if (unit) q.whereILike('owner_unit', `%${unit}%`)
@@ -265,9 +285,13 @@ export default class ProjectProposalsController {
         'project.assign_reviewer'
       )
       if (hasPkhReview || hasViewAll) {
-        // PKH / xem tất cả — không giới hạn unit
-      } else if (hasUnitReview && user.unit) {
-        q.where('owner_unit', user.unit)
+        // PKH / xem tất cả — không giới hạn đơn vị
+      } else if (hasUnitReview && user.departmentId != null) {
+        // Trưởng khoa: chỉ đề xuất của GV cùng department_id
+        const peerIds = await User.query().where('department_id', user.departmentId).select('id')
+        const ids = peerIds.map((u) => u.id)
+        if (ids.length) q.whereIn('owner_id', ids)
+        else q.where('owner_id', user.id)
       } else {
         q.where('owner_id', user.id)
       }
@@ -345,7 +369,7 @@ export default class ProjectProposalsController {
     }
 
     // AC1: chỉ tạo khi có kỳ OPEN khớp cấp (suy từ QT)
-    const active = await CallForProposalService.findActivePeriodForLevel(level)
+    const active = await CallForProposalService.findActivePeriodForLevel(level, processTypeId)
     if (!active) {
       return response.unprocessableEntity({
         success: false,
@@ -356,6 +380,7 @@ export default class ProjectProposalsController {
 
     const code = await ProjectProposal.generateCode(payload.year)
     const summary = (payload.summary || payload.objectives).trim()
+    const ownerUnit = await resolveUserUnitLabel(user)
 
     const proposal = await ProjectProposal.create({
       code,
@@ -368,7 +393,7 @@ export default class ProjectProposalsController {
       ownerId: user.id,
       ownerName: user.fullName,
       ownerEmail: user.email,
-      ownerUnit: user.unit ?? '',
+      ownerUnit,
       coAuthors: payload.coAuthors ?? [],
       objectives: payload.objectives,
       summary,
@@ -403,7 +428,7 @@ export default class ProjectProposalsController {
         message: 'Chỉ được sửa đề xuất ở trạng thái Nháp, Khoa trả lại hoặc PKH yêu cầu bổ sung.',
       })
     }
-    if (proposal.ownerId !== user.id) {
+    if (!this.isProposalOwner(proposal, user.id)) {
       return response.forbidden({ success: false, message: 'Bạn không có quyền sửa đề xuất này.' })
     }
 
@@ -421,7 +446,10 @@ export default class ProjectProposalsController {
           message: 'Loại quy trình đề tài không hợp lệ hoặc đã ngừng hoạt động.',
         })
       }
-      const active = await CallForProposalService.findActivePeriodForLevel(proposal.level)
+      const active = await CallForProposalService.findActivePeriodForLevel(
+        proposal.level,
+        proposal.projectProcessTypeId
+      )
       if (!active) {
         return response.unprocessableEntity({
           success: false,
@@ -430,7 +458,10 @@ export default class ProjectProposalsController {
       }
       proposal.callForProposalId = active.callForProposal.id
     } else if (payload.level && payload.level !== proposal.level) {
-      const active = await CallForProposalService.findActivePeriodForLevel(payload.level)
+      const active = await CallForProposalService.findActivePeriodForLevel(
+        payload.level,
+        proposal.projectProcessTypeId
+      )
       if (!active) {
         return response.unprocessableEntity({
           success: false,
@@ -465,7 +496,7 @@ export default class ProjectProposalsController {
         message: 'Chỉ được xóa đề xuất ở trạng thái Nháp.',
       })
     }
-    if (proposal.ownerId !== user.id) {
+    if (!this.isProposalOwner(proposal, user.id)) {
       return response.forbidden({ success: false, message: 'Bạn không có quyền xóa đề xuất này.' })
     }
     await proposal.delete()
@@ -486,7 +517,7 @@ export default class ProjectProposalsController {
         message: 'Chỉ được gửi đề xuất ở trạng thái Nháp hoặc Khoa trả lại.',
       })
     }
-    if (proposal.ownerId !== user.id) {
+    if (!this.isProposalOwner(proposal, user.id)) {
       return response.forbidden({ success: false, message: 'Bạn không có quyền gửi đề xuất này.' })
     }
 
@@ -495,7 +526,10 @@ export default class ProjectProposalsController {
       return response.unprocessableEntity({ success: false, message: readyErr })
     }
 
-    const active = await CallForProposalService.findActivePeriodForLevel(proposal.level)
+    const active = await CallForProposalService.findActivePeriodForLevel(
+      proposal.level,
+      proposal.projectProcessTypeId
+    )
     if (!active) {
       return response.unprocessableEntity({
         success: false,
@@ -505,6 +539,11 @@ export default class ProjectProposalsController {
     }
 
     const from = proposal.status
+    // Backfill đơn vị nếu trống (user IAM chỉ có departmentId)
+    if (!String(proposal.ownerUnit ?? '').trim()) {
+      const ownerUnit = await resolveUserUnitLabel(user)
+      if (ownerUnit) proposal.ownerUnit = ownerUnit
+    }
     proposal.status = 'SUBMITTED'
     proposal.callForProposalId = active.callForProposal.id
     proposal.unitApproved = null
@@ -527,7 +566,10 @@ export default class ProjectProposalsController {
     return response.ok({ success: true, data: this.serialize(proposal) })
   }
 
-  /** POST /api/project-proposals/:id/withdraw */
+  /**
+   * POST /api/project-proposals/:id/withdraw
+   * SUBMITTED → DRAFT (rút về nháp để sửa / gửi lại). Audit vẫn ghi WITHDRAW.
+   */
   async withdraw(ctx: HttpContext) {
     const { auth, params, response } = ctx
     const user = auth.use('api').user!
@@ -541,15 +583,17 @@ export default class ProjectProposalsController {
         message: 'Chỉ được rút đề xuất đang chờ Khoa.',
       })
     }
-    if (proposal.ownerId !== user.id) {
+    if (!this.isProposalOwner(proposal, user.id)) {
       return response.forbidden({ success: false, message: 'Bạn không có quyền rút đề xuất này.' })
     }
 
     const oldData = this.serialize(proposal)
     const from = proposal.status
-    proposal.status = 'WITHDRAWN'
+    proposal.status = 'DRAFT'
+    proposal.unitApproved = null
+    proposal.unitComment = null
     await proposal.save()
-    await this.writeAudit(proposal.id, user.id, 'WITHDRAW', from, 'WITHDRAWN')
+    await this.writeAudit(proposal.id, user.id, 'WITHDRAW', from, 'DRAFT')
 
     await AuditLogService.log({
       userId: user.id,
@@ -589,12 +633,17 @@ export default class ProjectProposalsController {
         message: 'Chỉ xử lý đề xuất đang chờ Khoa.',
       })
     }
-    const currentUserUnit = user.unit
-    if (!currentUserUnit || proposal.ownerUnit !== currentUserUnit) {
+    const owner = await User.find(proposal.ownerId)
+    if (!sameDepartmentId(user.departmentId, owner?.departmentId)) {
       return response.forbidden({
         success: false,
         message: 'Bạn không có quyền duyệt đề xuất của đơn vị khác.',
       })
+    }
+    // Chỉ để hiển thị: bổ sung owner_unit nếu trống
+    if (!String(proposal.ownerUnit ?? '').trim()) {
+      const label = await resolveUserUnitLabel(user)
+      if (label) proposal.ownerUnit = label
     }
 
     const payload = await request.validateUsing(unitReviewProposalValidator)
@@ -667,11 +716,16 @@ export default class ProjectProposalsController {
         message: 'Chỉ trả lại đề xuất đang chờ Khoa.',
       })
     }
-    if (!user.unit || proposal.ownerUnit !== user.unit) {
+    const owner = await User.find(proposal.ownerId)
+    if (!sameDepartmentId(user.departmentId, owner?.departmentId)) {
       return response.forbidden({
         success: false,
         message: 'Bạn không có quyền trả lại đề xuất của đơn vị khác.',
       })
+    }
+    if (!String(proposal.ownerUnit ?? '').trim()) {
+      const label = await resolveUserUnitLabel(user)
+      if (label) proposal.ownerUnit = label
     }
 
     const payload = await request.validateUsing(unitReturnProposalValidator)
@@ -774,7 +828,7 @@ export default class ProjectProposalsController {
     if (!proposal) {
       return response.notFound({ success: false, message: 'Không tìm thấy đề xuất.' })
     }
-    if (proposal.ownerId !== user.id) {
+    if (!this.isProposalOwner(proposal, user.id)) {
       return response.forbidden({ success: false, message: 'Chỉ chủ hồ sơ được gửi lại PKH.' })
     }
     if (proposal.status !== 'YEU_CAU_BS') {
@@ -1069,12 +1123,17 @@ export default class ProjectProposalsController {
   async pendingUnitCount({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
     const canReview = await PermissionService.userHasPermission(user.id, 'project.assign_reviewer')
-    if (!canReview || !user.unit) {
+    if (!canReview || user.departmentId == null) {
+      return response.ok({ success: true, data: { count: 0 } })
+    }
+    const peerIds = await User.query().where('department_id', user.departmentId).select('id')
+    const ids = peerIds.map((u) => u.id)
+    if (!ids.length) {
       return response.ok({ success: true, data: { count: 0 } })
     }
     const result = await ProjectProposal.query()
       .where('status', 'SUBMITTED')
-      .where('owner_unit', user.unit)
+      .whereIn('owner_id', ids)
       .count('* as total')
     const count = Number(result[0].$extras.total || 0)
     return response.ok({ success: true, data: { count } })
@@ -1117,7 +1176,7 @@ export default class ProjectProposalsController {
         if (!proposal) {
           return { error: 'NOT_FOUND' as const }
         }
-        if (proposal.ownerId !== user.id) {
+        if (!this.isProposalOwner(proposal, user.id)) {
           return { error: 'FORBIDDEN' as const }
         }
         if (proposal.status !== 'DIEU_CHINH') {
@@ -1274,7 +1333,7 @@ export default class ProjectProposalsController {
     if (!proposal) {
       return response.notFound({ success: false, message: 'Không tìm thấy đề xuất.' })
     }
-    const isOwner = proposal.ownerId === user.id
+    const isOwner = this.isProposalOwner(proposal, user.id)
     const isPkh = await this.assertPkh(user.id)
     if (!isOwner && !isPkh) {
       return response.forbidden({ success: false, message: 'Không có quyền xem phiên bản điều chỉnh.' })

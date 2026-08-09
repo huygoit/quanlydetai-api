@@ -34,7 +34,17 @@ export default class EmailLogService {
 
     if (!MailService.isConfigured()) {
       log.status = 'STUB'
-      log.errorMessage = 'SMTP chưa cấu hình (.env) — chỉ ghi log, chưa gửi thật.'
+      log.errorMessage = MailService.isEnabledFlag()
+        ? 'SMTP_ENABLED=true nhưng thiếu SMTP_HOST/USER/PASSWORD — chưa gửi thật.'
+        : 'SMTP_ENABLED≠true — chế độ kiểm thử: chỉ ghi log, không gửi mail.'
+      await log.save()
+      return log
+    }
+
+    // Allowlist: test gửi thật nhưng không blast cả danh sách staffs
+    if (!MailService.isRecipientAllowed(toEmail)) {
+      log.status = 'STUB'
+      log.errorMessage = `Bỏ qua SMTP — không nằm trong SMTP_ALLOWLIST (test).`
       await log.save()
       return log
     }

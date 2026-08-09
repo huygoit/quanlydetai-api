@@ -8,10 +8,15 @@ import CfpEmailJob from '#models/cfp_email_job'
 import Staff from '#models/staff'
 import NotificationService from '#services/notification_service'
 import PermissionService from '#services/permission_service'
+import EmailLog from '#models/email_log'
 import EmailLogService from '#services/email_log_service'
 import MailService from '#services/mail_service'
+import { enqueueCfpEmailBroadcast } from '#queues/cfp_email_queue'
 import type { ProjectProposalLevel } from '#models/project_proposal'
+import ProjectProcessType from '#models/project_process_type'
+import { levelFromProcessTypeCode } from '#utils/project_process_type_level'
 import db from '@adonisjs/lucid/services/db'
+import env from '#start/env'
 
 const LINK_LIST = '/projects/call-for-proposals'
 const LINK_DETAIL = (id: number) => `/projects/call-for-proposals/${id}`
@@ -21,7 +26,10 @@ export type CfpWritePayload = {
   periodKind: CfpPeriodKind
   periodLabel: string
   deadlineAt: string
-  levels: ProjectProposalLevel[]
+  /** Chọn từ danh mục loại quy trình đề tài */
+  projectProcessTypeIds?: number[]
+  /** Legacy — suy từ QT nếu không gửi ids */
+  levels?: ProjectProposalLevel[]
   contentHtml?: string | null
   attachmentUrls?: string[]
 }
@@ -66,8 +74,49 @@ export default class CallForProposalService {
     })
   }
 
-  static serialize(cfp: CallForProposal, opts?: { includePeriod?: boolean; includeAudits?: boolean }) {
+  /**
+   * Resolve danh mục QT ACTIVE → ids + levels suy ra.
+   * Bắt buộc có ít nhất 1 loại hợp lệ.
+   */
+  static async resolveProcessTypesAndLevels(payload: {
+    projectProcessTypeIds?: number[]
+    levels?: ProjectProposalLevel[]
+  }): Promise<{ projectProcessTypeIds: number[]; levels: ProjectProposalLevel[] }> {
+    const rawIds = [...new Set((payload.projectProcessTypeIds || []).map(Number).filter((n) => n > 0))]
+    if (rawIds.length) {
+      const rows = await ProjectProcessType.query()
+        .whereIn('id', rawIds)
+        .where('status', 'ACTIVE')
+      if (rows.length !== rawIds.length) {
+        throw new Error('INVALID_PROCESS_TYPES')
+      }
+      const levels = [
+        ...new Set(rows.map((r) => levelFromProcessTypeCode(r.code))),
+      ] as ProjectProposalLevel[]
+      return { projectProcessTypeIds: rawIds, levels }
+    }
+    if (payload.levels?.length) {
+      return { projectProcessTypeIds: [], levels: payload.levels }
+    }
+    throw new Error('MISSING_LEVELS')
+  }
+
+  static async serialize(
+    cfp: CallForProposal,
+    opts?: { includePeriod?: boolean; includeAudits?: boolean }
+  ) {
     const period = cfp.submissionPeriod
+    const typeIds = cfp.projectProcessTypeIds ?? []
+    let projectProcessTypes: Array<{ id: number; code: string; name: string }> = []
+    if (typeIds.length) {
+      const rows = await ProjectProcessType.query().whereIn('id', typeIds).orderBy('display_order', 'asc')
+      projectProcessTypes = rows.map((r) => ({
+        id: Number(r.id),
+        code: r.code,
+        name: r.name,
+      }))
+    }
+
     const data: Record<string, unknown> = {
       id: Number(cfp.id),
       title: cfp.title,
@@ -75,6 +124,8 @@ export default class CallForProposalService {
       periodLabel: cfp.periodLabel,
       deadlineAt: cfp.deadlineAt?.toISO() ?? null,
       levels: cfp.levels ?? [],
+      projectProcessTypeIds: typeIds,
+      projectProcessTypes,
       contentHtml: cfp.contentHtml,
       attachmentUrls: cfp.attachmentUrls ?? [],
       status: cfp.status,
@@ -119,12 +170,14 @@ export default class CallForProposalService {
 
   static async create(userId: number, payload: CfpWritePayload) {
     const deadlineAt = this.assertDeadlineMin10Days(payload.deadlineAt)
+    const resolved = await this.resolveProcessTypesAndLevels(payload)
     const cfp = await CallForProposal.create({
       title: payload.title.trim(),
       periodKind: payload.periodKind,
       periodLabel: payload.periodLabel.trim(),
       deadlineAt,
-      levels: payload.levels,
+      levels: resolved.levels,
+      projectProcessTypeIds: resolved.projectProcessTypeIds,
       contentHtml: payload.contentHtml ?? null,
       attachmentUrls: payload.attachmentUrls ?? [],
       status: 'DRAFT',
@@ -144,6 +197,7 @@ export default class CallForProposalService {
       periodLabel: cfp.periodLabel,
       deadlineAt: cfp.deadlineAt.toISO(),
       levels: cfp.levels,
+      projectProcessTypeIds: cfp.projectProcessTypeIds,
     }
     if (payload.title != null) cfp.title = payload.title.trim()
     if (payload.periodKind != null) cfp.periodKind = payload.periodKind
@@ -151,7 +205,14 @@ export default class CallForProposalService {
     if (payload.deadlineAt != null) {
       cfp.deadlineAt = this.assertDeadlineMin10Days(payload.deadlineAt)
     }
-    if (payload.levels != null) cfp.levels = payload.levels
+    if (payload.projectProcessTypeIds != null || payload.levels != null) {
+      const resolved = await this.resolveProcessTypesAndLevels({
+        projectProcessTypeIds: payload.projectProcessTypeIds,
+        levels: payload.levels,
+      })
+      cfp.projectProcessTypeIds = resolved.projectProcessTypeIds
+      cfp.levels = resolved.levels
+    }
     if (payload.contentHtml !== undefined) cfp.contentHtml = payload.contentHtml
     if (payload.attachmentUrls != null) cfp.attachmentUrls = payload.attachmentUrls
     await cfp.save()
@@ -163,6 +224,7 @@ export default class CallForProposalService {
         periodLabel: cfp.periodLabel,
         deadlineAt: cfp.deadlineAt.toISO(),
         levels: cfp.levels,
+        projectProcessTypeIds: cfp.projectProcessTypeIds,
       },
     })
     return cfp
@@ -261,23 +323,101 @@ export default class CallForProposalService {
       )
     })
 
-    // Gửi thông báo in-app + email SMTP (nếu đã cấu hình .env)
-    void this.enqueueBroadcast(cfp).catch(() => undefined)
+    // Gửi mail theo cấu hình QUEUE / SYNC (.env)
+    void this.dispatchBroadcast(cfp).catch(() => undefined)
     return cfp
   }
 
+  /** Bật đẩy BullMQ? Mặc định true nếu chưa set (giữ hành vi cũ). */
+  static isCfpEmailQueueEnabled(): boolean {
+    const v = env.get('CFP_EMAIL_QUEUE_ENABLED')
+    return v === undefined || v === null ? true : v === true
+  }
+
+  /** Bật gửi đồng bộ trong process API (cách cũ)? Mặc định false. */
+  static isCfpEmailSyncEnabled(): boolean {
+    return env.get('CFP_EMAIL_SYNC_ENABLED') === true
+  }
+
   /**
-   * Broadcast phát hành CFP: in-app cho staff có userId + email SMTP nếu đã cấu hình.
+   * Phát sóng mail CFP theo 2 chế độ (.env):
+   * - CFP_EMAIL_QUEUE_ENABLED: đẩy Redis/BullMQ → worker gửi
+   * - CFP_EMAIL_SYNC_ENABLED: gọi enqueueBroadcast ngay trong API (không cần Redis)
+   * Cả hai bật: ưu tiên queue; queue lỗi thì fallback sync nếu SYNC bật.
    */
-  static async enqueueBroadcast(cfp: CallForProposal) {
-    const job = await CfpEmailJob.create({
-      callForProposalId: cfp.id,
-      status: 'RUNNING',
-      total: 0,
-      sent: 0,
-    })
+  static async dispatchBroadcast(cfp: CallForProposal, opts?: { resumeJobId?: number }) {
+    const useQueue = this.isCfpEmailQueueEnabled()
+    const useSync = this.isCfpEmailSyncEnabled()
+
+    if (!useQueue && !useSync) {
+      await CfpEmailJob.create({
+        callForProposalId: cfp.id,
+        status: 'FAILED',
+        total: 0,
+        sent: 0,
+        error:
+          'Chưa bật chế độ gửi mail CFP. Đặt CFP_EMAIL_QUEUE_ENABLED=true và/hoặc CFP_EMAIL_SYNC_ENABLED=true.',
+      })
+      throw new Error('CFP_EMAIL_DISPATCH_DISABLED')
+    }
+
+    if (useQueue) {
+      try {
+        return await enqueueCfpEmailBroadcast({
+          cfpId: Number(cfp.id),
+          resumeJobId: opts?.resumeJobId ?? null,
+        })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (useSync) {
+          // Redis/BullMQ lỗi → fallback cách cũ trong process API
+          void this.enqueueBroadcast(cfp, opts).catch(() => undefined)
+          return null
+        }
+        await CfpEmailJob.create({
+          callForProposalId: cfp.id,
+          status: 'FAILED',
+          total: 0,
+          sent: 0,
+          error: `Không đẩy BullMQ (cần Redis + worker). Bật CFP_EMAIL_SYNC_ENABLED=true để gửi cách cũ: ${msg}`,
+        })
+        throw e
+      }
+    }
+
+    // Chỉ SYNC: gửi ngay trong process (fire-and-forget — không chặn HTTP quá lâu nếu gọi void bên ngoài)
+    void this.enqueueBroadcast(cfp, opts).catch(() => undefined)
+    return null
+  }
+
+  /**
+   * Broadcast phát hành CFP: in-app + email SMTP tới staffs.email.
+   * Chạy trong worker BullMQ. Hỗ trợ resume: bỏ qua email đã SENT.
+   */
+  static async enqueueBroadcast(cfp: CallForProposal, opts?: { resumeJobId?: number }) {
+    let job =
+      opts?.resumeJobId != null
+        ? await CfpEmailJob.find(opts.resumeJobId)
+        : null
+    if (!job) {
+      job = await CfpEmailJob.create({
+        callForProposalId: cfp.id,
+        status: 'RUNNING',
+        total: 0,
+        sent: 0,
+      })
+    } else {
+      job.status = 'RUNNING'
+      job.error = null
+      await job.save()
+    }
+
     try {
-      const staffs = await Staff.query().whereNotNull('email').select('id', 'email', 'userId', 'fullName')
+      // Ưu tiên id tăng dần — mail mới (vd Gmail test) thường ở cuối, không được kẹt giữa chừng
+      const staffs = await Staff.query()
+        .whereNotNull('email')
+        .select('id', 'email', 'userId', 'fullName')
+        .orderBy('id', 'asc')
       const withEmail = staffs.filter((s) => (s.email || '').trim().length > 0)
       job.total = withEmail.length
       await job.save()
@@ -289,7 +429,8 @@ export default class CallForProposalService {
             .filter((id): id is number => id != null && id > 0)
         ),
       ]
-      if (userIds.length) {
+      // Chỉ push in-app lần đầu (không resume)
+      if (!opts?.resumeJobId && userIds.length) {
         await NotificationService.pushMany(userIds, {
           type: 'SYSTEM',
           title: 'Thông báo tuyển chọn đề tài đã phát hành',
@@ -303,34 +444,69 @@ export default class CallForProposalService {
       if (MailService.isConfigured()) {
         const subject = `[KH&CN] ${cfp.title}`
         const body = `Thông báo tuyển chọn đề tài đã phát hành.\n\n${cfp.title}\nHạn nộp: ${cfp.deadlineAt.toFormat('dd/MM/yyyy')}\nSố VB: ${cfp.officialDocNo || '—'}\n\nVui lòng đăng nhập hệ thống để xem chi tiết.`
-        const seen = new Set<string>()
+
+        // Email đã gửi thành công trước đó — bỏ qua khi resume
+        const alreadySent = await EmailLog.query()
+          .where('related_type', 'call_for_proposal')
+          .where('related_id', cfp.id)
+          .where('status', 'SENT')
+          .select('to_email')
+        const doneSet = new Set(
+          alreadySent.map((r) => String(r.toEmail || '').trim().toLowerCase()).filter(Boolean)
+        )
+        mailSent = doneSet.size
+
+        // Đánh dấu log PENDING treo → FAILED để không nhầm trạng thái
+        await EmailLog.query()
+          .where('related_type', 'call_for_proposal')
+          .where('related_id', cfp.id)
+          .where('status', 'PENDING')
+          .update({
+            status: 'FAILED',
+            error_message: 'SMTP treo / bị gián đoạn — đánh dấu FAILED để gửi lại.',
+          })
+
+        const seen = new Set<string>(doneSet)
+        let processed = 0
         for (const s of withEmail) {
           const to = String(s.email || '')
             .trim()
             .toLowerCase()
           if (!to || seen.has(to)) continue
           seen.add(to)
-          const log = await EmailLogService.send({
-            toEmail: to,
-            subject,
-            body,
-            relatedType: 'call_for_proposal',
-            relatedId: cfp.id,
-          })
-          if (log?.status === 'SENT') mailSent++
-          else if (log?.status === 'FAILED') mailFailed++
+          try {
+            const log = await EmailLogService.send({
+              toEmail: to,
+              subject,
+              body,
+              relatedType: 'call_for_proposal',
+              relatedId: cfp.id,
+            })
+            if (log?.status === 'SENT') mailSent++
+            else mailFailed++
+          } catch {
+            mailFailed++
+          }
+          processed++
+          // Cập nhật tiến độ định kỳ — UI/DB biết job còn sống
+          if (processed % 10 === 0) {
+            job.sent = mailSent
+            job.error = `Đang gửi… ${mailSent} OK, ${mailFailed} lỗi (đã bỏ qua ${doneSet.size} đã gửi).`
+            await job.save()
+          }
         }
         job.sent = mailSent
         job.status = 'DONE'
         job.error =
           mailFailed > 0
-            ? `Đã gửi ${mailSent}/${seen.size} email SMTP; thất bại ${mailFailed}. In-app: ${userIds.length} user.`
+            ? `Đã gửi ${mailSent} email SMTP; thất bại ${mailFailed}; bỏ qua đã gửi ${doneSet.size}. In-app: ${userIds.length} user.`
             : `Đã gửi ${mailSent} email SMTP + in-app ${userIds.length} user.`
       } else {
         job.sent = userIds.length
         job.status = 'DONE'
-        job.error =
-          'SMTP chưa cấu hình — chỉ gửi thông báo nội bộ. Điền SMTP_* trong .env để gửi email thật.'
+        job.error = MailService.isEnabledFlag()
+          ? 'SMTP thiếu HOST/USER/PASSWORD — chỉ thông báo nội bộ.'
+          : 'SMTP_ENABLED≠true (kiểm thử) — không gửi email; chỉ thông báo nội bộ. Bật SMTP_ENABLED=true để gửi thật.'
       }
       await job.save()
     } catch (e) {
@@ -338,6 +514,18 @@ export default class CallForProposalService {
       job.error = e instanceof Error ? e.message : String(e)
       await job.save()
     }
+  }
+
+  /** Tiếp tục / gửi lại theo QUEUE hoặc SYNC (bỏ qua mail đã SENT). */
+  static async resumeBroadcast(cfpId: number) {
+    const cfp = await CallForProposal.find(cfpId)
+    if (!cfp || cfp.status !== 'PUBLISHED') throw new Error('CFP_NOT_PUBLISHED')
+    const job = await CfpEmailJob.query()
+      .where('call_for_proposal_id', cfpId)
+      .orderBy('id', 'desc')
+      .first()
+    await this.dispatchBroadcast(cfp, { resumeJobId: job?.id })
+    return job
   }
 
   static async extend(cfp: CallForProposal, userId: number, deadlineIso: string) {
@@ -377,10 +565,12 @@ export default class CallForProposalService {
   }
 
   /**
-   * Tìm kỳ OPEN còn hạn có levels chứa `level`.
-   * Dùng để khóa nộp đề xuất.
+   * Tìm kỳ OPEN còn hạn khớp loại quy trình / cấp đề tài.
    */
-  static async findActivePeriodForLevel(level: ProjectProposalLevel) {
+  static async findActivePeriodForLevel(
+    level: ProjectProposalLevel,
+    projectProcessTypeId?: number | null
+  ) {
     const now = DateTime.local()
     const periods = await SubmissionPeriod.query()
       .where('status', 'OPEN')
@@ -390,6 +580,13 @@ export default class CallForProposalService {
     for (const p of periods) {
       const cfp = p.callForProposal
       if (!cfp || cfp.status !== 'PUBLISHED') continue
+      const typeIds = cfp.projectProcessTypeIds || []
+      if (projectProcessTypeId && typeIds.length) {
+        if (typeIds.includes(Number(projectProcessTypeId))) {
+          return { period: p, callForProposal: cfp }
+        }
+        continue
+      }
       const levels = cfp.levels || []
       if (levels.includes(level)) {
         return { period: p, callForProposal: cfp }

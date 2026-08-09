@@ -34,6 +34,16 @@ export default class CallForProposal extends BaseModel {
   })
   declare levels: ProjectProposalLevel[]
 
+  /** ID loại quy trình đề tài (danh mục ACTIVE) áp dụng cho thông báo */
+  @column({
+    prepare: (v: number[] | null) => (v == null ? '[]' : JSON.stringify(v)),
+    consume: (v: string | unknown) => {
+      const arr = typeof v === 'string' ? JSON.parse(v) : Array.isArray(v) ? v : []
+      return arr.map((x: unknown) => Number(x)).filter((n: number) => Number.isFinite(n) && n > 0)
+    },
+  })
+  declare projectProcessTypeIds: number[]
+
   @column()
   declare contentHtml: string | null
 

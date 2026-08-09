@@ -45,8 +45,7 @@ import ScientificProfileCatalogController from '#controllers/scientific_profile_
 import AdminRolesController from '#controllers/admin/roles_controller'
 import AdminPermissionsController from '#controllers/admin/permissions_controller'
 import AdminIamUsersController from '#controllers/admin/iam_users_controller'
-import AdminPersonalProfilesController from '#controllers/admin/personal_profiles_controller'
-import MePersonalProfileController from '#controllers/me_personal_profile_controller'
+import MeStaffProfileController from '#controllers/me_staff_profile_controller'
 import AdminStaffsController from '#controllers/admin/staffs_controller'
 import AdminPublicationsController from '#controllers/admin/publications_controller'
 import AdminPublicationAuthorsController from '#controllers/admin/publication_authors_controller'
@@ -350,28 +349,21 @@ router
   .prefix('/api/admin/users')
   .use([middleware.auth()])
 
-// --- Admin: personal profiles CRUD (chỉ ADMIN)
-router
-  .group(() => {
-    router.get('/', [AdminPersonalProfilesController, 'index'])
-    router.get('/user/:userId', [AdminPersonalProfilesController, 'showByUserId'])
-    router.get('/:id', [AdminPersonalProfilesController, 'show'])
-    router.post('/', [AdminPersonalProfilesController, 'store'])
-    router.put('/:id', [AdminPersonalProfilesController, 'update'])
-    router.patch('/:id/status', [AdminPersonalProfilesController, 'changeStatus'])
-  })
-  .prefix('/api/admin/personal-profiles')
-  .use([middleware.auth(), middleware.role('ADMIN')])
-
-// --- Admin: danh mục nhân sự staffs (permission: department.view)
+// --- Admin: danh mục nhân sự staffs (master)
 router
   .group(() => {
     router
       .get('/', [AdminStaffsController, 'index'])
-      .use(middleware.permission('department.view'))
+      .use(middleware.permission('department.view,personal_profile.view'))
+    router
+      .post('/', [AdminStaffsController, 'store'])
+      .use(middleware.permission('personal_profile.create'))
     router
       .get('/:id', [AdminStaffsController, 'show'])
-      .use(middleware.permission('department.view'))
+      .use(middleware.permission('department.view,personal_profile.view'))
+    router
+      .put('/:id', [AdminStaffsController, 'update'])
+      .use(middleware.permission('personal_profile.update'))
   })
   .prefix('/api/admin/staffs')
   .use([middleware.auth()])
@@ -509,13 +501,13 @@ router
   .prefix('/api/profile/me')
   .middleware([middleware.auth(), middleware.personalWorkspace()])
 
-// --- Hồ sơ cá nhân của user đang đăng nhập (xem + tự sửa)
+// --- Hồ sơ nhân sự của user đang đăng nhập (bảng staffs)
 router
   .group(() => {
-    router.get('/', [MePersonalProfileController, 'show'])
-    router.put('/', [MePersonalProfileController, 'update'])
+    router.get('/', [MeStaffProfileController, 'show'])
+    router.put('/', [MeStaffProfileController, 'update'])
   })
-  .prefix('/api/me/personal-profile')
+  .prefix('/api/me/staff-profile')
   .middleware([middleware.auth(), middleware.personalWorkspace()])
 
 // --- Alias không có /api (một số FE đang gọi /profile/me)

@@ -65,7 +65,8 @@ export default await Env.create(new URL('../', import.meta.url), {
   |   SMTP_USER=user@domain.com
   |   SMTP_PASSWORD=...
   |   SMTP_FROM=user@domain.com  (tuỳ chọn, mặc định = SMTP_USER)
-  |   SMTP_ENABLED=true
+  |   SMTP_ENABLED=true   ← bắt buộc true mới gửi mail thật; false/omit = chỉ STUB (test)
+  |   SMTP_ALLOWLIST=a@x.com,b@y.com  ← (tuỳ chọn) chỉ gửi thật các email này; trống = gửi tất cả
   */
   SMTP_ENABLED: Env.schema.boolean.optional(),
   SMTP_HOST: Env.schema.string.optional(),
@@ -74,4 +75,20 @@ export default await Env.create(new URL('../', import.meta.url), {
   SMTP_USER: Env.schema.string.optional(),
   SMTP_PASSWORD: Env.schema.string.optional(),
   SMTP_FROM: Env.schema.string.optional(),
+  SMTP_ALLOWLIST: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Redis + chế độ gửi mail broadcast CFP
+  |----------------------------------------------------------
+  | CFP_EMAIL_QUEUE_ENABLED=true  → đẩy BullMQ (cần Redis + npm run worker:cfp-email)
+  | CFP_EMAIL_SYNC_ENABLED=true   → gửi ngay trong process API (cách cũ, không cần Redis)
+  | Redis/BullMQ lỗi: tắt QUEUE, bật SYNC.
+  | Cả hai true: ưu tiên QUEUE; đẩy queue thất bại thì fallback SYNC (nếu SYNC bật).
+  */
+  REDIS_HOST: Env.schema.string.optional(),
+  REDIS_PORT: Env.schema.number.optional(),
+  REDIS_PASSWORD: Env.schema.string.optional(),
+  CFP_EMAIL_QUEUE_ENABLED: Env.schema.boolean.optional(),
+  CFP_EMAIL_SYNC_ENABLED: Env.schema.boolean.optional(),
 })
