@@ -107,6 +107,28 @@ export default class ScientificProfile extends BaseModel {
   @column()
   declare degreeCountry: string | null
 
+  /**
+   * Quá trình đào tạo theo bậc (Đại học, Thạc sĩ, NCS…).
+   * JSON: [{ id, level, major, institution, country, startYear, endYear, trainingForm, note }]
+   */
+  @column({
+    prepare: (v: unknown[] | null) => (v == null ? '[]' : JSON.stringify(v)),
+    consume: (v: string | unknown) =>
+      typeof v === 'string' ? JSON.parse(v) : Array.isArray(v) ? v : [],
+  })
+  declare educationRecords: Record<string, unknown>[]
+
+  /**
+   * Khóa tập huấn / đào tạo / bồi dưỡng chuyên môn khác.
+   * JSON: [{ id, name, organizer, location, startYear, endYear, certificate, note }]
+   */
+  @column({
+    prepare: (v: unknown[] | null) => (v == null ? '[]' : JSON.stringify(v)),
+    consume: (v: string | unknown) =>
+      typeof v === 'string' ? JSON.parse(v) : Array.isArray(v) ? v : [],
+  })
+  declare trainingCourses: Record<string, unknown>[]
+
   @column()
   declare mainResearchArea: string | null
 

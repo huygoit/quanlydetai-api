@@ -34,6 +34,7 @@ export default class AdminStaffsController {
       departmentName: s.departmentName,
       staffType: s.staffType,
       positionTitle: s.positionTitle,
+      professionalTitle: s.professionalTitle,
       currentJob: s.currentJob,
       userId: s.userId,
       createdAt: s.createdAt.toISO(),
@@ -120,7 +121,9 @@ export default class AdminStaffsController {
 
   /**
    * GET /api/admin/staffs
-   * Query: page, perPage, keyword, departmentId, departmentCode, staffType, hasUser (true|false), sortBy, order
+   * Query: page, perPage, keyword, departmentId, departmentCode, staffType,
+   *        positionTitle, partyPosition (lọc theo ID trong chuỗi),
+   *        hasUser (true|false), sortBy, order
    */
   async index({ request, response }: HttpContext) {
     const page = request.input('page', 1)
@@ -130,6 +133,8 @@ export default class AdminStaffsController {
     const departmentIdRaw = request.input('departmentId', '')
     const departmentCode = request.input('departmentCode', '')
     const staffType = request.input('staffType', '')
+    const positionTitle = request.input('positionTitle', '')
+    const partyPosition = request.input('partyPosition', '')
     const hasUserRaw = request.input('hasUser', '')
     const sortBy = request.input('sortBy', '')
     const order = request.input('order', 'asc')
@@ -149,6 +154,8 @@ export default class AdminStaffsController {
       departmentId: Number.isFinite(departmentId) ? departmentId : undefined,
       departmentCode: departmentCode || undefined,
       staffType: staffType || undefined,
+      positionTitle: positionTitle || undefined,
+      partyPosition: partyPosition || undefined,
       hasUser,
       sortBy: sortBy || undefined,
       order: order === 'desc' ? 'desc' : 'asc',

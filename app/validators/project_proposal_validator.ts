@@ -1,18 +1,6 @@
 import vine from '@vinejs/vine'
 
-/** Lĩnh vực (theo prompt 07) */
-const FIELD_OPTIONS = [
-  'Công nghệ thông tin',
-  'Kinh tế - Quản lý',
-  'Khoa học xã hội',
-  'Kỹ thuật - Công nghệ',
-  'Y - Dược',
-  'Nông nghiệp - Sinh học',
-  'Khoa học tự nhiên',
-  'Giáo dục',
-] as const
-
-/** Cấp đề tài (dùng nội bộ / khớp kỳ CFP) */
+/** Cấp đề tài (dùng nội bộ / khớp kỳ CFP) — khớp catalogs PROJECT_LEVEL */
 const LEVEL_OPTIONS = ['CO_SO', 'TRUONG', 'BO', 'NHA_NUOC'] as const
 
 /** Mức ưu tiên Phòng KH */
@@ -24,7 +12,8 @@ const attachmentUrlRule = vine.string().trim().maxLength(500)
 export const createProjectProposalValidator = vine.compile(
   vine.object({
     title: vine.string().trim().minLength(1).maxLength(500),
-    field: vine.enum(FIELD_OPTIONS),
+    // Tên lĩnh vực từ danh mục fields — kiểm tra DB ở controller
+    field: vine.string().trim().minLength(1).maxLength(255),
     /** Phân cấp = loại quy trình đề tài (QT-I…) */
     projectProcessTypeId: vine.number().positive(),
     /** Giữ optional — BE tự suy từ QT nếu thiếu */
@@ -49,7 +38,7 @@ export const createProjectProposalValidator = vine.compile(
 export const updateProjectProposalValidator = vine.compile(
   vine.object({
     title: vine.string().trim().minLength(1).maxLength(500).optional(),
-    field: vine.enum(FIELD_OPTIONS).optional(),
+    field: vine.string().trim().minLength(1).maxLength(255).optional(),
     projectProcessTypeId: vine.number().positive().optional(),
     level: vine.enum(LEVEL_OPTIONS).optional(),
     year: vine.number().min(2020).max(2030).optional(),

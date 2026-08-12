@@ -1,6 +1,8 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import ScientificProfile from '#models/scientific_profile'
+import Staff from '#models/staff'
+import StaffPosition from '#models/staff_position'
 import Publication from '#models/publication'
 import PublicationAuthor from '#models/publication_author'
 import ProfileVerifyLog from '#models/profile_verify_log'
@@ -9,6 +11,7 @@ import { verifyProfileValidator } from '#validators/scientific_profile_validator
 import ProfileController from '#controllers/profile_controller'
 import PublicationAccessService from '#services/publication_access_service'
 import { mapPublicationAuthorToApi } from '#utils/publication_author_api'
+import { parseStaffPositionIds } from '#utils/staff_position_ids'
 
 const profileSerializer = new ProfileController()
 
@@ -17,7 +20,11 @@ const profileSerializer = new ProfileController()
  */
 export default class ProfilesController {
   /**
-   * GET /api/profiles - keyword, faculty, degree, academicTitle, mainResearchArea, status, page, perPage
+   * GET /api/profiles
+   * Query: keyword, faculty, degree, academicTitle, mainResearchArea, status,
+   *        positionTitle, partyPosition (ID trong chuỗi staffs, join user_id),
+   *        sortBy (updatedAt|fullName|positionTitle|faculty|degree), order (asc|desc),
+   *        page, perPage
    */
   async index({ request, response }: HttpContext) {
     const page = request.input('page', 1)
@@ -25,47 +32,154 @@ export default class ProfilesController {
     const keyword = request.input('keyword', '')
     const faculty = request.input('faculty', '')
     const degree = request.input('degree', '')
-    // Lọc theo học hàm (NONE / ASSOCIATE_PROFESSOR / PROFESSOR)
     const academicTitle = request.input('academicTitle', '')
     const mainResearchArea = request.input('mainResearchArea', '')
     const status = request.input('status', '')
+    const positionTitle = String(request.input('positionTitle', '') || '').trim()
+    const partyPosition = String(request.input('partyPosition', '') || '').trim()
+    const sortBy = String(request.input('sortBy', 'faculty') || 'faculty').trim()
+    const orderDir = String(request.input('order', 'asc') || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc'
 
-    const q = ScientificProfile.query()
-      .preload('user', (u) => u.select('id', 'email', 'full_name', 'unit'))
-      .orderBy('updated_at', 'desc')
+    const q = ScientificProfile.query().preload('user', (u) =>
+      u.select('id', 'email', 'full_name', 'unit')
+    )
 
     if (keyword) {
       q.where((b) => {
-        b.whereILike('full_name', `%${keyword}%`)
-          .orWhereILike('work_email', `%${keyword}%`)
-          .orWhereILike('organization', `%${keyword}%`)
+        b.whereILike('scientific_profiles.full_name', `%${keyword}%`)
+          .orWhereILike('scientific_profiles.work_email', `%${keyword}%`)
+          .orWhereILike('scientific_profiles.organization', `%${keyword}%`)
       })
     }
-    if (faculty) q.whereILike('faculty', `%${faculty}%`)
-    if (degree) q.where('degree', degree)
-    if (academicTitle) q.where('academic_title', academicTitle)
-    if (mainResearchArea) q.whereILike('main_research_area', `%${mainResearchArea}%`)
-    if (status) q.where('status', status)
+    if (faculty) q.whereILike('scientific_profiles.faculty', `%${faculty}%`)
+    if (degree) q.where('scientific_profiles.degree', degree)
+    if (academicTitle) q.where('scientific_profiles.academic_title', academicTitle)
+    if (mainResearchArea) q.whereILike('scientific_profiles.main_research_area', `%${mainResearchArea}%`)
+    if (status) q.where('scientific_profiles.status', status)
+
+    const applyIdFilter = (
+      sub: ReturnType<typeof ScientificProfile.query>,
+      column: string,
+      idRaw: string
+    ) => {
+      const pid = Number(idRaw)
+      if (!Number.isFinite(pid) || pid <= 0) return
+      const id = String(pid)
+      sub.where((b: any) => {
+        b.where(column, id)
+          .orWhere(column, 'like', `${id},%`)
+          .orWhere(column, 'like', `%,${id}`)
+          .orWhere(column, 'like', `%,${id},%`)
+      })
+    }
+
+    if (positionTitle || partyPosition) {
+      q.whereExists((sub) => {
+        sub
+          .from('staffs')
+          .whereColumn('staffs.user_id', 'scientific_profiles.user_id')
+          .whereNotNull('staffs.user_id')
+        if (positionTitle) applyIdFilter(sub, 'staffs.position_title', positionTitle)
+        if (partyPosition) applyIdFilter(sub, 'staffs.party_position', partyPosition)
+      })
+    }
+
+    // Sắp xếp — chức vụ theo tên chức vụ đầu tiên trong chuỗi ID
+    if (sortBy === 'positionTitle') {
+      q.select('scientific_profiles.*')
+      q.leftJoin('staffs', 'staffs.user_id', 'scientific_profiles.user_id')
+      q.joinRaw(
+        `LEFT JOIN staff_positions ON staff_positions.id = NULLIF(split_part(COALESCE(staffs.position_title, ''), ',', 1), '')::bigint`
+      )
+      q.orderByRaw(`staff_positions.name ${orderDir === 'asc' ? 'ASC' : 'DESC'} NULLS LAST`)
+      q.orderBy('scientific_profiles.id', 'asc')
+    } else if (sortBy === 'fullName') {
+      q.orderBy('scientific_profiles.full_name', orderDir)
+    } else if (sortBy === 'faculty') {
+      q.orderByRaw(
+        `scientific_profiles.faculty ${orderDir === 'asc' ? 'ASC' : 'DESC'} NULLS LAST`
+      )
+      q.orderBy('scientific_profiles.id', 'asc')
+    } else if (sortBy === 'degree') {
+      q.orderByRaw(
+        `scientific_profiles.degree ${orderDir === 'asc' ? 'ASC' : 'DESC'} NULLS LAST`
+      )
+      q.orderBy('scientific_profiles.id', 'asc')
+    } else {
+      q.orderBy('scientific_profiles.updated_at', orderDir)
+    }
 
     const paginated = await q.paginate(page, perPage)
-    const data = paginated.all().map((p) => ({
-      id: p.id,
-      userId: p.userId,
-      fullName: p.fullName,
-      workEmail: p.workEmail,
-      organization: p.organization,
-      faculty: p.faculty,
-      degree: p.degree,
-      academicTitle: p.academicTitle,
-      mainResearchArea: p.mainResearchArea,
-      status: p.status,
-      completeness: p.completeness,
-      updatedAt: p.updatedAt.toISO(),
-    }))
+    const rows = paginated.all()
+
+    // Gắn chức vụ từ staffs (1 query / trang)
+    const userIds = [
+      ...new Set(
+        rows
+          .map((p) => Number(p.userId))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    ]
+    const staffByUserId = new Map<number, string | null>()
+    if (userIds.length) {
+      const staffs = await Staff.query()
+        .whereIn('user_id', userIds)
+        .select('user_id', 'position_title')
+      for (const s of staffs) {
+        const uid = Number(s.userId)
+        if (!Number.isFinite(uid)) continue
+        // Một user một staff — nếu trùng giữ bản ghi đầu
+        if (!staffByUserId.has(uid)) staffByUserId.set(uid, s.positionTitle)
+      }
+    }
+
+    const allPosIds = new Set<number>()
+    for (const raw of staffByUserId.values()) {
+      for (const id of parseStaffPositionIds(raw)) allPosIds.add(id)
+    }
+    const nameById = new Map<number, string>()
+    if (allPosIds.size) {
+      const catalog = await StaffPosition.query()
+        .whereIn('id', [...allPosIds])
+        .select('id', 'name')
+      for (const c of catalog) nameById.set(Number(c.id), c.name)
+    }
+
+    const data = rows.map((p) => {
+      const uid = Number(p.userId)
+      const posRaw = Number.isFinite(uid) ? staffByUserId.get(uid) ?? null : null
+      const ids = parseStaffPositionIds(posRaw)
+      const label = ids
+        .map((id) => nameById.get(id) || `#${id}`)
+        .filter(Boolean)
+        .join(', ')
+      return {
+        id: p.id,
+        userId: p.userId,
+        fullName: p.fullName,
+        workEmail: p.workEmail,
+        organization: p.organization,
+        faculty: p.faculty,
+        degree: p.degree,
+        academicTitle: p.academicTitle,
+        mainResearchArea: p.mainResearchArea,
+        status: p.status,
+        completeness: p.completeness,
+        updatedAt: p.updatedAt.toISO(),
+        positionTitle: posRaw,
+        positionTitleLabel: label || null,
+      }
+    })
+
     return response.ok({
       success: true,
       data,
-      meta: { total: paginated.total, currentPage: paginated.currentPage, perPage: paginated.perPage, lastPage: paginated.lastPage },
+      meta: {
+        total: paginated.total,
+        currentPage: paginated.currentPage,
+        perPage: paginated.perPage,
+        lastPage: paginated.lastPage,
+      },
     })
   }
 

@@ -387,6 +387,52 @@ export default class ProfileController {
     }
     if (payload.subResearchAreas !== undefined) updates.subResearchAreas = payload.subResearchAreas ?? []
     if (payload.keywords !== undefined) updates.keywords = payload.keywords ?? []
+
+    const educationInput = payload.educationRecords ?? payload.education_records
+    if (educationInput !== undefined) {
+      updates.educationRecords = Array.isArray(educationInput)
+        ? educationInput.map((row: Record<string, unknown>, idx: number) => ({
+            id: String(row.id || `edu-${idx + 1}`),
+            level: row.level ? String(row.level) : null,
+            major: row.major != null ? String(row.major).trim() : '',
+            institution: row.institution != null ? String(row.institution).trim() : '',
+            country: row.country != null ? String(row.country).trim() : '',
+            startYear:
+              row.startYear === null || row.startYear === undefined || row.startYear === ''
+                ? null
+                : Number(row.startYear),
+            endYear:
+              row.endYear === null || row.endYear === undefined || row.endYear === ''
+                ? null
+                : Number(row.endYear),
+            trainingForm: row.trainingForm != null ? String(row.trainingForm).trim() : '',
+            note: row.note != null ? String(row.note).trim() : '',
+          }))
+        : []
+    }
+
+    const trainingInput = payload.trainingCourses ?? payload.training_courses
+    if (trainingInput !== undefined) {
+      updates.trainingCourses = Array.isArray(trainingInput)
+        ? trainingInput.map((row: Record<string, unknown>, idx: number) => ({
+            id: String(row.id || `trn-${idx + 1}`),
+            name: row.name != null ? String(row.name).trim() : '',
+            organizer: row.organizer != null ? String(row.organizer).trim() : '',
+            location: row.location != null ? String(row.location).trim() : '',
+            startYear:
+              row.startYear === null || row.startYear === undefined || row.startYear === ''
+                ? null
+                : Number(row.startYear),
+            endYear:
+              row.endYear === null || row.endYear === undefined || row.endYear === ''
+                ? null
+                : Number(row.endYear),
+            certificate: row.certificate != null ? String(row.certificate).trim() : '',
+            note: row.note != null ? String(row.note).trim() : '',
+          }))
+        : []
+    }
+
     await db.transaction(async (trx) => {
       profile.useTransaction(trx)
       profile.merge(updates)
@@ -759,6 +805,10 @@ export default class ProfileController {
       degreeYear: p.degreeYear,
       degreeInstitution: p.degreeInstitution,
       degreeCountry: p.degreeCountry,
+      educationRecords: p.educationRecords ?? [],
+      education_records: p.educationRecords ?? [],
+      trainingCourses: p.trainingCourses ?? [],
+      training_courses: p.trainingCourses ?? [],
       mainResearchArea: p.mainResearchArea,
       researchFieldId: p.researchFieldId ?? null,
       specialization: p.specialization ?? null,

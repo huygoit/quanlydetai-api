@@ -23,7 +23,7 @@ function mapServiceError(response: HttpContext['response'], e: unknown) {
     NO_PERIOD: 'Thông báo chưa có kỳ tiếp nhận.',
     DEADLINE_NOT_LATER: 'Ngày gia hạn phải sau hạn hiện tại.',
     ALREADY_CLOSED: 'Kỳ đã đóng.',
-    INVALID_PROCESS_TYPES: 'Loại quy trình đề tài không hợp lệ hoặc đã ngừng hoạt động.',
+    INVALID_PROCESS_TYPES: 'Cấp ý tưởng/đề tài không hợp lệ hoặc đã ngừng hoạt động.',
     MISSING_LEVELS: 'Chọn ít nhất một loại / cấp đề tài từ danh mục.',
   }
   if (messages[code]) {

@@ -153,6 +153,10 @@ export default class ProjectProposal extends BaseModel {
   @column()
   declare projectProcessTypeId: number | null
 
+  /** Ý tưởng nguồn (khi tạo tự động sau phê duyệt đặt hàng) */
+  @column()
+  declare sourceIdeaId: number | null
+
   /** Hạn GV bổ sung hồ sơ (PKH yêu cầu) */
   @column.dateTime()
   declare supplementDueAt: DateTime | null

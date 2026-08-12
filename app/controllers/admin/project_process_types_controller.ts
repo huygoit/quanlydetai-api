@@ -6,7 +6,7 @@ import { updateProjectProcessTypeValidator } from '#validators/update_project_pr
 import { updateProjectProcessTypeStatusValidator } from '#validators/update_project_process_type_status_validator'
 
 /**
- * Admin CRUD — danh mục loại quy trình đề tài.
+ * Admin CRUD — danh mục cấp ý tưởng/đề tài.
  */
 export default class AdminProjectProcessTypesController {
   private serialize(row: ProjectProcessType) {
@@ -71,7 +71,7 @@ export default class AdminProjectProcessTypesController {
       if ((err as Error).message === 'PROJECT_PROCESS_TYPE_NOT_FOUND') {
         return response.notFound({
           success: false,
-          message: 'Không tìm thấy loại quy trình đề tài.',
+          message: 'Không tìm thấy cấp ý tưởng/đề tài.',
         })
       }
       throw err
@@ -90,14 +90,14 @@ export default class AdminProjectProcessTypesController {
       })
       return response.created({
         success: true,
-        message: 'Đã tạo loại quy trình đề tài',
+        message: 'Đã tạo cấp ý tưởng/đề tài',
         data: this.serialize(row),
       })
     } catch (err) {
       if ((err as Error).message === 'CODE_EXISTS') {
         return response.unprocessableEntity({
           success: false,
-          message: 'Mã loại quy trình đã tồn tại.',
+          message: 'Mã cấp đã tồn tại.',
         })
       }
       throw err
@@ -124,20 +124,20 @@ export default class AdminProjectProcessTypesController {
       })
       return response.ok({
         success: true,
-        message: 'Đã cập nhật loại quy trình đề tài',
+        message: 'Đã cập nhật cấp ý tưởng/đề tài',
         data: this.serialize(row),
       })
     } catch (err) {
       if ((err as Error).message === 'PROJECT_PROCESS_TYPE_NOT_FOUND') {
         return response.notFound({
           success: false,
-          message: 'Không tìm thấy loại quy trình đề tài.',
+          message: 'Không tìm thấy cấp ý tưởng/đề tài.',
         })
       }
       if ((err as Error).message === 'CODE_EXISTS') {
         return response.unprocessableEntity({
           success: false,
-          message: 'Mã loại quy trình đã tồn tại.',
+          message: 'Mã cấp đã tồn tại.',
         })
       }
       throw err
@@ -161,7 +161,7 @@ export default class AdminProjectProcessTypesController {
       if ((err as Error).message === 'PROJECT_PROCESS_TYPE_NOT_FOUND') {
         return response.notFound({
           success: false,
-          message: 'Không tìm thấy loại quy trình đề tài.',
+          message: 'Không tìm thấy cấp ý tưởng/đề tài.',
         })
       }
       throw err

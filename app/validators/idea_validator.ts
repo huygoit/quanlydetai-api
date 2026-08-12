@@ -1,5 +1,4 @@
 import vine from '@vinejs/vine'
-import Idea from '#models/idea'
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'] as const
 
@@ -7,8 +6,10 @@ export const createIdeaValidator = vine.compile(
   vine.object({
     title: vine.string().trim().minLength(1).maxLength(500),
     summary: vine.string().trim().minLength(1),
-    field: vine.string().trim().minLength(1).maxLength(100),
-    suitableLevels: vine.array(vine.enum(Idea.suitableLevelsList)).optional(),
+    // Tên lĩnh vực từ danh mục fields — kiểm tra DB ở controller
+    field: vine.string().trim().minLength(1).maxLength(255),
+    // Mã QT từ danh mục Cấp ý tưởng/đề tài — kiểm tra DB ở controller
+    suitableLevels: vine.array(vine.string().trim()).optional(),
   })
 )
 
@@ -16,8 +17,8 @@ export const updateIdeaValidator = vine.compile(
   vine.object({
     title: vine.string().trim().minLength(1).maxLength(500).optional(),
     summary: vine.string().trim().minLength(1).optional(),
-    field: vine.string().trim().minLength(1).maxLength(100).optional(),
-    suitableLevels: vine.array(vine.enum(Idea.suitableLevelsList)).optional(),
+    field: vine.string().trim().minLength(1).maxLength(255).optional(),
+    suitableLevels: vine.array(vine.string().trim()).optional(),
   })
 )
 

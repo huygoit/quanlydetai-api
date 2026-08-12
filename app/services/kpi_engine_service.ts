@@ -236,17 +236,13 @@ export default class KpiEngineService {
   }
 
   /**
-   * Tính trực tiếp giờ NCKH theo năm học (lọc KQNC theo ngày xuất bản), không phụ thuộc cache kpi_results.
+   * Tính trực tiếp giờ NCKH theo khoảng ngày xuất bản (null = không lọc ngày).
    * Trả về Map<profileId, totalHours>. Chỉ tính cho các profile trong `onlyProfileIds` nếu được truyền.
-   *
-   * Tối ưu: load gộp toàn bộ dữ liệu 1 lần (profiles, publications + authors, projects, rule cache)
-   * rồi tính trong bộ nhớ — tránh N+1 query theo từng hồ sơ (nguyên nhân báo cáo "quay mãi").
    */
-  static async hoursByProfileForAcademicYear(
-    academicYear: string,
+  static async hoursByProfileForPeriod(
+    period: KpiPeriodRange | null,
     onlyProfileIds?: number[]
   ): Promise<Map<number, number>> {
-    const period = khoangNamHoc(academicYear) ?? khoangNamTaiChinh()
     const targetIds = onlyProfileIds?.length
       ? new Set(onlyProfileIds.map((n) => Number(n)))
       : await this.collectKpiProfileIds()
@@ -278,7 +274,7 @@ export default class KpiEngineService {
     }
 
     for (const pub of publications) {
-      if (!publicationTrongKhoangKy(pub, period)) continue
+      if (period && !publicationTrongKhoangKy(pub, period)) continue
       const authors = pub.publicationAuthors.map((a) => ({
         profileId: a.profileId,
         fullName: a.fullName,
@@ -311,7 +307,7 @@ export default class KpiEngineService {
     // Tất cả đề tài đã duyệt (1 lần), lọc theo kỳ, gắn theo chủ nhiệm (owner_id = user_id)
     const projects = await ProjectProposal.query().where('status', 'APPROVED').orderBy('id', 'asc')
     for (const proj of projects) {
-      if (!projectTrongKhoangKy(proj, period)) continue
+      if (period && !projectTrongKhoangKy(proj, period)) continue
       const pid = proj.ownerId != null ? profileIdByUserId.get(Number(proj.ownerId)) : undefined
       if (pid == null) continue
       addOutput(pid, {
@@ -327,12 +323,13 @@ export default class KpiEngineService {
     }
 
     // Tính trong bộ nhớ: strategy dùng rule cache nên không còn query DB
+    const periodKey = period ? `${period.fromDate}_${period.toDate}` : 'all'
     for (const [pid, outputs] of outputsByProfile) {
       const profile = profileById.get(pid)
       if (!profile) continue
       const context: KpiContext = {
         profileId: pid,
-        academicYear: `${period.fromDate}_${period.toDate}`,
+        academicYear: periodKey,
         isFemale: isFemaleGender(profile.gender),
         profileFullName: profile.fullName ?? null,
         ruleCache: cache,
@@ -345,6 +342,18 @@ export default class KpiEngineService {
       result.set(pid, Math.round(total * 100) / 100)
     }
     return result
+  }
+
+  /**
+   * Tính trực tiếp giờ NCKH theo năm học (lọc KQNC theo ngày xuất bản), không phụ thuộc cache kpi_results.
+   * Trả về Map<profileId, totalHours>. Chỉ tính cho các profile trong `onlyProfileIds` nếu được truyền.
+   */
+  static async hoursByProfileForAcademicYear(
+    academicYear: string,
+    onlyProfileIds?: number[]
+  ): Promise<Map<number, number>> {
+    const period = khoangNamHoc(academicYear) ?? khoangNamTaiChinh()
+    return this.hoursByProfileForPeriod(period, onlyProfileIds)
   }
 
   /**

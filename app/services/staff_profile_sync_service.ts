@@ -3,6 +3,8 @@ import ScientificProfile from '#models/scientific_profile'
 import { resolveScientificProfileAcademicTitleKey } from '#constants/scientific_profile_catalog'
 import User from '#models/user'
 import { DateTime } from 'luxon'
+import StaffPosition from '#models/staff_position'
+import { parseStaffPositionIds } from '#utils/staff_position_ids'
 
 const DEFAULT_ORGANIZATION = 'Trường Đại học Sư phạm - Đại học Đà Nẵng'
 
@@ -73,7 +75,31 @@ function toDate(v: unknown): DateTime | null {
   return null
 }
 
-function buildPayload(staff: Staff, user: User | null): BaseSyncPayload {
+function resolveChucVuText(
+  raw: string | null | undefined,
+  idToName: Map<number, string>
+): string | null {
+  if (!raw?.trim()) return null
+  const trimmed = raw.trim()
+  if (/^\d+(,\d+)*$/.test(trimmed)) {
+    const names = parseStaffPositionIds(trimmed)
+      .map((id) => idToName.get(id))
+      .filter(Boolean) as string[]
+    if (names.length) return fitText(names.join(', '), 100)
+    return null
+  }
+  return fitText(trimmed, 100)
+}
+
+function buildPayload(
+  staff: Staff,
+  user: User | null,
+  positionIdToName: Map<number, string>
+): BaseSyncPayload {
+  const chucVuText =
+    resolveChucVuText(staff.positionTitle, positionIdToName) ||
+    fitText(staff.currentJob, 100)
+
   return {
     fullName: staff.fullName?.trim() || user?.fullName?.trim() || `Nhân sự ${staff.staffCode}`,
     dateOfBirth: toDate(staff.dateOfBirth),
@@ -82,8 +108,8 @@ function buildPayload(staff: Staff, user: User | null): BaseSyncPayload {
     phone: staff.phone?.trim() || null,
     organization: DEFAULT_ORGANIZATION,
     department: staff.departmentName?.trim() || null,
-    currentTitle: fitText(staff.positionTitle || staff.currentJob, 100),
-    managementRole: fitText(staff.concurrentPosition, 100),
+    currentTitle: chucVuText,
+    managementRole: null,
     academicTitle: resolveScientificProfileAcademicTitleKey(staff.academicTitle),
   }
 }
@@ -220,6 +246,10 @@ export default class StaffProfileSyncService {
     const profileByUserId = new Map<number, ScientificProfile>()
     for (const p of profiles) profileByUserId.set(Number(p.userId), p)
 
+    const catalog = await StaffPosition.query().where('status', 'ACTIVE')
+    const positionIdToName = new Map<number, string>()
+    for (const c of catalog) positionIdToName.set(c.id, c.name)
+
     for (const staff of staffs) {
       try {
         const uid = Number(staff.userId)
@@ -229,7 +259,7 @@ export default class StaffProfileSyncService {
           continue
         }
 
-        const payload = buildPayload(staff, user)
+        const payload = buildPayload(staff, user, positionIdToName)
         const existing = profileByUserId.get(uid)
 
         if (!existing) {

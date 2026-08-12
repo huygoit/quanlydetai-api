@@ -65,6 +65,50 @@ export const updateProfileValidator = vine.compile(
     subResearchAreas: vine.array(vine.string()).optional(),
     keywords: vine.array(vine.string()).optional(),
 
+    /** Quá trình đào tạo theo bậc (Đại học / Thạc sĩ / NCS / …) */
+    educationRecords: vine
+      .array(
+        vine.object({
+          id: vine.string().trim().maxLength(64).optional(),
+          level: vine
+            .enum([
+              'UNDERGRADUATE',
+              'BACHELOR',
+              'MASTER',
+              'PHD_CANDIDATE',
+              'DOCTORATE',
+              'OTHER',
+            ] as const)
+            .optional(),
+          major: vine.string().trim().maxLength(255).optional(),
+          institution: vine.string().trim().maxLength(255).optional(),
+          country: vine.string().trim().maxLength(100).optional(),
+          startYear: vine.number().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+          endYear: vine.number().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+          trainingForm: vine.string().trim().maxLength(100).optional(),
+          note: vine.string().trim().maxLength(500).optional(),
+        })
+      )
+      .optional(),
+    education_records: vine.array(vine.any()).optional(),
+
+    /** Khóa tập huấn / bồi dưỡng chuyên môn */
+    trainingCourses: vine
+      .array(
+        vine.object({
+          id: vine.string().trim().maxLength(64).optional(),
+          name: vine.string().trim().maxLength(255).optional(),
+          organizer: vine.string().trim().maxLength(255).optional(),
+          location: vine.string().trim().maxLength(255).optional(),
+          startYear: vine.number().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+          endYear: vine.number().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+          certificate: vine.string().trim().maxLength(255).optional(),
+          note: vine.string().trim().maxLength(500).optional(),
+        })
+      )
+      .optional(),
+    training_courses: vine.array(vine.any()).optional(),
+
     /**
      * Cho phép FE lưu nested languages trong PUT /profile/me.
      * Nếu gửi mảng này thì backend sẽ replace toàn bộ languages theo payload.

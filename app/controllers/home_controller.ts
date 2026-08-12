@@ -7,6 +7,7 @@ import CouncilSession from '#models/council_session'
 import Student from '#models/student'
 import ScientificProfile from '#models/scientific_profile'
 import ResearchOutputType from '#models/research_output_type'
+import Publication from '#models/publication'
 import PermissionService from '#services/permission_service'
 import DashboardOverviewService from '#services/dashboard_overview_service'
 import db from '@adonisjs/lucid/services/db'
@@ -201,8 +202,11 @@ export default class HomeController {
         },
       ]
     } else {
-      // NCV, CNDT, TRUONG_DON_VI, HOI_DONG
-      const [myProposalsRow, myIdeasRow, unreadRow] = await Promise.all([
+      // NCV, CNDT — chỉ số từ DB, không hardcode trend
+      const myProfile = await ScientificProfile.query().where('user_id', user.id).first()
+      const profileId = myProfile ? Number(myProfile.id) : null
+
+      const [myProposalsRow, myIdeasRow, unreadRow, pubsRow] = await Promise.all([
         ProjectProposal.query()
           .where('owner_id', user.id)
           .whereIn('status', ['SUBMITTED', 'CHO_PKH', 'APPROVED'])
@@ -214,34 +218,33 @@ export default class HomeController {
           .where('read', false)
           .count('*', 'total')
           .first(),
+        profileId
+          ? Publication.query().where('profile_id', profileId).count('*', 'total').first()
+          : Promise.resolve(null),
       ])
       const projectsInProgress = getCount(myProposalsRow)
       const ideasSubmitted = getCount(myIdeasRow)
       const unread = getCount(unreadRow)
+      const publicationsCount = getCount(pubsRow)
       data = [
         {
           key: 'projects_in_progress',
           title: 'Đề tài đang thực hiện',
           value: projectsInProgress,
-          trend: 'up',
-          trendPercent: 50,
           icon: 'ProjectOutlined',
           color: '#1890ff',
         },
         {
-          key: 'projects_pending_acceptance',
-          title: 'Chờ nghiệm thu',
-          value: 0,
-          trend: 'flat',
-          icon: 'ClockCircleOutlined',
+          key: 'publications_count',
+          title: 'Kết quả NCKH',
+          value: publicationsCount,
+          icon: 'CheckCircleOutlined',
           color: '#52c41a',
         },
         {
           key: 'ideas_submitted',
           title: 'Ý tưởng đã nộp',
           value: ideasSubmitted,
-          trend: 'up',
-          trendPercent: 25,
           icon: 'BulbOutlined',
           color: '#faad14',
         },
@@ -249,8 +252,6 @@ export default class HomeController {
           key: 'notifications_unread',
           title: 'Thông báo chưa đọc',
           value: unread,
-          trend: 'down',
-          trendPercent: -20,
           icon: 'BellOutlined',
           color: '#ff4d4f',
         },
@@ -375,63 +376,41 @@ export default class HomeController {
         },
       ]
     } else {
-      // NCV, CNDT
+      // NCV, CNDT — task từ DB thật, không fallback mock
       const myProposals = await ProjectProposal.query()
         .where('owner_id', user.id)
         .whereIn('status', ['SUBMITTED', 'CHO_PKH', 'APPROVED'])
         .orderBy('updated_at', 'desc')
-        .limit(3)
+        .limit(5)
       const myIdeas = await Idea.query()
         .where('owner_id', user.id)
         .where('status', 'DRAFT')
-        .limit(2)
+        .limit(5)
       data = [
-        ...myProposals.slice(0, 1).map((p) => ({
+        ...myProposals.map((p) => ({
           id: `task-proposal-${p.id}`,
           type: 'NOP_BAO_CAO_TIEN_DO',
-          title: `Nộp báo cáo tiến độ: ${p.title}`,
-          description: `Hạn nộp theo kế hoạch.`,
+          title: `Theo dõi đề tài: ${p.title}`,
+          description: PROPOSAL_STATUS_LABELS[p.status] ?? p.status,
           relatedModule: 'PROJECT' as const,
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19) + 'Z',
           status: 'PENDING' as const,
-          priority: 'HIGH' as const,
-          link: `/projects/${p.id}/progress`,
+          priority: (p.status === 'SUBMITTED' || p.status === 'CHO_PKH' ? 'HIGH' : 'MEDIUM') as
+            | 'HIGH'
+            | 'MEDIUM'
+            | 'LOW',
+          link: `/projects/${p.id}`,
         })),
-        ...myIdeas.slice(0, 1).map((i) => ({
+        ...myIdeas.map((i) => ({
           id: `task-idea-${i.id}`,
           type: 'NOP_Y_TUONG',
           title: `Hoàn thiện ý tưởng: ${i.title}`,
+          description: IDEA_STATUS_LABELS[i.status] ?? i.status,
           relatedModule: 'IDEA' as const,
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19) + 'Z',
           status: 'PENDING' as const,
           priority: 'HIGH' as const,
-          link: '/ideas/new',
+          link: `/ideas/${i.id}`,
         })),
-      ].filter(Boolean) as TaskItem[]
-      if (data.length === 0) {
-        data = [
-          {
-            id: 'task1',
-            type: 'NOP_Y_TUONG',
-            title: 'Nộp ý tưởng mới',
-            relatedModule: 'IDEA',
-            dueDate: '2025-12-05T00:00:00Z',
-            status: 'PENDING',
-            priority: 'HIGH',
-            link: '/ideas/new',
-          },
-          {
-            id: 'task2',
-            type: 'NOP_DE_XUAT',
-            title: 'Nộp đề xuất đề tài',
-            relatedModule: 'PROJECT',
-            dueDate: '2025-12-20T00:00:00Z',
-            status: 'PENDING',
-            priority: 'MEDIUM',
-            link: '/projects/register',
-          },
-        ]
-      }
+      ]
     }
 
     return response.ok({ success: true, data })
@@ -498,7 +477,8 @@ export default class HomeController {
         role: 'CHU_NHIEM' as const,
         startDate,
         endDate,
-        progress: p.status === 'APPROVED' ? 45 : undefined,
+        // Không bịa % tiến độ — chưa có trường thật trên đề xuất
+        progress: undefined,
       }
     })
 

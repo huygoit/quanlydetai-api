@@ -45,6 +45,8 @@ import AdminFieldsController from '#controllers/admin/fields_controller'
 import FieldsController from '#controllers/fields_controller'
 import AdminSpecializationsController from '#controllers/admin/specializations_controller'
 import SpecializationsController from '#controllers/specializations_controller'
+import AdminStaffPositionsController from '#controllers/admin/staff_positions_controller'
+import StaffPositionsController from '#controllers/staff_positions_controller'
 import AdminProjectProcessTypesController from '#controllers/admin/project_process_types_controller'
 import ProjectProcessTypesController from '#controllers/project_process_types_controller'
 import ScientificProfileCatalogController from '#controllers/scientific_profile_catalog_controller'
@@ -219,6 +221,38 @@ router
     router.get('/:id', [SpecializationsController, 'show'])
   })
   .prefix('/api/specializations')
+  .middleware([middleware.auth()])
+
+// --- Admin: danh mục chức vụ nhân sự
+router
+  .group(() => {
+    router
+      .get('/', [AdminStaffPositionsController, 'index'])
+      .use(middleware.permission('staff_position.view'))
+    router
+      .get('/:id', [AdminStaffPositionsController, 'show'])
+      .use(middleware.permission('staff_position.view'))
+    router
+      .post('/', [AdminStaffPositionsController, 'store'])
+      .use(middleware.permission('staff_position.create'))
+    router
+      .put('/:id', [AdminStaffPositionsController, 'update'])
+      .use(middleware.permission('staff_position.update'))
+    router
+      .patch('/:id/status', [AdminStaffPositionsController, 'changeStatus'])
+      .use(middleware.permission('staff_position.update'))
+  })
+  .prefix('/api/admin/staff-positions')
+  .use([middleware.auth()])
+
+// --- Catalog chức vụ (đọc, chỉ cần đăng nhập)
+router
+  .group(() => {
+    router.get('/options', [StaffPositionsController, 'options'])
+    router.get('/', [StaffPositionsController, 'index'])
+    router.get('/:id', [StaffPositionsController, 'show'])
+  })
+  .prefix('/api/staff-positions')
   .middleware([middleware.auth()])
 
 // --- Admin: loại quy trình đề tài CRUD
@@ -789,6 +823,8 @@ router
     router.get('/teachers/:profileId', [KpisController, 'teachersShow'])
     router.get('/publications/:id/breakdown', [KpisController, 'publicationsBreakdown'])
     router.get('/nckh-hours-report', [KpisController, 'nckhHoursReport'])
+    router.get('/nckh-data-report/column-config', [KpisController, 'nckhDataReportColumnConfig'])
+    router.put('/nckh-data-report/column-config', [KpisController, 'updateNckhDataReportColumnConfig'])
     router.get('/nckh-data-report', [KpisController, 'nckhDataReport'])
     router.post('/recalculate', [KpisController, 'recalculate'])
   })

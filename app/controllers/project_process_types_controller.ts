@@ -4,7 +4,7 @@ import ProjectProcessTypeService from '#services/project_process_type_service'
 import { projectProcessTypeCatalogQueryValidator } from '#validators/project_process_type_catalog_validator'
 
 /**
- * Catalog loại quy trình đề tài — đọc, chỉ cần đăng nhập.
+ * Catalog cấp ý tưởng/đề tài — đọc, chỉ cần đăng nhập.
  */
 export default class ProjectProcessTypesController {
   private serializeItem(row: ProjectProcessType) {
@@ -78,7 +78,7 @@ export default class ProjectProcessTypesController {
       if ((err as Error).message === 'PROJECT_PROCESS_TYPE_NOT_FOUND') {
         return response.notFound({
           success: false,
-          message: 'Không tìm thấy loại quy trình đề tài.',
+          message: 'Không tìm thấy cấp ý tưởng/đề tài.',
         })
       }
       throw err

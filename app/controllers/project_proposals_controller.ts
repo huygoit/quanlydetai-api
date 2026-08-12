@@ -30,6 +30,7 @@ import ProposalAdjustmentService from '#services/proposal_adjustment_service'
 import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
 import { resolveUserUnitLabel, sameDepartmentId } from '#utils/user_unit'
+import { isActiveFieldName } from '#utils/catalog_assert'
 
 /**
  * Ánh xạ mã QT → cấp dùng kiểm tra kỳ CFP.
@@ -355,6 +356,10 @@ export default class ProjectProposalsController {
     const user = auth.use('api').user!
     const payload = await request.validateUsing(createProjectProposalValidator)
 
+    if (!(await isActiveFieldName(payload.field))) {
+      return response.badRequest({ success: false, message: 'Lĩnh vực không thuộc danh mục.' })
+    }
+
     let processTypeId = payload.projectProcessTypeId
     let level: ProjectProposalLevel
     try {
@@ -364,7 +369,7 @@ export default class ProjectProposalsController {
     } catch {
       return response.unprocessableEntity({
         success: false,
-        message: 'Loại quy trình đề tài không hợp lệ hoặc đã ngừng hoạt động.',
+        message: 'Cấp ý tưởng/đề tài không hợp lệ hoặc đã ngừng hoạt động.',
       })
     }
 
@@ -434,6 +439,10 @@ export default class ProjectProposalsController {
 
     const payload = await request.validateUsing(updateProjectProposalValidator)
 
+    if (payload.field !== undefined && !(await isActiveFieldName(payload.field))) {
+      return response.badRequest({ success: false, message: 'Lĩnh vực không thuộc danh mục.' })
+    }
+
     // Đổi loại quy trình / cấp → kiểm tra lại kỳ OPEN
     if (payload.projectProcessTypeId != null) {
       try {
@@ -443,7 +452,7 @@ export default class ProjectProposalsController {
       } catch {
         return response.unprocessableEntity({
           success: false,
-          message: 'Loại quy trình đề tài không hợp lệ hoặc đã ngừng hoạt động.',
+          message: 'Cấp ý tưởng/đề tài không hợp lệ hoặc đã ngừng hoạt động.',
         })
       }
       const active = await CallForProposalService.findActivePeriodForLevel(

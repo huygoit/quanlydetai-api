@@ -14,12 +14,16 @@ import {
   councilResultValidator,
 } from '#validators/idea_validator'
 import type { IdeaStatus } from '#models/idea'
+import { resolveUserUnitLabel } from '#utils/user_unit'
+import { areActiveProcessTypeCodes, isActiveFieldName } from '#utils/catalog_assert'
+import IdeaToProposalService from '#services/idea_to_proposal_service'
+import ProjectProposal from '#models/project_proposal'
 
 /**
  * API Ngân hàng ý tưởng: CRUD, workflow (submit, receive, approve, reject), create-project, council-result.
  */
 export default class IdeasController {
-  private serializeIdea(idea: Idea) {
+  private serializeIdea(idea: Idea, linkedProposalId?: number | null) {
     return {
       id: idea.id,
       code: idea.code,
@@ -38,6 +42,7 @@ export default class IdeasController {
       rejectedByRole: idea.rejectedByRole,
       rejectedAt: idea.rejectedAt ? idea.rejectedAt.toISO() : null,
       linkedProjectId: idea.linkedProjectId,
+      linkedProposalId: linkedProposalId ?? null,
       councilSessionId: idea.councilSessionId,
       councilAvgWeightedScore: idea.councilAvgWeightedScore != null ? Number(idea.councilAvgWeightedScore) : null,
       councilAvgNoveltyScore: idea.councilAvgNoveltyScore != null ? Number(idea.councilAvgNoveltyScore) : null,
@@ -57,7 +62,7 @@ export default class IdeasController {
     return Number(idea.ownerId) === Number(userId)
   }
 
-  private serializeListItem(idea: Idea) {
+  private serializeListItem(idea: Idea, linkedProposalId?: number | null) {
     return {
       id: idea.id,
       code: idea.code,
@@ -70,9 +75,24 @@ export default class IdeasController {
       ownerUnit: idea.ownerUnit,
       status: idea.status,
       priority: idea.priority,
+      linkedProjectId: idea.linkedProjectId,
+      linkedProposalId: linkedProposalId ?? null,
       createdAt: idea.createdAt.toISO(),
       updatedAt: idea.updatedAt.toISO(),
     }
+  }
+
+  /** Map ideaId → proposalId từ source_idea_id */
+  private async mapLinkedProposalIds(ideaIds: number[]): Promise<Map<number, number>> {
+    const map = new Map<number, number>()
+    if (ideaIds.length === 0) return map
+    const rows = await ProjectProposal.query()
+      .whereIn('source_idea_id', ideaIds)
+      .select('id', 'source_idea_id')
+    for (const row of rows) {
+      if (row.sourceIdeaId != null) map.set(Number(row.sourceIdeaId), Number(row.id))
+    }
+    return map
   }
 
   /**
@@ -103,7 +123,9 @@ export default class IdeasController {
     if (levels.length > 0) q.whereRaw('suitable_levels ?| ?::text[]', [levels])
 
     const paginated = await q.paginate(page, perPage)
-    const data = paginated.all().map((i) => this.serializeListItem(i))
+    const rows = paginated.all()
+    const linkMap = await this.mapLinkedProposalIds(rows.map((i) => i.id))
+    const data = rows.map((i) => this.serializeListItem(i, linkMap.get(i.id) ?? null))
     return response.ok({
       success: true,
       data,
@@ -116,7 +138,7 @@ export default class IdeasController {
     const perPage = Math.min(request.input('perPage', 10), 100)
     const keyword = request.input('keyword', '')
     const field = request.input('field', '')
-    const unit = request.input('unit', '')
+    const unit = request.input('unit', '') || request.input('ownerUnit', '')
     const status = request.input('status', '')
     const suitableLevels = request.input('suitableLevels') ?? request.input('suitableLevels[]')
     const priority = request.input('priority', '')
@@ -139,7 +161,9 @@ export default class IdeasController {
     if (levels.length > 0) q.whereRaw('suitable_levels ?| ?::text[]', [levels])
 
     const paginated = await q.paginate(page, perPage)
-    const data = paginated.all().map((i) => this.serializeListItem(i))
+    const rows = paginated.all()
+    const linkMap = await this.mapLinkedProposalIds(rows.map((i) => i.id))
+    const data = rows.map((i) => this.serializeListItem(i, linkMap.get(i.id) ?? null))
     return response.ok({
       success: true,
       data,
@@ -150,22 +174,39 @@ export default class IdeasController {
   async show({ params, response }: HttpContext) {
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
-    return response.ok({ success: true, data: this.serializeIdea(idea) })
+    const linkMap = await this.mapLinkedProposalIds([idea.id])
+    return response.ok({
+      success: true,
+      data: this.serializeIdea(idea, linkMap.get(idea.id) ?? null),
+    })
   }
 
   async store({ auth, request, response }: HttpContext) {
     const user = auth.use('api').user!
     const payload = await request.validateUsing(createIdeaValidator)
+
+    if (!(await isActiveFieldName(payload.field))) {
+      return response.badRequest({ success: false, message: 'Lĩnh vực không thuộc danh mục.' })
+    }
+    const levels = payload.suitableLevels ?? []
+    if (levels.length > 0 && !(await areActiveProcessTypeCodes(levels))) {
+      return response.badRequest({
+        success: false,
+        message: 'Cấp ý tưởng/đề tài không thuộc danh mục.',
+      })
+    }
+
     const code = await Idea.generateCode()
+    const ownerUnit = await resolveUserUnitLabel(user)
     const idea = await Idea.create({
       code,
       title: payload.title,
       summary: payload.summary,
       field: payload.field,
-      suitableLevels: payload.suitableLevels ?? [],
+      suitableLevels: levels,
       ownerId: user.id,
       ownerName: user.fullName,
-      ownerUnit: user.unit ?? '',
+      ownerUnit,
       status: 'DRAFT',
     })
     return response.created({ success: true, data: this.serializeIdea(idea) })
@@ -178,6 +219,19 @@ export default class IdeasController {
     if (!this.isOwner(idea, user.id)) return response.forbidden({ success: false, message: 'Chỉ chủ sở hữu mới được sửa.' })
     if (idea.status !== 'DRAFT') return response.badRequest({ success: false, message: 'Chỉ được sửa khi trạng thái DRAFT.' })
     const payload = await request.validateUsing(updateIdeaValidator)
+    if (payload.field !== undefined && !(await isActiveFieldName(payload.field))) {
+      return response.badRequest({ success: false, message: 'Lĩnh vực không thuộc danh mục.' })
+    }
+    if (
+      payload.suitableLevels !== undefined &&
+      payload.suitableLevels.length > 0 &&
+      !(await areActiveProcessTypeCodes(payload.suitableLevels))
+    ) {
+      return response.badRequest({
+        success: false,
+        message: 'Cấp ý tưởng/đề tài không thuộc danh mục.',
+      })
+    }
     if (payload.title !== undefined) idea.title = payload.title
     if (payload.summary !== undefined) idea.summary = payload.summary
     if (payload.field !== undefined) idea.field = payload.field
@@ -261,13 +315,48 @@ export default class IdeasController {
     if (!canApprove) return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được phê duyệt đặt hàng.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
-    if (idea.status !== 'PROPOSED_FOR_ORDER') return response.badRequest({ success: false, message: 'Chỉ phê duyệt đặt hàng khi trạng thái PROPOSED_FOR_ORDER.' })
+    if (idea.status !== 'PROPOSED_FOR_ORDER') {
+      return response.badRequest({
+        success: false,
+        message: 'Chỉ phê duyệt đặt hàng khi trạng thái PROPOSED_FOR_ORDER.',
+      })
+    }
     const payload = await request.validateUsing(approveOrderValidator)
     idea.status = 'APPROVED_FOR_ORDER'
     if (payload.noteForReview !== undefined) idea.noteForReview = payload.noteForReview ?? null
     await idea.save()
+
+    // Tự động tạo đề xuất đề tài (DRAFT) và copy thông tin từ ý tưởng
+    let proposalPayload: { id: number; code: string; created: boolean } | null = null
+    try {
+      const result = await IdeaToProposalService.createDraftFromIdea(idea, user.id)
+      proposalPayload = {
+        id: result.proposal.id,
+        code: result.proposal.code,
+        created: result.created,
+      }
+    } catch (err) {
+      if ((err as Error).message === 'NO_ACTIVE_PROCESS_TYPE') {
+        return response.unprocessableEntity({
+          success: false,
+          message:
+            'Đã phê duyệt đặt hàng nhưng chưa tạo được đề xuất: thiếu danh mục Cấp ý tưởng/đề tài (QT).',
+          data: this.serializeIdea(idea),
+        })
+      }
+      throw err
+    }
+
     await NotificationService.notifyIdeaStatusChanged(idea.ownerId, idea.code, 'APPROVED_FOR_ORDER', idea.id)
-    return response.ok({ success: true, message: 'Đã phê duyệt đặt hàng.', data: this.serializeIdea(idea) })
+    await idea.refresh()
+    return response.ok({
+      success: true,
+      message: proposalPayload?.created
+        ? `Đã phê duyệt đặt hàng và tạo đề xuất ${proposalPayload.code}.`
+        : 'Đã phê duyệt đặt hàng.',
+      data: this.serializeIdea(idea, proposalPayload?.id ?? null),
+      proposal: proposalPayload,
+    })
   }
 
   async reject({ auth, params, request, response }: HttpContext) {
@@ -299,16 +388,45 @@ export default class IdeasController {
   async createProject({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
     const canCreate = await IdeaPermissionService.canCreateProjectFromIdea(user)
-    if (!canCreate) return response.forbidden({ success: false, message: 'Chỉ Phòng KH hoặc Admin được tạo đề tài từ ý tưởng.' })
+    if (!canCreate) {
+      return response.forbidden({
+        success: false,
+        message: 'Chỉ Phòng KH hoặc Admin được tạo đề tài từ ý tưởng.',
+      })
+    }
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
-    if (idea.status !== 'APPROVED_FOR_ORDER') return response.badRequest({ success: false, message: 'Chỉ tạo đề tài khi trạng thái APPROVED_FOR_ORDER.' })
-    const year = new Date().getFullYear()
-    const random = Math.floor(100 + Math.random() * 900)
-    const linkedProjectId = `DT-${year}-${String(random).padStart(3, '0')}`
-    idea.linkedProjectId = linkedProjectId
-    await idea.save()
-    return response.ok({ success: true, data: { ideaId: idea.id, linkedProjectId } })
+    if (idea.status !== 'APPROVED_FOR_ORDER') {
+      return response.badRequest({
+        success: false,
+        message: 'Chỉ tạo đề tài khi trạng thái APPROVED_FOR_ORDER.',
+      })
+    }
+
+    try {
+      const result = await IdeaToProposalService.createDraftFromIdea(idea, user.id)
+      await idea.refresh()
+      return response.ok({
+        success: true,
+        message: result.created
+          ? `Đã tạo đề xuất ${result.proposal.code} từ ý tưởng.`
+          : `Đề xuất ${result.proposal.code} đã tồn tại.`,
+        data: {
+          ideaId: idea.id,
+          linkedProjectId: result.proposal.code,
+          linkedProposalId: result.proposal.id,
+          created: result.created,
+        },
+      })
+    } catch (err) {
+      if ((err as Error).message === 'NO_ACTIVE_PROCESS_TYPE') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Thiếu danh mục Cấp ý tưởng/đề tài (QT) đang hoạt động.',
+        })
+      }
+      throw err
+    }
   }
 
   async councilResult({ params, request, response }: HttpContext) {

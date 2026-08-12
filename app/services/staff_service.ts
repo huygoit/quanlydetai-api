@@ -3,6 +3,10 @@ import Department from '#models/department'
 import User from '#models/user'
 import type { ModelPaginatorContract } from '@adonisjs/lucid/types/model'
 import { DateTime } from 'luxon'
+import {
+  normalizeStaffPositionIdsField,
+  parseStaffPositionIds,
+} from '#utils/staff_position_ids'
 
 /** Tham số lọc danh sách nhân sự (staffs) */
 export interface StaffListFilters {
@@ -18,6 +22,10 @@ export interface StaffListFilters {
   departmentCode?: string
   /** Lọc theo loại cán bộ (nv_loaicanbo — chứa) */
   staffType?: string
+  /** Lọc chức vụ — ID nằm trong chuỗi position_title */
+  positionTitle?: string
+  /** Lọc chức vụ Đảng — ID nằm trong chuỗi party_position */
+  partyPosition?: string
   /** true = đã liên kết user; false = chưa liên kết; bỏ qua = tất cả */
   hasUser?: boolean
   sortBy?: string
@@ -33,9 +41,19 @@ export default class StaffService {
     const perPage = Math.min(Math.max(1, Number(filters.perPage) || 20), 100)
     const order = filters.order === 'desc' ? 'desc' : 'asc'
 
-    const validSort = ['id', 'fullName', 'staffCode', 'departmentName', 'createdAt', 'staffType', 'email']
-    const sortBy = filters.sortBy || 'fullName'
-    const sortCol = validSort.includes(sortBy) ? sortBy : 'fullName'
+    const validSort = [
+      'id',
+      'fullName',
+      'staffCode',
+      'departmentName',
+      'createdAt',
+      'staffType',
+      'email',
+      'professionalTitle',
+      'positionTitle',
+    ]
+    const sortBy = filters.sortBy || 'departmentName'
+    const sortCol = validSort.includes(sortBy) ? sortBy : 'departmentName'
 
     const q = Staff.query()
 
@@ -87,15 +105,58 @@ export default class StaffService {
       q.whereILike('staffType', `%${st}%`)
     }
 
+    const positionIdRaw = filters.positionTitle?.trim()
+    if (positionIdRaw) {
+      const pid = Number(positionIdRaw)
+      if (Number.isFinite(pid) && pid > 0) {
+        const id = String(pid)
+        q.where((b) => {
+          b.where('positionTitle', id)
+            .orWhere('positionTitle', 'like', `${id},%`)
+            .orWhere('positionTitle', 'like', `%,${id}`)
+            .orWhere('positionTitle', 'like', `%,${id},%`)
+        })
+      }
+    }
+
+    const partyIdRaw = filters.partyPosition?.trim()
+    if (partyIdRaw) {
+      const pid = Number(partyIdRaw)
+      if (Number.isFinite(pid) && pid > 0) {
+        const id = String(pid)
+        q.where((b) => {
+          b.where('partyPosition', id)
+            .orWhere('partyPosition', 'like', `${id},%`)
+            .orWhere('partyPosition', 'like', `%,${id}`)
+            .orWhere('partyPosition', 'like', `%,${id},%`)
+        })
+      }
+    }
+
     if (filters.hasUser === true) {
       q.whereNotNull('userId')
     } else if (filters.hasUser === false) {
       q.whereNull('userId')
     }
 
-    q.orderBy(sortCol, order)
-    if (sortCol !== 'id') {
-      q.orderBy('id', 'asc')
+    // Chức vụ: sort theo tên chức vụ đầu trong chuỗi ID (join danh mục)
+    if (sortCol === 'positionTitle') {
+      q.select('staffs.*')
+      q.joinRaw(
+        `LEFT JOIN staff_positions ON staff_positions.id = NULLIF(split_part(COALESCE(staffs.position_title, ''), ',', 1), '')::bigint`
+      )
+      q.orderByRaw(`staff_positions.name ${order === 'asc' ? 'ASC' : 'DESC'} NULLS LAST`)
+      q.orderBy('staffs.id', 'asc')
+    } else if (sortCol === 'professionalTitle') {
+      q.orderByRaw(
+        `staffs.professional_title ${order === 'asc' ? 'ASC' : 'DESC'} NULLS LAST`
+      )
+      q.orderBy('staffs.id', 'asc')
+    } else {
+      q.orderBy(sortCol, order)
+      if (sortCol !== 'id') {
+        q.orderBy('id', 'asc')
+      }
     }
 
     return q.paginate(page, perPage)
@@ -160,7 +221,16 @@ export default class StaffService {
         staff.departmentId = null
       }
     }
-    if (payload.positionTitle !== undefined) staff.positionTitle = (payload.positionTitle as string) || null
+    if (payload.positionTitle !== undefined) {
+      staff.positionTitle = normalizeStaffPositionIdsField(
+        payload.positionTitle as string | number[] | null
+      )
+    }
+    if (payload.partyPosition !== undefined) {
+      staff.partyPosition = normalizeStaffPositionIdsField(
+        payload.partyPosition as string | number[] | null
+      )
+    }
     if (payload.staffType !== undefined) staff.staffType = (payload.staffType as string) || null
     if (payload.currentJob !== undefined) staff.currentJob = (payload.currentJob as string) || null
     if (payload.professionalDegree !== undefined) {
