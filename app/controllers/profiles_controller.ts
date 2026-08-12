@@ -17,7 +17,7 @@ const profileSerializer = new ProfileController()
  */
 export default class ProfilesController {
   /**
-   * GET /api/profiles - keyword, faculty, degree, mainResearchArea, status, page, perPage
+   * GET /api/profiles - keyword, faculty, degree, academicTitle, mainResearchArea, status, page, perPage
    */
   async index({ request, response }: HttpContext) {
     const page = request.input('page', 1)
@@ -25,6 +25,8 @@ export default class ProfilesController {
     const keyword = request.input('keyword', '')
     const faculty = request.input('faculty', '')
     const degree = request.input('degree', '')
+    // Lọc theo học hàm (NONE / ASSOCIATE_PROFESSOR / PROFESSOR)
+    const academicTitle = request.input('academicTitle', '')
     const mainResearchArea = request.input('mainResearchArea', '')
     const status = request.input('status', '')
 
@@ -41,6 +43,7 @@ export default class ProfilesController {
     }
     if (faculty) q.whereILike('faculty', `%${faculty}%`)
     if (degree) q.where('degree', degree)
+    if (academicTitle) q.where('academic_title', academicTitle)
     if (mainResearchArea) q.whereILike('main_research_area', `%${mainResearchArea}%`)
     if (status) q.where('status', status)
 
@@ -53,6 +56,7 @@ export default class ProfilesController {
       organization: p.organization,
       faculty: p.faculty,
       degree: p.degree,
+      academicTitle: p.academicTitle,
       mainResearchArea: p.mainResearchArea,
       status: p.status,
       completeness: p.completeness,
