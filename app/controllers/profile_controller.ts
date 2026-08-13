@@ -342,6 +342,8 @@ export default class ProfileController {
       if (!raw) {
         updates.academicTitle = null
         updates.academicTitleYear = null
+        updates.academicTitleMajor = null
+        updates.academicTitleCountry = null
       } else {
         const titleKey = resolveScientificProfileAcademicTitleKey(raw)
         if (!titleKey) {
@@ -354,6 +356,8 @@ export default class ProfileController {
         updates.academicTitle = titleKey
         if (titleKey === 'NONE') {
           updates.academicTitleYear = null
+          updates.academicTitleMajor = null
+          updates.academicTitleCountry = null
         }
       }
     }
@@ -363,10 +367,26 @@ export default class ProfileController {
       updates.academicTitleYear =
         academicTitleYearInput === null ? null : Number(academicTitleYearInput)
     }
+    if (payload.academicTitleMajor !== undefined)
+      updates.academicTitleMajor = payload.academicTitleMajor ?? null
+    if (payload.academicTitleCountry !== undefined)
+      updates.academicTitleCountry = payload.academicTitleCountry ?? null
 
     if (payload.degreeYear !== undefined) updates.degreeYear = payload.degreeYear ?? null
     if (payload.degreeInstitution !== undefined) updates.degreeInstitution = payload.degreeInstitution ?? null
     if (payload.degreeCountry !== undefined) updates.degreeCountry = payload.degreeCountry ?? null
+    if (payload.degreeMajor !== undefined) updates.degreeMajor = payload.degreeMajor ?? null
+    if (payload.undergraduateInstitution !== undefined)
+      updates.undergraduateInstitution = payload.undergraduateInstitution ?? null
+    if (payload.undergraduateYear !== undefined)
+      updates.undergraduateYear =
+        payload.undergraduateYear === null || payload.undergraduateYear === ''
+          ? null
+          : Number(payload.undergraduateYear)
+    if (payload.undergraduateMajor !== undefined)
+      updates.undergraduateMajor = payload.undergraduateMajor ?? null
+    if (payload.undergraduateCountry !== undefined)
+      updates.undergraduateCountry = payload.undergraduateCountry ?? null
     if (payload.mainResearchArea !== undefined) updates.mainResearchArea = payload.mainResearchArea ?? null
     if (payload.researchFieldId !== undefined) {
       updates.researchFieldId = payload.researchFieldId ?? null
@@ -430,6 +450,41 @@ export default class ProfileController {
             certificate: row.certificate != null ? String(row.certificate).trim() : '',
             note: row.note != null ? String(row.note).trim() : '',
           }))
+        : []
+    }
+
+    const teachingWorkInput = payload.teachingWorkRecords ?? payload.teaching_work_records
+    if (teachingWorkInput !== undefined) {
+      updates.teachingWorkRecords = Array.isArray(teachingWorkInput)
+        ? teachingWorkInput.map((row: Record<string, unknown>, idx: number) => {
+            const isCurrent = Boolean(row.isCurrent)
+            return {
+              id: String(row.id || `tw-${idx + 1}`),
+              fromMonth:
+                row.fromMonth === null || row.fromMonth === undefined || row.fromMonth === ''
+                  ? null
+                  : Number(row.fromMonth),
+              fromYear:
+                row.fromYear === null || row.fromYear === undefined || row.fromYear === ''
+                  ? null
+                  : Number(row.fromYear),
+              toMonth: isCurrent
+                ? null
+                : row.toMonth === null || row.toMonth === undefined || row.toMonth === ''
+                  ? null
+                  : Number(row.toMonth),
+              toYear: isCurrent
+                ? null
+                : row.toYear === null || row.toYear === undefined || row.toYear === ''
+                  ? null
+                  : Number(row.toYear),
+              isCurrent,
+              role: row.role != null ? String(row.role).trim() : '',
+              organization: row.organization != null ? String(row.organization).trim() : '',
+              country: row.country != null ? String(row.country).trim() : '',
+              note: row.note != null ? String(row.note).trim() : '',
+            }
+          })
         : []
     }
 
@@ -802,13 +857,22 @@ export default class ProfileController {
       academicTitleLabel: getScientificProfileAcademicTitleLabel(p.academicTitle),
       academicTitleYear: p.academicTitleYear ?? null,
       academic_title_year: p.academicTitleYear ?? null,
+      academicTitleMajor: p.academicTitleMajor ?? null,
+      academicTitleCountry: p.academicTitleCountry ?? null,
       degreeYear: p.degreeYear,
       degreeInstitution: p.degreeInstitution,
       degreeCountry: p.degreeCountry,
+      degreeMajor: p.degreeMajor ?? null,
+      undergraduateInstitution: p.undergraduateInstitution ?? null,
+      undergraduateYear: p.undergraduateYear ?? null,
+      undergraduateMajor: p.undergraduateMajor ?? null,
+      undergraduateCountry: p.undergraduateCountry ?? null,
       educationRecords: p.educationRecords ?? [],
       education_records: p.educationRecords ?? [],
       trainingCourses: p.trainingCourses ?? [],
       training_courses: p.trainingCourses ?? [],
+      teachingWorkRecords: p.teachingWorkRecords ?? [],
+      teaching_work_records: p.teachingWorkRecords ?? [],
       mainResearchArea: p.mainResearchArea,
       researchFieldId: p.researchFieldId ?? null,
       specialization: p.specialization ?? null,

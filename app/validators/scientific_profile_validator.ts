@@ -55,9 +55,16 @@ export const updateProfileValidator = vine.compile(
     academicTitle: vine.enum(SCIENTIFIC_PROFILE_ACADEMIC_TITLE_KEYS).optional(),
     academicTitleYear: vine.number().min(1900).max(new Date().getFullYear() + 1).optional(),
     academic_title_year: vine.number().min(1900).max(new Date().getFullYear() + 1).optional(),
+    academicTitleMajor: vine.string().trim().maxLength(255).nullable().optional(),
+    academicTitleCountry: vine.string().trim().maxLength(100).nullable().optional(),
     degreeYear: vine.number().optional(),
     degreeInstitution: vine.string().trim().maxLength(255).optional(),
     degreeCountry: vine.string().trim().maxLength(100).optional(),
+    degreeMajor: vine.string().trim().maxLength(255).nullable().optional(),
+    undergraduateInstitution: vine.string().trim().maxLength(255).nullable().optional(),
+    undergraduateYear: vine.number().min(1900).max(new Date().getFullYear() + 1).nullable().optional(),
+    undergraduateMajor: vine.string().trim().maxLength(255).nullable().optional(),
+    undergraduateCountry: vine.string().trim().maxLength(100).nullable().optional(),
     mainResearchArea: vine.string().trim().maxLength(255).optional(),
     researchFieldId: vine.number().withoutDecimals().positive().nullable().optional(),
     specialization: vine.string().trim().maxLength(255).nullable().optional(),
@@ -108,6 +115,25 @@ export const updateProfileValidator = vine.compile(
       )
       .optional(),
     training_courses: vine.array(vine.any()).optional(),
+
+    /** Quá trình giảng dạy và công tác */
+    teachingWorkRecords: vine
+      .array(
+        vine.object({
+          id: vine.string().trim().maxLength(64).optional(),
+          fromMonth: vine.number().min(1).max(12).optional().nullable(),
+          fromYear: vine.number().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+          toMonth: vine.number().min(1).max(12).optional().nullable(),
+          toYear: vine.number().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+          isCurrent: vine.boolean().optional(),
+          role: vine.string().trim().maxLength(255).optional(),
+          organization: vine.string().trim().maxLength(255).optional(),
+          country: vine.string().trim().maxLength(100).optional(),
+          note: vine.string().trim().maxLength(500).optional(),
+        })
+      )
+      .optional(),
+    teaching_work_records: vine.array(vine.any()).optional(),
 
     /**
      * Cho phép FE lưu nested languages trong PUT /profile/me.

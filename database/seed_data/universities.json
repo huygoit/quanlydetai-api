@@ -1,0 +1,2274 @@
+[
+  {
+    "code": "VNU",
+    "name": "Đại học Quốc gia Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 1
+  },
+  {
+    "code": "QHL",
+    "name": "Khoa Luật (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 2
+  },
+  {
+    "code": "QHQ",
+    "name": "Khoa Quốc tế (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 3
+  },
+  {
+    "code": "QHY",
+    "name": "Trường Đại học Y Dược (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 4
+  },
+  {
+    "code": "QHI",
+    "name": "Trường Đại học Công nghệ (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 5
+  },
+  {
+    "code": "QHE",
+    "name": "Trường Đại học Kinh tế (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 6
+  },
+  {
+    "code": "QHS",
+    "name": "Trường Đại học Giáo dục (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 7
+  },
+  {
+    "code": "QHT",
+    "name": "Trường Đại học Khoa học Tự nhiên (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 8
+  },
+  {
+    "code": "QHX",
+    "name": "Trường Đại học Khoa học Xã hội và Nhân văn (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 9
+  },
+  {
+    "code": "QHD",
+    "name": "Trường Quản trị và Kinh doanh (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 10
+  },
+  {
+    "code": "QHF",
+    "name": "Trường Đại học Ngoại ngữ (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 11
+  },
+  {
+    "code": "VJU",
+    "name": "Trường Đại học Việt Nhật (ĐHQG Hà Nội)",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 12
+  },
+  {
+    "code": "NVH",
+    "name": "Học viện Âm nhạc Quốc gia Việt Nam",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 13
+  },
+  {
+    "code": "HBT",
+    "name": "Học viện Báo chí Tuyên truyền",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 14
+  },
+  {
+    "code": "HCP",
+    "name": "Học viện Chính sách và Phát triển",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 15
+  },
+  {
+    "code": "BVH",
+    "name": "Học viện Công nghệ Bưu chính Viễn thông",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 16
+  },
+  {
+    "code": "HCH",
+    "name": "Học viện Hành chính Quốc gia",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 17
+  },
+  {
+    "code": "KMA",
+    "name": "Học viện Kỹ thuật Mật mã",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 18
+  },
+  {
+    "code": "NHH",
+    "name": "Học viện Ngân hàng",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 19
+  },
+  {
+    "code": "HQT",
+    "name": "Học viện Ngoại giao",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 20
+  },
+  {
+    "code": "HVN",
+    "name": "Học viện Nông nghiệp Việt Nam",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 21
+  },
+  {
+    "code": "HPN",
+    "name": "Học viện Phụ nữ Việt Nam",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 22
+  },
+  {
+    "code": "HVQ",
+    "name": "Học viện Quản lý Giáo dục",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 23
+  },
+  {
+    "code": "HTC",
+    "name": "Học viện Tài chính",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 24
+  },
+  {
+    "code": "HTN",
+    "name": "Học viện Thanh Thiếu niên Việt Nam",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 25
+  },
+  {
+    "code": "HTA",
+    "name": "Học viện Tòa án",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 26
+  },
+  {
+    "code": "HYD",
+    "name": "Học viện Y Dược học cổ truyền Việt Nam",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 27
+  },
+  {
+    "code": "BKA",
+    "name": "Đại học Bách khoa Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 28
+  },
+  {
+    "code": "LDA",
+    "name": "Trường Đại học Công đoàn",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 29
+  },
+  {
+    "code": "GTA",
+    "name": "Trường Đại học Công nghệ Giao thông vận tải",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 30
+  },
+  {
+    "code": "CCM",
+    "name": "Trường Đại học Công nghiệp Dệt may Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 31
+  },
+  {
+    "code": "DCN",
+    "name": "Trường Đại học Công nghiệp Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 32
+  },
+  {
+    "code": "VHD",
+    "name": "Trường Đại học Công nghiệp Việt Hung",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 33
+  },
+  {
+    "code": "DDN",
+    "name": "Trường Đại học Đại Nam",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 34
+  },
+  {
+    "code": "DDL",
+    "name": "Trường Đại học Điện lực",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 35
+  },
+  {
+    "code": "DKH",
+    "name": "Trường Đại học Dược Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 36
+  },
+  {
+    "code": "FPT",
+    "name": "Trường Đại học FPT",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 37
+  },
+  {
+    "code": "GHA",
+    "name": "Trường Đại học Giao thông vận tải",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 38
+  },
+  {
+    "code": "NHF",
+    "name": "Trường Đại học Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 39
+  },
+  {
+    "code": "ETU",
+    "name": "Trường Đại học Hòa Bình",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 40
+  },
+  {
+    "code": "KCN",
+    "name": "Trường Đại học Khoa học và Công nghệ Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 41
+  },
+  {
+    "code": "DKS",
+    "name": "Trường Đại học Kiểm sát Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 42
+  },
+  {
+    "code": "KTA",
+    "name": "Trường Đại học Kiến trúc Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 43
+  },
+  {
+    "code": "DKK",
+    "name": "Trường Đại học Kinh tế Kỹ thuật Công nghiệp",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 44
+  },
+  {
+    "code": "KHA",
+    "name": "Đại học Kinh tế Quốc dân",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 45
+  },
+  {
+    "code": "LNH",
+    "name": "Trường Đại học Lâm nghiệp",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 46
+  },
+  {
+    "code": "DLX",
+    "name": "Trường Đại học Lao động Xã hội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 47
+  },
+  {
+    "code": "LPH",
+    "name": "Trường Đại học Luật Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 48
+  },
+  {
+    "code": "MDA",
+    "name": "Trường Đại học Mỏ Địa chất Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 49
+  },
+  {
+    "code": "MTC",
+    "name": "Trường Đại học Mỹ thuật Công nghiệp",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 50
+  },
+  {
+    "code": "MTH",
+    "name": "Trường Đại học Mỹ thuật Việt Nam",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 51
+  },
+  {
+    "code": "NTH",
+    "name": "Trường Đại học Ngoại thương",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 52
+  },
+  {
+    "code": "NTU",
+    "name": "Trường Đại học Nguyễn Trãi",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 53
+  },
+  {
+    "code": "SKD",
+    "name": "Trường Đại học Sân khấu Điện ảnh",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 54
+  },
+  {
+    "code": "SPH",
+    "name": "Trường Đại học Sư phạm Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 55
+  },
+  {
+    "code": "GNT",
+    "name": "Trường Đại học Sư phạm Nghệ thuật Trung ương Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 56
+  },
+  {
+    "code": "TDH",
+    "name": "Trường Đại học Sư phạm Thể dục thể thao Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 57
+  },
+  {
+    "code": "FBU",
+    "name": "Trường Đại học Tài chính Ngân hàng Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 58
+  },
+  {
+    "code": "DMT",
+    "name": "Trường Đại học Tài nguyên và Môi trường Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 59
+  },
+  {
+    "code": "DTL",
+    "name": "Trường Đại học Thăng Long",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 60
+  },
+  {
+    "code": "TDD",
+    "name": "Trường Đại học Thành Đô",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 61
+  },
+  {
+    "code": "HNM",
+    "name": "Trường Đại học Thủ đô Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 62
+  },
+  {
+    "code": "TMU",
+    "name": "Trường Đại học Thương mại",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 63
+  },
+  {
+    "code": "TLA",
+    "name": "Trường Đại học Thủy lợi",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 64
+  },
+  {
+    "code": "VHH",
+    "name": "Trường Đại học Văn hóa Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 65
+  },
+  {
+    "code": "XDA",
+    "name": "Trường Đại học Xây dựng Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 66
+  },
+  {
+    "code": "YHB",
+    "name": "Trường Đại học Y Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 67
+  },
+  {
+    "code": "YTC",
+    "name": "Trường Đại học Y tế Công cộng",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 68
+  },
+  {
+    "code": "DCQ",
+    "name": "Trường Đại học Công nghệ và Quản lý Hữu nghị",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 69
+  },
+  {
+    "code": "DDU",
+    "name": "Trường Đại học Đông Đô",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 70
+  },
+  {
+    "code": "DQK",
+    "name": "Trường Đại học Kinh doanh và Công nghệ Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 71
+  },
+  {
+    "code": "DPD",
+    "name": "Trường Đại học Phương Đông",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 72
+  },
+  {
+    "code": "MHN",
+    "name": "Trường Đại học Mở Hà Nội",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 73
+  },
+  {
+    "code": "PKA",
+    "name": "Đại học Phenikaa",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 74
+  },
+  {
+    "code": "CMC",
+    "name": "Trường Đại học CMC",
+    "region": "HA_NOI",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 75
+  },
+  {
+    "code": "VNU-HCM",
+    "name": "Đại học Quốc gia TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 76
+  },
+  {
+    "code": "QSY",
+    "name": "Trường Đại học Sức khỏe - ĐHQG TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 77
+  },
+  {
+    "code": "QSB",
+    "name": "Trường Đại học Bách khoa - ĐHQG TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 78
+  },
+  {
+    "code": "QSC",
+    "name": "Trường Đại học Công nghệ Thông tin - ĐHQG TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 79
+  },
+  {
+    "code": "QST",
+    "name": "Trường Đại học Khoa học Tự nhiên - ĐHQG TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 80
+  },
+  {
+    "code": "QSX",
+    "name": "Trường Đại học Khoa học Xã hội và Nhân văn - ĐHQG TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 81
+  },
+  {
+    "code": "QSQ",
+    "name": "Trường Đại học Quốc tế - ĐHQG TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 82
+  },
+  {
+    "code": "QSK",
+    "name": "Trường Đại học Kinh tế - Luật (ĐHQG TP.HCM)",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 83
+  },
+  {
+    "code": "HVC",
+    "name": "Học viện Cán bộ TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 84
+  },
+  {
+    "code": "BVS",
+    "name": "Học viện Công nghệ Bưu chính Viễn thông - Cơ sở TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 85
+  },
+  {
+    "code": "HHK",
+    "name": "Học viện Hàng không Việt Nam",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 86
+  },
+  {
+    "code": "NVS",
+    "name": "Nhạc viện TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 87
+  },
+  {
+    "code": "DCT",
+    "name": "Trường Đại học Công thương TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 88
+  },
+  {
+    "code": "IUH",
+    "name": "Trường Đại học Công nghiệp TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 89
+  },
+  {
+    "code": "GSA",
+    "name": "Trường Đại học Giao thông vận tải - Cơ sở 2",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 90
+  },
+  {
+    "code": "GTS",
+    "name": "Trường Đại học Giao thông vận tải TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 91
+  },
+  {
+    "code": "HSU",
+    "name": "Trường Đại học Hoa Sen",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 92
+  },
+  {
+    "code": "KTS",
+    "name": "Trường Đại học Kiến trúc TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 93
+  },
+  {
+    "code": "UEF",
+    "name": "Trường Đại học Kinh tế - Tài chính TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 94
+  },
+  {
+    "code": "KSA",
+    "name": "Đại học Kinh tế TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 95
+  },
+  {
+    "code": "DLS",
+    "name": "Trường Đại học Lao động Xã hội - Cơ sở TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 96
+  },
+  {
+    "code": "LPS",
+    "name": "Trường Đại học Luật TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 97
+  },
+  {
+    "code": "MBS",
+    "name": "Trường Đại học Mở TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 98
+  },
+  {
+    "code": "MTS",
+    "name": "Trường Đại học Mỹ thuật TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 99
+  },
+  {
+    "code": "NHS",
+    "name": "Trường Đại học Ngân hàng TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 100
+  },
+  {
+    "code": "NTS",
+    "name": "Trường Đại học Ngoại thương - Cơ sở phía Nam",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 101
+  },
+  {
+    "code": "NTT",
+    "name": "Trường Đại học Nguyễn Tất Thành",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 102
+  },
+  {
+    "code": "NLS",
+    "name": "Trường Đại học Nông Lâm TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 103
+  },
+  {
+    "code": "HIU",
+    "name": "Trường Đại học Quốc tế Hồng Bàng",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 104
+  },
+  {
+    "code": "SGD",
+    "name": "Trường Đại học Sài Gòn",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 105
+  },
+  {
+    "code": "DSD",
+    "name": "Trường Đại học Sân khấu Điện ảnh TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 106
+  },
+  {
+    "code": "SPK",
+    "name": "Trường Đại học Sư phạm Kỹ thuật TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 107
+  },
+  {
+    "code": "SPS",
+    "name": "Trường Đại học Sư phạm TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 108
+  },
+  {
+    "code": "DMS",
+    "name": "Trường Đại học Tài chính - Marketing",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 109
+  },
+  {
+    "code": "DTM",
+    "name": "Trường Đại học Tài nguyên và Môi trường TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 110
+  },
+  {
+    "code": "TDS",
+    "name": "Trường Đại học Thể dục Thể thao TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 111
+  },
+  {
+    "code": "TLS",
+    "name": "Trường Đại học Thủy lợi - Cơ sở 2",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 112
+  },
+  {
+    "code": "DTT",
+    "name": "Trường Đại học Tôn Đức Thắng",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 113
+  },
+  {
+    "code": "VHS",
+    "name": "Trường Đại học Văn hóa TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 114
+  },
+  {
+    "code": "VGU",
+    "name": "Trường Đại học Việt - Đức",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 115
+  },
+  {
+    "code": "YDS",
+    "name": "Trường Đại học Y Dược TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 116
+  },
+  {
+    "code": "TYS",
+    "name": "Trường Đại học Y khoa Phạm Ngọc Thạch",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 117
+  },
+  {
+    "code": "DSG",
+    "name": "Trường Đại học Công nghệ Sài Gòn",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 118
+  },
+  {
+    "code": "GDU",
+    "name": "Trường Đại học Gia Định",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 119
+  },
+  {
+    "code": "DKC",
+    "name": "Trường Đại học Công nghệ TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 120
+  },
+  {
+    "code": "DHV",
+    "name": "Trường Đại học Hùng Vương TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 121
+  },
+  {
+    "code": "SIU",
+    "name": "Trường Đại học Quốc tế Sài Gòn",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 122
+  },
+  {
+    "code": "DVH",
+    "name": "Trường Đại học Văn Hiến",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 123
+  },
+  {
+    "code": "DVL",
+    "name": "Trường Đại học Văn Lang",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 124
+  },
+  {
+    "code": "STS",
+    "name": "Trường Đại học Sư phạm TDTT TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 125
+  },
+  {
+    "code": "DNT",
+    "name": "Trường Đại học Ngoại ngữ - Tin học TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 126
+  },
+  {
+    "code": "UMT",
+    "name": "Trường Đại học Quản lý và Công nghệ TP.HCM",
+    "region": "HCM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 127
+  },
+  {
+    "code": "TNU",
+    "name": "Đại học Thái Nguyên",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 128
+  },
+  {
+    "code": "DTF",
+    "name": "Trường Ngoại ngữ (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 129
+  },
+  {
+    "code": "DTQ",
+    "name": "Khoa Quốc tế (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 130
+  },
+  {
+    "code": "DTP",
+    "name": "Phân hiệu Đại học Thái Nguyên tại Lào Cai",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 131
+  },
+  {
+    "code": "DTC",
+    "name": "Trường Đại học Công nghệ TT và Truyền thông (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 132
+  },
+  {
+    "code": "DTZ",
+    "name": "Trường Đại học Khoa học (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 133
+  },
+  {
+    "code": "DTE",
+    "name": "Trường Đại học Kinh tế - Quản trị kinh doanh (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 134
+  },
+  {
+    "code": "DTK",
+    "name": "Trường Đại học Kỹ thuật Công nghiệp (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 135
+  },
+  {
+    "code": "DTN",
+    "name": "Trường Đại học Nông lâm (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 136
+  },
+  {
+    "code": "DTS",
+    "name": "Trường Đại học Sư phạm (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 137
+  },
+  {
+    "code": "DTY",
+    "name": "Trường Đại học Y Dược (ĐH Thái Nguyên)",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 138
+  },
+  {
+    "code": "DCA",
+    "name": "Trường Đại học Chu Văn An",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 139
+  },
+  {
+    "code": "DDA",
+    "name": "Trường Đại học Công nghệ Đông Á",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 140
+  },
+  {
+    "code": "DDM",
+    "name": "Trường Đại học Công nghiệp Quảng Ninh",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 141
+  },
+  {
+    "code": "VUI",
+    "name": "Trường Đại học Công nghiệp Việt Trì",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 142
+  },
+  {
+    "code": "DHP",
+    "name": "Trường Đại học Quản lý và Công nghệ Hải Phòng",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 143
+  },
+  {
+    "code": "DTV",
+    "name": "Trường Đại học Lương Thế Vinh",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 144
+  },
+  {
+    "code": "YDD",
+    "name": "Trường Đại học Điều dưỡng Nam Định",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 145
+  },
+  {
+    "code": "HLU",
+    "name": "Trường Đại học Hạ Long",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 146
+  },
+  {
+    "code": "DKT",
+    "name": "Trường Đại học Hải Dương",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 147
+  },
+  {
+    "code": "THP",
+    "name": "Trường Đại học Hải Phòng",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 148
+  },
+  {
+    "code": "HHA",
+    "name": "Trường Đại học Hàng hải",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 149
+  },
+  {
+    "code": "DNB",
+    "name": "Trường Đại học Hoa Lư",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 150
+  },
+  {
+    "code": "HDT",
+    "name": "Trường Đại học Hồng Đức",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 151
+  },
+  {
+    "code": "THV",
+    "name": "Trường Đại học Hùng Vương",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 152
+  },
+  {
+    "code": "UKB",
+    "name": "Trường Đại học Kinh Bắc",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 153
+  },
+  {
+    "code": "DKY",
+    "name": "Trường Đại học Kỹ thuật Y tế Hải Dương",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 154
+  },
+  {
+    "code": "DBG",
+    "name": "Trường Đại học Nông Lâm Bắc Giang",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 155
+  },
+  {
+    "code": "DBH",
+    "name": "Trường Đại học Quốc tế Bắc Hà",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 156
+  },
+  {
+    "code": "SDU",
+    "name": "Trường Đại học Sao Đỏ",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 157
+  },
+  {
+    "code": "SP2",
+    "name": "Trường Đại học Sư phạm Hà Nội 2",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 158
+  },
+  {
+    "code": "SKH",
+    "name": "Trường Đại học Sư phạm Kỹ thuật Hưng Yên",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 159
+  },
+  {
+    "code": "SKN",
+    "name": "Trường Đại học Sư phạm Kỹ thuật Nam Định",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 160
+  },
+  {
+    "code": "DFA",
+    "name": "Trường Đại học Tài chính - Quản trị kinh doanh",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 161
+  },
+  {
+    "code": "TQU",
+    "name": "Trường Đại học Tân Trào",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 162
+  },
+  {
+    "code": "TTB",
+    "name": "Trường Đại học Tây Bắc",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 163
+  },
+  {
+    "code": "DTB",
+    "name": "Trường Đại học Thái Bình",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 164
+  },
+  {
+    "code": "DDB",
+    "name": "Trường Đại học Thành Đông",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 165
+  },
+  {
+    "code": "TDB",
+    "name": "Trường Đại học Thể dục Thể thao Bắc Ninh",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 166
+  },
+  {
+    "code": "DVP",
+    "name": "Trường Đại học Trưng Vương",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 167
+  },
+  {
+    "code": "DVD",
+    "name": "Trường Đại học Văn hóa Thể thao và Du lịch Thanh Hóa",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 168
+  },
+  {
+    "code": "DVB",
+    "name": "Trường Đại học Việt Bắc",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 169
+  },
+  {
+    "code": "YPB",
+    "name": "Trường Đại học Y Dược Hải Phòng",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 170
+  },
+  {
+    "code": "YTB",
+    "name": "Trường Đại học Y Dược Thái Bình",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 171
+  },
+  {
+    "code": "THU",
+    "name": "Trường Đại học Y khoa Tokyo Việt Nam",
+    "region": "MIEN_BAC",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 172
+  },
+  {
+    "code": "TAG",
+    "name": "Đại học Cần Thơ",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 173
+  },
+  {
+    "code": "BVU",
+    "name": "Trường Đại học Bà Rịa - Vũng Tàu",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 174
+  },
+  {
+    "code": "DBL",
+    "name": "Trường Đại học Bạc Liêu",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 175
+  },
+  {
+    "code": "DBD",
+    "name": "Trường Đại học Bình Dương",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 176
+  },
+  {
+    "code": "TCT",
+    "name": "Trường Đại học An Giang (ĐHQG HCM)",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 177
+  },
+  {
+    "code": "DCD",
+    "name": "Trường Đại học Công nghệ Đồng Nai",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 178
+  },
+  {
+    "code": "MIT",
+    "name": "Trường Đại học Công nghệ Miền Đông",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 179
+  },
+  {
+    "code": "DCL",
+    "name": "Trường Đại học Cửu Long",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 180
+  },
+  {
+    "code": "DLH",
+    "name": "Trường Đại học Lạc Hồng",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 181
+  },
+  {
+    "code": "PVU",
+    "name": "Trường Đại học Dầu khí Việt Nam",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 182
+  },
+  {
+    "code": "DNU",
+    "name": "Trường Đại học Đồng Nai",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 183
+  },
+  {
+    "code": "SPD",
+    "name": "Trường Đại học Đồng Tháp",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 184
+  },
+  {
+    "code": "TKG",
+    "name": "Trường Đại học Kiên Giang",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 185
+  },
+  {
+    "code": "DLA",
+    "name": "Trường Đại học Kinh tế Công nghiệp Long An",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 186
+  },
+  {
+    "code": "DKB",
+    "name": "Trường Đại học Kinh tế Kỹ thuật Bình Dương",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 187
+  },
+  {
+    "code": "KCC",
+    "name": "Trường Đại học Kỹ thuật Công nghệ Cần Thơ",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 188
+  },
+  {
+    "code": "LNS",
+    "name": "Trường Đại học Lâm nghiệp - Cơ sở 2",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 189
+  },
+  {
+    "code": "DNC",
+    "name": "Trường Đại học Nam Cần Thơ",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 190
+  },
+  {
+    "code": "EIU",
+    "name": "Trường Đại học Quốc tế Miền Đông",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 191
+  },
+  {
+    "code": "VLU",
+    "name": "Trường Đại học Sư phạm Kỹ thuật Vĩnh Long",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 192
+  },
+  {
+    "code": "TTU",
+    "name": "Trường Đại học Tân Tạo",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 193
+  },
+  {
+    "code": "DTD",
+    "name": "Trường Đại học Tây Đô",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 194
+  },
+  {
+    "code": "TDM",
+    "name": "Trường Đại học Thủ Dầu Một",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 195
+  },
+  {
+    "code": "TTG",
+    "name": "Trường Đại học Tiền Giang",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 196
+  },
+  {
+    "code": "DVT",
+    "name": "Trường Đại học Trà Vinh",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 197
+  },
+  {
+    "code": "VTT",
+    "name": "Trường Đại học Võ Trường Toản",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 198
+  },
+  {
+    "code": "MTU",
+    "name": "Trường Đại học Xây dựng Miền Tây",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 199
+  },
+  {
+    "code": "YCT",
+    "name": "Trường Đại học Y Dược Cần Thơ",
+    "region": "MIEN_NAM",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 200
+  },
+  {
+    "code": "HueUni",
+    "name": "Đại học Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 201
+  },
+  {
+    "code": "DHD",
+    "name": "Trường Du lịch - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 202
+  },
+  {
+    "code": "DHC",
+    "name": "Khoa Giáo dục Thể chất - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 203
+  },
+  {
+    "code": "DHT",
+    "name": "Trường Đại học Khoa học - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 204
+  },
+  {
+    "code": "DHK",
+    "name": "Trường Đại học Kinh tế - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 205
+  },
+  {
+    "code": "DHL",
+    "name": "Trường Đại học Nông Lâm - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 206
+  },
+  {
+    "code": "DHN",
+    "name": "Trường Đại học Nghệ thuật - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 207
+  },
+  {
+    "code": "DHA",
+    "name": "Trường Đại học Luật - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 208
+  },
+  {
+    "code": "DHF",
+    "name": "Trường Đại học Ngoại ngữ - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 209
+  },
+  {
+    "code": "DHS",
+    "name": "Trường Đại học Sư phạm - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 210
+  },
+  {
+    "code": "DHY",
+    "name": "Trường Đại học Y Dược - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 211
+  },
+  {
+    "code": "DHE",
+    "name": "Khoa Kỹ thuật và Công nghệ - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 212
+  },
+  {
+    "code": "DHI",
+    "name": "Khoa Quốc tế - ĐH Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 213
+  },
+  {
+    "code": "DHQ",
+    "name": "Phân hiệu ĐH Huế tại Quảng Trị",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 214
+  },
+  {
+    "code": "UDN",
+    "name": "Đại học Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 215
+  },
+  {
+    "code": "DDG",
+    "name": "Khoa Giáo dục Thể chất - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 216
+  },
+  {
+    "code": "DDY",
+    "name": "Khoa Y Dược - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 217
+  },
+  {
+    "code": "DDP",
+    "name": "Phân hiệu Đại học Đà Nẵng tại Kon Tum",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 218
+  },
+  {
+    "code": "DDK",
+    "name": "Trường Đại học Bách khoa - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 219
+  },
+  {
+    "code": "DDQ",
+    "name": "Trường Đại học Kinh tế - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 220
+  },
+  {
+    "code": "DDF",
+    "name": "Trường Đại học Ngoại ngữ - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 221
+  },
+  {
+    "code": "DDS",
+    "name": "Trường Đại học Sư phạm - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 222
+  },
+  {
+    "code": "DSK",
+    "name": "Trường Đại học Sư phạm Kỹ thuật - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 223
+  },
+  {
+    "code": "DDV",
+    "name": "Viện Nghiên cứu và Đào tạo Việt - Anh - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 224
+  },
+  {
+    "code": "VKU",
+    "name": "Khoa Công nghệ Thông tin và Truyền thông - ĐH Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 225
+  },
+  {
+    "code": "KTD",
+    "name": "Trường Đại học Kiến trúc Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 226
+  },
+  {
+    "code": "BMU",
+    "name": "Trường Đại học Y Dược Buôn Ma Thuột",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 227
+  },
+  {
+    "code": "DVX",
+    "name": "Trường Đại học Công nghệ Vạn Xuân",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 228
+  },
+  {
+    "code": "DCV",
+    "name": "Trường Đại học Công nghiệp Vinh",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 229
+  },
+  {
+    "code": "TDL",
+    "name": "Trường Đại học Đà Lạt",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 230
+  },
+  {
+    "code": "DDT",
+    "name": "Đại học Duy Tân",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 231
+  },
+  {
+    "code": "DPX",
+    "name": "Trường Đại học Dân lập Phú Xuân",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 232
+  },
+  {
+    "code": "DYD",
+    "name": "Trường Đại học Yersin Đà Lạt",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 233
+  },
+  {
+    "code": "DAD",
+    "name": "Trường Đại học Đông Á",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 234
+  },
+  {
+    "code": "HHT",
+    "name": "Trường Đại học Hà Tĩnh",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 235
+  },
+  {
+    "code": "UKH",
+    "name": "Trường Đại học Khánh Hòa",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 236
+  },
+  {
+    "code": "CEA",
+    "name": "Trường Đại học Kinh tế Nghệ An",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 237
+  },
+  {
+    "code": "YDN",
+    "name": "Trường Đại học Kỹ thuật Y Dược Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 238
+  },
+  {
+    "code": "HVA",
+    "name": "Học viện Âm nhạc Huế",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 239
+  },
+  {
+    "code": "TSN",
+    "name": "Trường Đại học Nha Trang",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 240
+  },
+  {
+    "code": "DPQ",
+    "name": "Trường Đại học Phạm Văn Đồng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 241
+  },
+  {
+    "code": "DPC",
+    "name": "Trường Đại học Phan Châu Trinh",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 242
+  },
+  {
+    "code": "DPT",
+    "name": "Trường Đại học Phan Thiết",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 243
+  },
+  {
+    "code": "DPY",
+    "name": "Trường Đại học Phú Yên",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 244
+  },
+  {
+    "code": "DQB",
+    "name": "Trường Đại học Quảng Bình",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 245
+  },
+  {
+    "code": "DQU",
+    "name": "Trường Đại học Quảng Nam",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 246
+  },
+  {
+    "code": "DQT",
+    "name": "Trường Đại học Quang Trung",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 247
+  },
+  {
+    "code": "DQN",
+    "name": "Trường Đại học Quy Nhơn",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 248
+  },
+  {
+    "code": "SKV",
+    "name": "Trường Đại học Sư phạm Kỹ thuật Vinh",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 249
+  },
+  {
+    "code": "UFA",
+    "name": "Trường Đại học Tài chính Kế toán",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 250
+  },
+  {
+    "code": "TTN",
+    "name": "Trường Đại học Tây Nguyên",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 251
+  },
+  {
+    "code": "TBD",
+    "name": "Trường Đại học Thái Bình Dương",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": true,
+    "display_order": 252
+  },
+  {
+    "code": "TTD",
+    "name": "Trường Đại học Thể dục Thể thao Đà Nẵng",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 253
+  },
+  {
+    "code": "TDV",
+    "name": "Trường Đại học Vinh",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 254
+  },
+  {
+    "code": "XDT",
+    "name": "Trường Đại học Xây dựng Miền Trung",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 255
+  },
+  {
+    "code": "YKV",
+    "name": "Trường Đại học Y khoa Vinh",
+    "region": "MIEN_TRUNG",
+    "school_block": "CIVIL",
+    "is_private": false,
+    "display_order": 256
+  },
+  {
+    "code": "BPH",
+    "name": "Học viện Biên phòng",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 257
+  },
+  {
+    "code": "HQH",
+    "name": "Học viện Hải quân",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 258
+  },
+  {
+    "code": "HEH",
+    "name": "Học viện Hậu cần",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 259
+  },
+  {
+    "code": "NQH",
+    "name": "Học viện Khoa học Quân sự",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 260
+  },
+  {
+    "code": "KQH",
+    "name": "Học viện Kỹ thuật Quân sự",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 261
+  },
+  {
+    "code": "PKH",
+    "name": "Học viện Phòng không - Không quân",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 262
+  },
+  {
+    "code": "YQH",
+    "name": "Học viện Quân Y",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 263
+  },
+  {
+    "code": "LCH",
+    "name": "Trường Đại học Chính trị (Trường Sĩ quan Chính trị)",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 264
+  },
+  {
+    "code": "ZNH",
+    "name": "Trường Đại học Văn hóa - Nghệ thuật Quân đội",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 265
+  },
+  {
+    "code": "SNH",
+    "name": "Trường Sĩ quan Công binh",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 266
+  },
+  {
+    "code": "DCH",
+    "name": "Trường Sĩ quan Đặc công",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 267
+  },
+  {
+    "code": "KGH",
+    "name": "Trường Sĩ quan Không quân",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 268
+  },
+  {
+    "code": "VPH",
+    "name": "Trường Sĩ quan Kỹ thuật QS Vinhempich (ĐH Trần Đại Nghĩa)",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 269
+  },
+  {
+    "code": "LAH",
+    "name": "Trường Sĩ quan Lục quân 1 (ĐH Trần Quốc Tuấn)",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 270
+  },
+  {
+    "code": "LBH",
+    "name": "Trường Sĩ quan Lục quân 2 (ĐH Nguyễn Huệ)",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 271
+  },
+  {
+    "code": "PBH",
+    "name": "Trường Sĩ quan Pháo binh",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 272
+  },
+  {
+    "code": "HGH",
+    "name": "Trường Sĩ quan Phòng Hóa",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 273
+  },
+  {
+    "code": "TGH",
+    "name": "Trường Sĩ quan Tăng - Thiết giáp",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 274
+  },
+  {
+    "code": "TTH",
+    "name": "Trường Sĩ quan Thông tin",
+    "region": "QUAN_DOI",
+    "school_block": "MILITARY",
+    "is_private": false,
+    "display_order": 275
+  },
+  {
+    "code": "ANH",
+    "name": "Học viện An ninh Nhân dân",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 276
+  },
+  {
+    "code": "CSH",
+    "name": "Học viện Cảnh sát Nhân dân",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 277
+  },
+  {
+    "code": "HCA",
+    "name": "Học viện Chính trị Công an Nhân dân",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 278
+  },
+  {
+    "code": "ANS",
+    "name": "Trường Đại học An ninh Nhân dân",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 279
+  },
+  {
+    "code": "CSS",
+    "name": "Trường Đại học Cảnh sát Nhân dân",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 280
+  },
+  {
+    "code": "HCB",
+    "name": "Trường Đại học Kỹ thuật - Hậu cần Công an Nhân dân phía Bắc",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 281
+  },
+  {
+    "code": "HCN",
+    "name": "Trường Đại học Kỹ thuật - Hậu cần Công an Nhân dân phía Nam",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 282
+  },
+  {
+    "code": "PCH",
+    "name": "Trường Đại học Phòng cháy chữa cháy phía Bắc",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 283
+  },
+  {
+    "code": "PCS",
+    "name": "Trường Đại học Phòng cháy chữa cháy phía Nam",
+    "region": "CONG_AN",
+    "school_block": "POLICE",
+    "is_private": false,
+    "display_order": 284
+  }
+]

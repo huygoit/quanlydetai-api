@@ -5,6 +5,8 @@ import KpiResult from '#models/kpi_result'
 import KpiEngineService from '#services/kpi_engine_service'
 import PermissionService from '#services/permission_service'
 import NckhDataReportColumnConfigService from '#services/nckh_data_report_column_config_service'
+import NckhDataReportService from '#services/nckh_data_report_service'
+import * as XLSX from 'xlsx'
 import { resolveKpiPeriodRange, khoangNamHoc, publicationTrongKhoangKy, type KpiPeriodRange } from '#utils/kpi_period_helper'
 import { genderForPublicationAuthorRow } from '#utils/publication_author_api'
 import { dungChiaTheoPhanTramDongGop } from '#services/kpi_engine/publication_strategy'
@@ -608,145 +610,135 @@ export default class KpisController {
     const period = resolveReportPeriod(request)
     const periodLabel = nhanKhoangKy(period)
     const facultyParam = String(request.input('faculty', '')).trim()
-
-    const { selection, isDefaultAll, allTypes } =
-      await NckhDataReportColumnConfigService.getSelection()
-    const { columnTree, leafColumns } = NckhDataReportColumnConfigService.buildDisplayColumns(
-      allTypes,
-      selection
-    )
-    const leafIdSet = new Set(leafColumns.map((c) => c.id))
-
-    const facultyRows = await ScientificProfile.query()
-      .whereNotNull('faculty')
-      .distinct('faculty')
-      .select('faculty')
-    const faculties = facultyRows
-      .map((r) => (r.faculty || '').trim())
-      .filter((f) => f.length > 0)
-      .sort((a, b) => COLLATOR_VI.compare(a, b))
-
-    const faculty = facultyParam || faculties[0] || ''
-    const emptyTotals = () => {
-      const counts: Record<string, number> = {}
-      for (const leaf of leafColumns) counts[String(leaf.id)] = 0
-      return { hours: 0, counts }
-    }
-
-    if (!faculty) {
-      return response.ok({
-        success: true,
-        data: {
-          academic_year: periodLabel,
-          period_from: period?.fromDate ?? null,
-          period_to: period?.toDate ?? null,
-          period_label: periodLabel,
-          faculty: '',
-          generated_at: new Date().toISOString(),
-          faculties,
-          isDefaultAll,
-          selection,
-          columnTree,
-          leafColumns,
-          rows: [],
-          totals: emptyTotals(),
-        },
-      })
-    }
-
-    const profiles = await ScientificProfile.query()
-      .where('faculty', faculty)
-      .select('id', 'fullName')
-    const profileIds = profiles.map((p) => Number(p.id))
-
-    type RowState = {
-      fullName: string
-      hours: number
-      note: string
-      counts: Record<string, number>
-    }
-    const rowByProfile = new Map<number, RowState>()
-    for (const p of profiles) {
-      const counts: Record<string, number> = {}
-      for (const leaf of leafColumns) counts[String(leaf.id)] = 0
-      rowByProfile.set(Number(p.id), {
-        fullName: p.fullName || '',
-        hours: 0,
-        note: '',
-        counts,
-      })
-    }
-
-    if (profileIds.length > 0) {
-      const pubs = await Publication.query()
-        .whereIn('profile_id', profileIds)
-        .select('profileId', 'researchOutputTypeId', 'publishedAt', 'year')
-      for (const pub of pubs) {
-        const pid = pub.profileId != null ? Number(pub.profileId) : null
-        if (pid == null) continue
-        if (period && !publicationTrongKhoangKy(pub, period)) continue
-        const row = rowByProfile.get(pid)
-        if (!row) continue
-        const typeId =
-          pub.researchOutputTypeId != null ? Number(pub.researchOutputTypeId) : null
-        if (typeId == null || !leafIdSet.has(typeId)) continue
-        row.counts[String(typeId)] = (row.counts[String(typeId)] || 0) + 1
-      }
-
-      const hoursMap = await KpiEngineService.hoursByProfileForPeriod(period, profileIds)
-      for (const [pid, hours] of hoursMap) {
-        const row = rowByProfile.get(Number(pid))
-        if (row) row.hours = Math.round((Number(hours) || 0) * 100) / 100
-      }
-    }
-
-    const rows = Array.from(rowByProfile.values())
-      .map((r) => {
-        const { hoTenDem, ten } = tachHoTen(r.fullName)
-        return { ...r, hoTenDem, ten }
-      })
-      .sort((a, b) => {
-        const byTen = COLLATOR_VI.compare(a.ten, b.ten)
-        if (byTen !== 0) return byTen
-        return COLLATOR_VI.compare(a.hoTenDem, b.hoTenDem)
-      })
-      .map((r, i) => ({
-        stt: i + 1,
-        fullName: r.fullName,
-        hoTenDem: r.hoTenDem,
-        ten: r.ten,
-        hours: r.hours,
-        note: r.note,
-        counts: r.counts,
-      }))
-
-    const totals = emptyTotals()
-    for (const r of rows) {
-      totals.hours += r.hours
-      for (const leaf of leafColumns) {
-        const key = String(leaf.id)
-        totals.counts[key] = (totals.counts[key] || 0) + (r.counts[key] || 0)
-      }
-    }
-    totals.hours = Math.round(totals.hours * 100) / 100
-
-    return response.ok({
-      success: true,
-      data: {
-        academic_year: periodLabel,
-        period_from: period?.fromDate ?? null,
-        period_to: period?.toDate ?? null,
-        period_label: periodLabel,
-        faculty,
-        generated_at: new Date().toISOString(),
-        faculties,
-        isDefaultAll,
-        selection,
-        columnTree,
-        leafColumns,
-        rows,
-        totals,
-      },
-    })
+    const data = await NckhDataReportService.build({ period, periodLabel, facultyParam })
+    return response.ok({ success: true, data })
   }
+
+  /**
+   * GET /api/kpis/nckh-data-report/export-excel
+   * Xuất Excel đủ cột theo cấu hình L1/L2/L3 (cùng filter kỳ + khoa).
+   */
+  async exportNckhDataReportExcel({ request, response, auth }: HttpContext) {
+    const user = auth.use('api').user!
+    if (!(await userCoQuyenXemBaoCao(user.id))) {
+      return response.forbidden({ success: false, message: 'Bạn không có quyền xem báo cáo thống kê.' })
+    }
+
+    const period = resolveReportPeriod(request)
+    const periodLabel = nhanKhoangKy(period)
+    const facultyParam = String(request.input('faculty', '')).trim()
+    const data = await NckhDataReportService.build({ period, periodLabel, facultyParam })
+
+    if (!data.faculty) {
+      return response.badRequest({ success: false, message: 'Chưa có Khoa/đơn vị để xuất.' })
+    }
+    if (!data.leafColumns.length) {
+      return response.badRequest({
+        success: false,
+        message: 'Chưa chọn cột loại kết quả. Vào Cấu hình cột trước khi xuất Excel.',
+      })
+    }
+
+    const leafN = data.leafColumns.length
+    const title = `DỮ LIỆU NCKH CỦA ${data.faculty.toUpperCase()}`
+    const periodLine = data.period_label || ''
+
+    // Hàng tiêu đề + 3 hàng header (L1 / L2 / L3) + dữ liệu + tổng
+    const rowTitle: (string | number)[] = [title]
+    const rowPeriod: (string | number)[] = [periodLine]
+    const rowL1: (string | number)[] = ['Số TT', 'Họ và tên đệm', 'Tên']
+    const rowL2: (string | number)[] = ['', '', '']
+    const rowL3: (string | number)[] = ['', '', '']
+
+    for (const l1 of data.columnTree) {
+      const n1 = demSoLaCot(l1)
+      rowL1.push(l1.name)
+      for (let i = 1; i < n1; i++) rowL1.push('')
+      for (const l2 of l1.children || []) {
+        const n2 = demSoLaCot(l2)
+        rowL2.push(l2.name)
+        for (let i = 1; i < n2; i++) rowL2.push('')
+        for (const l3 of l2.children || []) {
+          rowL3.push(l3.name)
+        }
+      }
+    }
+    rowL1.push('Giờ Nghiên cứu khoa học', 'Ghi chú')
+    rowL2.push('', '')
+    rowL3.push('', '')
+
+    const sheetData: (string | number)[][] = [rowTitle, rowPeriod, rowL1, rowL2, rowL3]
+
+    for (const r of data.rows) {
+      const line: (string | number)[] = [r.stt, r.hoTenDem, r.ten]
+      for (const leaf of data.leafColumns) {
+        line.push(r.counts?.[String(leaf.id)] || 0)
+      }
+      line.push(r.hours || 0, r.note || '')
+      sheetData.push(line)
+    }
+
+    const totalLine: (string | number)[] = ['', 'Tổng cộng', '']
+    for (const leaf of data.leafColumns) {
+      totalLine.push(data.totals.counts?.[String(leaf.id)] || 0)
+    }
+    totalLine.push(data.totals.hours || 0, '')
+    sheetData.push(totalLine)
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet(sheetData)
+
+    // Merge tiêu đề / kỳ / header định danh + colspan L1/L2
+    const lastCol = 2 + leafN + 2 // 0-based: STT..Ghi chú
+    const merges: XLSX.Range[] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
+      { s: { r: 2, c: 0 }, e: { r: 4, c: 0 } }, // STT
+      { s: { r: 2, c: 1 }, e: { r: 4, c: 1 } }, // Họ
+      { s: { r: 2, c: 2 }, e: { r: 4, c: 2 } }, // Tên
+      { s: { r: 2, c: 3 + leafN }, e: { r: 4, c: 3 + leafN } }, // Giờ
+      { s: { r: 2, c: 4 + leafN }, e: { r: 4, c: 4 + leafN } }, // Ghi chú
+    ]
+
+    let col = 3
+    for (const l1 of data.columnTree) {
+      const n1 = demSoLaCot(l1)
+      if (n1 > 1) merges.push({ s: { r: 2, c: col }, e: { r: 2, c: col + n1 - 1 } })
+      let c2 = col
+      for (const l2 of l1.children || []) {
+        const n2 = demSoLaCot(l2)
+        if (n2 > 1) merges.push({ s: { r: 3, c: c2 }, e: { r: 3, c: c2 + n2 - 1 } })
+        c2 += n2
+      }
+      col += n1
+    }
+    ws['!merges'] = merges
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 22 },
+      { wch: 12 },
+      ...data.leafColumns.map(() => ({ wch: 14 })),
+      { wch: 12 },
+      { wch: 16 },
+    ]
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Du lieu NCKH')
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+
+    const safeFaculty = data.faculty.replace(/[^\p{L}\p{N}\-_ ]/gu, '').trim().slice(0, 40) || 'don-vi'
+    const filename = `thong-ke-ket-qua-nckh-${safeFaculty}.xlsx`
+
+    response.header(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response.header('Content-Disposition', `attachment; filename="${filename}"`)
+    return response.send(buf)
+  }
+}
+
+/** Đếm số lá L3 trong nhánh cột (dùng khi xuất Excel). */
+function demSoLaCot(node: { level: number; children?: Array<{ level: number; children?: any[] }> }): number {
+  if (node.level === 3) return 1
+  return (node.children || []).reduce((s, c) => s + demSoLaCot(c), 0)
 }

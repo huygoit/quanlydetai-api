@@ -175,6 +175,7 @@ export default class AdminPublicationsController {
       publicationType: payload.publicationType ?? 'JOURNAL',
       journalOrConference: payload.journalOrConference,
       publisher: payload.publisher ?? null,
+      fundingOrganization: payload.fundingOrganization ?? null,
       year: publicationDates.year,
       publishedAt: publicationDates.publishedAt,
       volume: payload.volume ?? null,
@@ -282,6 +283,8 @@ export default class AdminPublicationsController {
     if (payload.journalOrConference !== undefined)
       updates.journalOrConference = payload.journalOrConference
     if (payload.publisher !== undefined) updates.publisher = payload.publisher ?? null
+    if (payload.fundingOrganization !== undefined)
+      updates.fundingOrganization = payload.fundingOrganization ?? null
     if (dateUpdates.publishedAt !== undefined) updates.publishedAt = dateUpdates.publishedAt
     if (dateUpdates.year !== undefined) updates.year = dateUpdates.year
     if (payload.volume !== undefined) updates.volume = payload.volume ?? null

@@ -98,6 +98,14 @@ export default class ScientificProfile extends BaseModel {
   @column()
   declare academicTitleYear: number | null
 
+  /** Chuyên ngành gắn với học hàm (vd. công nhận GS ở Pháp). */
+  @column()
+  declare academicTitleMajor: string | null
+
+  /** Quốc gia công nhận học hàm. */
+  @column()
+  declare academicTitleCountry: string | null
+
   @column()
   declare degreeYear: number | null
 
@@ -106,6 +114,34 @@ export default class ScientificProfile extends BaseModel {
 
   @column()
   declare degreeCountry: string | null
+
+  /** Chuyên ngành gắn với học vị (Thạc sĩ / Tiến sĩ…). */
+  @column()
+  declare degreeMajor: string | null
+
+  /** Tốt nghiệp đại học — tên trường / cơ sở. */
+  @column()
+  declare undergraduateInstitution: string | null
+
+  @column()
+  declare undergraduateYear: number | null
+
+  @column()
+  declare undergraduateMajor: string | null
+
+  @column()
+  declare undergraduateCountry: string | null
+
+  /**
+   * Quá trình giảng dạy & công tác (nhiều dòng).
+   * JSON: [{ id, fromMonth, fromYear, toMonth, toYear, isCurrent, role, organization, country, note }]
+   */
+  @column({
+    prepare: (v: unknown[] | null) => (v == null ? '[]' : JSON.stringify(v)),
+    consume: (v: string | unknown) =>
+      typeof v === 'string' ? JSON.parse(v) : Array.isArray(v) ? v : [],
+  })
+  declare teachingWorkRecords: Record<string, unknown>[]
 
   /**
    * Quá trình đào tạo theo bậc (Đại học, Thạc sĩ, NCS…).

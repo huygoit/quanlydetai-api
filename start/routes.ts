@@ -45,6 +45,10 @@ import AdminFieldsController from '#controllers/admin/fields_controller'
 import FieldsController from '#controllers/fields_controller'
 import AdminSpecializationsController from '#controllers/admin/specializations_controller'
 import SpecializationsController from '#controllers/specializations_controller'
+import AdminCountriesController from '#controllers/admin/countries_controller'
+import CountriesController from '#controllers/countries_controller'
+import AdminUniversitiesController from '#controllers/admin/universities_controller'
+import UniversitiesController from '#controllers/universities_controller'
 import AdminStaffPositionsController from '#controllers/admin/staff_positions_controller'
 import StaffPositionsController from '#controllers/staff_positions_controller'
 import AdminProjectProcessTypesController from '#controllers/admin/project_process_types_controller'
@@ -221,6 +225,60 @@ router
     router.get('/:id', [SpecializationsController, 'show'])
   })
   .prefix('/api/specializations')
+  .middleware([middleware.auth()])
+
+// --- Admin: danh mục quốc gia
+router
+  .group(() => {
+    router
+      .get('/', [AdminCountriesController, 'index'])
+      .use(middleware.permission('country.view'))
+    router
+      .post('/', [AdminCountriesController, 'store'])
+      .use(middleware.permission('country.create'))
+    router
+      .put('/:id', [AdminCountriesController, 'update'])
+      .use(middleware.permission('country.update'))
+    router
+      .patch('/:id/status', [AdminCountriesController, 'changeStatus'])
+      .use(middleware.permission('country.update'))
+  })
+  .prefix('/api/admin/countries')
+  .use([middleware.auth()])
+
+// --- Catalog quốc gia (đọc)
+router
+  .group(() => {
+    router.get('/options', [CountriesController, 'options'])
+  })
+  .prefix('/api/countries')
+  .middleware([middleware.auth()])
+
+// --- Admin: danh mục trường đại học
+router
+  .group(() => {
+    router
+      .get('/', [AdminUniversitiesController, 'index'])
+      .use(middleware.permission('university.view'))
+    router
+      .post('/', [AdminUniversitiesController, 'store'])
+      .use(middleware.permission('university.create'))
+    router
+      .put('/:id', [AdminUniversitiesController, 'update'])
+      .use(middleware.permission('university.update'))
+    router
+      .patch('/:id/status', [AdminUniversitiesController, 'changeStatus'])
+      .use(middleware.permission('university.update'))
+  })
+  .prefix('/api/admin/universities')
+  .use([middleware.auth()])
+
+// --- Catalog trường đại học (đọc)
+router
+  .group(() => {
+    router.get('/options', [UniversitiesController, 'options'])
+  })
+  .prefix('/api/universities')
   .middleware([middleware.auth()])
 
 // --- Admin: danh mục chức vụ nhân sự
@@ -825,6 +883,7 @@ router
     router.get('/nckh-hours-report', [KpisController, 'nckhHoursReport'])
     router.get('/nckh-data-report/column-config', [KpisController, 'nckhDataReportColumnConfig'])
     router.put('/nckh-data-report/column-config', [KpisController, 'updateNckhDataReportColumnConfig'])
+    router.get('/nckh-data-report/export-excel', [KpisController, 'exportNckhDataReportExcel'])
     router.get('/nckh-data-report', [KpisController, 'nckhDataReport'])
     router.post('/recalculate', [KpisController, 'recalculate'])
   })

@@ -37,6 +37,10 @@ export default class Publication extends BaseModel {
   @column()
   declare publisher: string | null
 
+  /** Đơn vị tài trợ (bài báo khoa học — phục vụ khen thưởng). */
+  @column()
+  declare fundingOrganization: string | null
+
   @column()
   declare year: number | null
 
