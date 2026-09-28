@@ -262,6 +262,37 @@ export default class PermissionService {
       module: 'staff_position',
       action: 'delete',
     },
+    // US-05-01 — Mẫu hợp đồng BM.06
+    {
+      code: 'contract_template.view',
+      name: 'Xem mẫu hợp đồng BM.06',
+      module: 'contract_template',
+      action: 'view',
+    },
+    {
+      code: 'contract_template.create',
+      name: 'Tạo / upload mẫu hợp đồng BM.06',
+      module: 'contract_template',
+      action: 'create',
+    },
+    {
+      code: 'contract_template.update',
+      name: 'Cập nhật mẫu hợp đồng BM.06',
+      module: 'contract_template',
+      action: 'update',
+    },
+    {
+      code: 'contract_template.delete',
+      name: 'Xóa mẫu hợp đồng BM.06',
+      module: 'contract_template',
+      action: 'delete',
+    },
+    {
+      code: 'project.contract_manage',
+      name: 'PKH quản lý / sinh dự thảo hợp đồng BM.06',
+      module: 'project',
+      action: 'contract_manage',
+    },
   ]
 
   static async syncMissingStandardPermissions(): Promise<{ added: number; permissions: Permission[] }> {

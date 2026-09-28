@@ -557,6 +557,15 @@ export default class ProjectOutlineBudgetService {
       link: `/projects/budget-approvals/${outline.id}`,
     })
 
+    // US-05-01 bước 1: tự sinh dự thảo BM.06
+    try {
+      const { default: ProjectContractService } = await import('#services/project_contract_service')
+      await ProjectContractService.generateDraft(outline, actorId, { silent: false })
+    } catch (e) {
+      // Không chặn phê duyệt — PKH có thể sinh lại thủ công
+      console.error('[US-05-01] Sinh dự thảo hợp đồng thất bại:', (e as Error)?.message || e)
+    }
+
     return { row, outline, idempotent: false }
   }
 

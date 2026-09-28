@@ -63,10 +63,12 @@
     "@adonisjs/lucid": "^21.6.1",
     "@vinejs/vine": "^3.0.1",
     "bullmq": "^6.0.7",
+    "docxtemplater": "^3.71.0",
     "ioredis": "^6.0.0",
     "luxon": "^3.7.2",
     "nodemailer": "^9.0.3",
     "pg": "^8.18.0",
+    "pizzip": "^3.3.0",
     "reflect-metadata": "^0.2.2",
     "xlsx": "^0.18.5"
   },

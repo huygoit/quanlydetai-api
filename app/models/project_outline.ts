@@ -243,6 +243,12 @@ export default class ProjectOutline extends BaseModel {
   @column()
   declare module5Opened: boolean
 
+  @column()
+  declare activeContractId: number | null
+
+  @column()
+  declare contractStatus: string | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

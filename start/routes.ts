@@ -34,6 +34,8 @@ import ProjectOutlineReviewsController from '#controllers/project_outline_review
 import ProjectOutlineScoresController from '#controllers/project_outline_scores_controller'
 import ProjectOutlineDefensesController from '#controllers/project_outline_defenses_controller'
 import ProjectOutlineBudgetsController from '#controllers/project_outline_budgets_controller'
+import AdminContractTemplatesController from '#controllers/admin/contract_templates_controller'
+import ProjectContractsController from '#controllers/project_contracts_controller'
 import CallForProposalsController from '#controllers/call_for_proposals_controller'
 import HomeController from '#controllers/home_controller'
 import KpisController from '#controllers/kpis_controller'
@@ -333,6 +335,43 @@ router
       .use(middleware.permission('project_process_type.update'))
   })
   .prefix('/api/admin/project-process-types')
+  .use([middleware.auth()])
+
+// --- Admin: mẫu hợp đồng BM.06 (US-05-01)
+router
+  .group(() => {
+    router
+      .get('/types', [AdminContractTemplatesController, 'types'])
+      .use(middleware.permission('contract_template.view'))
+    router
+      .get('/variables', [AdminContractTemplatesController, 'variableCatalog'])
+      .use(middleware.permission('contract_template.view'))
+    router
+      .get('/', [AdminContractTemplatesController, 'index'])
+      .use(middleware.permission('contract_template.view'))
+    router
+      .get('/:id/download', [AdminContractTemplatesController, 'download'])
+      .use(middleware.permission('contract_template.view'))
+    router
+      .get('/:id', [AdminContractTemplatesController, 'show'])
+      .use(middleware.permission('contract_template.view'))
+    router
+      .post('/', [AdminContractTemplatesController, 'store'])
+      .use(middleware.permission('contract_template.create'))
+    router
+      .put('/:id', [AdminContractTemplatesController, 'update'])
+      .use(middleware.permission('contract_template.update'))
+    router
+      .patch('/:id/status', [AdminContractTemplatesController, 'changeStatus'])
+      .use(middleware.permission('contract_template.update'))
+    router
+      .post('/:id/set-default', [AdminContractTemplatesController, 'setDefault'])
+      .use(middleware.permission('contract_template.update'))
+    router
+      .delete('/:id', [AdminContractTemplatesController, 'destroy'])
+      .use(middleware.permission('contract_template.delete'))
+  })
+  .prefix('/api/admin/contract-templates')
   .use([middleware.auth()])
 
 // --- Catalog loại quy trình đề tài (đọc, chỉ cần đăng nhập)
@@ -853,6 +892,18 @@ router
     router.post('/:outlineId/ld-decide', [ProjectOutlineBudgetsController, 'ldDecide'])
   })
   .prefix('/api/project-outline-budgets')
+  .middleware([middleware.auth()])
+
+// --- Hợp đồng BM.06 (US-05-01 bước 1: sinh dự thảo)
+router
+  .group(() => {
+    router.get('/', [ProjectContractsController, 'index'])
+    router.get('/by-outline/:outlineId', [ProjectContractsController, 'showByOutline'])
+    router.post('/by-outline/:outlineId/generate', [ProjectContractsController, 'generate'])
+    router.get('/:id/download', [ProjectContractsController, 'download'])
+    router.get('/:id', [ProjectContractsController, 'show'])
+  })
+  .prefix('/api/project-contracts')
   .middleware([middleware.auth()])
 
 // --- Dashboard / Home (theo role)
