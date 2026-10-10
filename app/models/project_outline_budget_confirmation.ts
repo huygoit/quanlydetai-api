@@ -90,7 +90,7 @@ export default class ProjectOutlineBudgetConfirmation extends BaseModel {
   @column()
   declare approvedBudget: number | null
 
-  @column.dateTime()
+  @column.dateTime({ columnName: 'module5_opened_at' })
   declare module5OpenedAt: DateTime | null
 
   @column()

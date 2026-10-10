@@ -6,9 +6,10 @@ import ContractTemplate from '#models/contract_template'
 
 export type ProjectContractStatus =
   | 'HOP_DONG_DRAFT'
+  | 'HOP_DONG_CHO_CNNV'
   | 'HOP_DONG_CHO_KY'
+  | 'HOP_DONG_CHO_PHAT_HANH'
   | 'HOP_DONG_DA_KY'
-  | 'DANG_THUC_HIEN'
 
 /**
  * Hợp đồng nhiệm vụ (BM.06) — Module 5.
@@ -69,6 +70,51 @@ export default class ProjectContract extends BaseModel {
 
   @column()
   declare note: string | null
+
+  @column()
+  declare externalContractNo: string | null
+
+  @column()
+  declare externalAgency: string | null
+
+  @column()
+  declare externalFileUrl: string | null
+
+  @column()
+  declare returnReason: string | null
+
+  @column.dateTime()
+  declare cnnvConfirmedAt: DateTime | null
+
+  @column()
+  declare cnnvConfirmedBy: number | null
+
+  @column.dateTime()
+  declare bghSignedAt: DateTime | null
+
+  @column()
+  declare bghSignedBy: number | null
+
+  @column.dateTime()
+  declare publishedAt: DateTime | null
+
+  @column()
+  declare publishedBy: number | null
+
+  @column()
+  declare issueNo: string | null
+
+  @column.dateTime()
+  declare cnnvSignedAt: DateTime | null
+
+  @column()
+  declare cnnvSignedBy: number | null
+
+  @column()
+  declare signedFileUrl: string | null
+
+  @column.dateTime()
+  declare effectiveAt: DateTime | null
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Module 5–6 — Việc frontend cần làm</title>
+  <style>
+    :root {
+      --ink: #1c2430;
+      --muted: #5c6b7a;
+      --line: #d9e0e7;
+      --bg: #f4f7fa;
+      --card: #fff;
+      --accent: #0f5c4c;
+      --warn: #8a4b08;
+      --warn-bg: #fff6e8;
+      --miss: #7a1f2b;
+      --miss-bg: #fdf2f3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font: 16px/1.55 "Segoe UI", system-ui, sans-serif;
+    }
+    header {
+      background: var(--accent);
+      color: #fff;
+      padding: 28px 20px 22px;
+    }
+    header h1 { margin: 0 0 8px; font-size: 1.7rem; }
+    header p { margin: 0; max-width: 760px; }
+    header a { color: #d7fff4; }
+    main { max-width: 980px; margin: 0 auto; padding: 20px 16px 64px; }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 18px;
+    }
+    nav a {
+      color: var(--accent);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 12px;
+      text-decoration: none;
+      font-size: 0.92rem;
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 18px 8px;
+      margin: 0 0 16px;
+    }
+    h2 { margin: 0 0 10px; font-size: 1.25rem; }
+    h3 { margin: 16px 0 8px; font-size: 1.05rem; }
+    p, li { color: var(--ink); }
+    .muted { color: var(--muted); }
+    code, pre {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.88rem;
+    }
+    code { background: #eef3f6; padding: 1px 5px; border-radius: 4px; }
+    pre {
+      background: #132028;
+      color: #e7f0ea;
+      padding: 12px 14px;
+      border-radius: 8px;
+      overflow: auto;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--line); padding: 7px 8px; vertical-align: top; text-align: left; }
+    th { background: #eef5f3; }
+    .todo { background: #f3faf7; border-left: 4px solid var(--accent); padding: 8px 12px; margin: 8px 0; }
+    .warn { background: var(--warn-bg); border-left: 4px solid var(--warn); padding: 8px 12px; margin: 8px 0; }
+    .miss { background: var(--miss-bg); border-left: 4px solid var(--miss); padding: 8px 12px; margin: 8px 0; }
+    ol.screens > li { margin: 0 0 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Module 5–6 — Tài liệu cho frontend</h1>
+    <p>Chỉ dành cho người dựng màn hình. Base <code>http://localhost:3333</code>. Mọi request gửi <code>Authorization: Bearer {token}</code>. Phần đã làm và phần còn thiếu để người khác đọc nằm ở <a href="module-5-6-tong-quan.html">module-5-6-tong-quan.html</a>.</p>
+  </header>
+  <main>
+    <nav>
+      <a href="#viec">Việc phải làm</a>
+      <a href="#quy-uoc">Quy ước gọi API</a>
+      <a href="#nut">Ẩn hiện nút</a>
+      <a href="#hop-dong">Hợp đồng</a>
+      <a href="#tien">Tạm ứng và mua sắm</a>
+      <a href="#tien-do">Tiến độ và điều chỉnh</a>
+      <a href="#cuoi-ky">Đánh giá cuối kỳ</a>
+      <a href="#khong-lam">Không tự thêm</a>
+    </nav>
+
+    <section id="viec">
+      <h2>1. Việc frontend phải làm</h2>
+      <p>Repo này chỉ có API. Cần dựng các màn sau, bám trạng thái server trả về. Không tự tính lại công thức kinh phí.</p>
+      <ol class="screens">
+        <li><strong>Hợp đồng BM.06</strong> — sinh dự thảo, sửa điều khoản khi còn nháp, phân bổ 10 mục chi, luồng CNNV → BGH → phát hành → ký.</li>
+        <li><strong>Sổ kinh phí</strong> — đọc <code>planned / advanced / spent / settled / remaining</code>. Số âm chỉ là cảnh báo.</li>
+        <li><strong>Tạm ứng và thanh toán</strong> — phiếu <code>TAM_UNG</code> hoặc <code>THANH_TOAN</code>, PKH rồi KH-TC.</li>
+        <li><strong>Mua sắm</strong> — phiếu riêng, không gộp vào thanh toán. CSVC chọn mua trực tiếp hoặc đấu thầu. CNNV xác nhận đã nhận.</li>
+        <li><strong>Báo cáo tiến độ</strong> — một báo cáo mỗi kỳ server đã tạo. Số tiền trên màn này chỉ đọc.</li>
+        <li><strong>Điều chỉnh BM.09</strong> — một phiếu, năm mục (thời gian, chủ nhiệm, nội dung, mốc, kinh phí) cộng lý do. Sau khi BGH duyệt, hiện link phụ lục.</li>
+        <li><strong>Đánh giá cuối kỳ</strong> — hồ sơ, hội đồng, phiếu nhận xét, biên bản, giải trình, quyết toán, thanh lý BM.14.</li>
+      </ol>
+      <div class="todo">
+        Nhắc hạn do server gửi (trong app và email). Frontend chỉ hiện cờ quá hạn: kỳ báo cáo <code>overdue</code>, giải trình <code>overdueExplanation</code>. Không tự đặt lịch 30/14/7/3 ngày hay ngày 10/13.
+      </div>
+    </section>
+
+    <section id="quy-uoc">
+      <h2>2. Quy ước gọi API</h2>
+      <ul>
+        <li>Thành công: <code>{ "success": true, "data": ... }</code>. Lỗi: <code>{ "success": false, "message": "..." }</code> với 403, 404 hoặc 422. Hiện <code>message</code>, không đoán mã lỗi.</li>
+        <li>File: upload trước <code>POST /api/uploads</code>, rồi gửi <code>{ "fileName", "fileUrl", "fileSize" }</code>. <code>fileSize</code> là byte.</li>
+        <li>Hợp đồng cũ (<code>/api/project-contracts</code>, trừ <code>GET /:id/flow</code> và <code>PUT /:id/clauses</code>): field <strong>snake_case</strong> (<code>contract_no</code>, <code>file_url</code>).</li>
+        <li><code>GET /api/project-contracts/:id/flow</code>, <code>PUT /:id/clauses</code> và toàn bộ <code>/api/module56</code>: <strong>camelCase</strong>.</li>
+        <li>Sau mỗi nút ký hoặc chuyển trạng thái hợp đồng, gọi lại <code>GET /:id/flow</code>. Các POST ký chỉ trả bản ghi snake_case, không có <code>roles</code>.</li>
+        <li>Vòng đời triển khai đọc <code>executionStatus</code> trên thuyết minh. <code>status</code> thuyết minh dừng ở Module 4 (<code>SAN_SANG_THUC_HIEN</code>). Module 5 mở khi status đó và <code>module5Opened = true</code>.</li>
+      </ul>
+      <p>Hạn file: tạm ứng, thanh toán, mua sắm mỗi file 10MB. Báo cáo tiến độ tổng 50MB. Báo cáo tổng kết 30MB. Tóm tắt 10MB.</p>
+    </section>
+
+    <section id="nut">
+      <h2>3. Ai thấy nút nào</h2>
+      <table>
+        <thead><tr><th>Vai</th><th>Điều kiện hiện nút</th></tr></thead>
+        <tbody>
+          <tr><td>Phòng KH</td><td>quyền <code>project.contract_manage</code>. Trên flow: <code>roles.canManage</code></td></tr>
+          <tr><td>Chủ nhiệm</td><td><code>ownerId</code> của thuyết minh. Trên flow: <code>roles.canCnnv</code></td></tr>
+          <tr><td>Ban giám hiệu</td><td><code>project.outline_approve</code>. <code>roles.canBgh</code></td></tr>
+          <tr><td>Tổ chức – Hành chính</td><td><code>project.contract_publish</code>. <code>roles.canPublish</code>. Role <code>TC_HC</code></td></tr>
+          <tr><td>Kế hoạch – Tài chính</td><td><code>project.budget_confirm</code>. Role <code>KH_TC</code></td></tr>
+          <tr><td>Cơ sở vật chất</td><td><code>project.procurement_handle</code>. Role <code>CSVC</code></td></tr>
+          <tr><td>Trưởng/phó phòng KH</td><td><code>project.contract_lead_confirm</code> — chỉ nút xác nhận gia hạn từ lần 2</td></tr>
+        </tbody>
+      </table>
+      <div class="warn">
+        Role <code>DEPARTMENT_STAFF</code> vẫn đang giữ cả ba quyền phát hành, mua sắm và xác nhận kinh phí. User cũ có thể thấy nút của cả ba phòng cho đến khi admin gán lại <code>KH_TC</code>, <code>TC_HC</code>, <code>CSVC</code>. Frontend cứ ẩn nút theo quyền, không hard-code tên role.
+      </div>
+      <h3>Trạng thái hợp đồng</h3>
+      <p><code>HOP_DONG_DRAFT</code> → <code>HOP_DONG_CHO_CNNV</code> → <code>HOP_DONG_CHO_KY</code> → <code>HOP_DONG_CHO_PHAT_HANH</code> → <code>HOP_DONG_DA_KY</code>.</p>
+      <ul>
+        <li>CNNV xác nhận nội dung không đổi status. Chỉ set <code>workflow.cnnvConfirmedAt</code>.</li>
+        <li>Nút Trình BGH: status <code>HOP_DONG_CHO_CNNV</code> và <code>cnnvConfirmedAt</code> khác null.</li>
+        <li>Nút CNNV ký: <code>HOP_DONG_CHO_PHAT_HANH</code> và <code>workflow.publishedAt</code> khác null. <code>signedFileUrl</code> được để trống.</li>
+      </ul>
+      <h3>Trạng thái triển khai</h3>
+      <p><code>DANG_THUC_HIEN</code> → <code>DGCK_DRAFT</code> → <code>DGCK_CHO_PKH</code> → <code>DGCK_BS</code> hoặc <code>DGCK_HOP_HD</code> → <code>DGCK_CHINH_SUA</code> / <code>DGCK_KHONG_DAT</code> / <code>DGCK_CHO_QUYET_TOAN</code> → <code>DGCK_CHO_THANH_LY</code> → <code>HOAN_THANH</code>. Dừng hẳn: <code>DGCK_DINH_CHI</code>.</p>
+      <h3>Mười mục chi</h3>
+      <p><code>MUC_01</code> công, <code>MUC_02</code> vật tư, <code>MUC_03</code> TSCĐ, <code>MUC_04</code> hội thảo, <code>MUC_05</code> thuê ngoài, <code>MUC_06</code> khảo sát, <code>MUC_07</code> văn phòng phẩm, <code>MUC_08</code> họp, <code>MUC_09</code> quản lý chung (không quá 5%), <code>MUC_10</code> khác. Tổng phải bằng kinh phí đã duyệt. <code>remaining = planned - spent - advanced</code>.</p>
+    </section>
+
+    <section id="hop-dong">
+      <h2>4. Màn hợp đồng và sổ kinh phí</h2>
+      <table>
+        <thead><tr><th>Việc trên màn</th><th>Gọi</th><th>Body</th></tr></thead>
+        <tbody>
+          <tr><td>Danh sách</td><td>GET <code>/api/project-contracts</code></td><td>query <code>page</code>, <code>perPage</code>, <code>status</code>, <code>keyword</code></td></tr>
+          <tr><td>Theo thuyết minh</td><td>GET <code>/api/project-contracts/by-outline/:outlineId</code></td><td>404 nếu chưa sinh</td></tr>
+          <tr><td>Sinh / sinh lại</td><td>POST <code>.../generate</code></td><td><code>{ "forceRegen": false }</code>. Chỉ sinh lại khi còn draft. Điều khoản PKH đã sửa được giữ</td></tr>
+          <tr><td>Tải DOCX</td><td>GET <code>/api/project-contracts/:id/download</code></td><td></td></tr>
+          <tr><td>Màn ký</td><td>GET <code>/api/project-contracts/:id/flow</code></td><td>snake_case + <code>workflow</code>, <code>roles</code>, <code>clauseFields</code></td></tr>
+          <tr><td>Hợp đồng ngoài</td><td>PUT <code>/:id/external</code></td><td><code>externalContractNo</code>, <code>externalAgency</code>, <code>externalFileUrl</code>. Cả ba không bắt buộc</td></tr>
+          <tr><td>Sửa điều khoản</td><td>PUT <code>/:id/clauses</code></td><td><code>{ "fields": { "dia_diem_ky": "Hà Nội" } }</code>. Chỉ khi draft</td></tr>
+          <tr><td>10 mục chi</td><td>PUT <code>/:id/budget-lines</code></td><td><code>{ "lines": [{ "code": "MUC_01", "amount": 0 }] }</code> đủ 10 mã</td></tr>
+          <tr><td>Trình CNNV / CNNV xác nhận / trả lại</td><td>POST <code>submit-cnnv</code>, <code>cnnv-confirm</code>, <code>cnnv-return</code></td><td>trả lại cần <code>{ "reason" }</code></td></tr>
+          <tr><td>Trình BGH / BGH ký / BGH trả</td><td>POST <code>submit-bgh</code>, <code>bgh-sign</code>, <code>bgh-return</code></td><td>trả cần <code>{ "reason" }</code></td></tr>
+          <tr><td>Phát hành / CNNV ký</td><td>POST <code>publish</code>, <code>cnnv-sign</code></td><td>phát hành <code>{ "issueNo" }</code>. Ký <code>{ "signedFileUrl" }</code> có thể rỗng</td></tr>
+        </tbody>
+      </table>
+      <h3>Form điều khoản</h3>
+      <p><code>clauseFields</code> là mảng <code>{ key, label, group, value, editable }</code>. Chỉ render ô nhập khi <code>editable === true</code>. Các ô còn lại hiện chữ, không gửi lên. Nhóm được sửa: địa điểm và số hợp đồng, căn cứ giao nhiệm vụ, bên A, chức vụ và tài khoản bên B, hình thức khoán, các khoản kinh phí không lấy từ thuyết minh, tỷ lệ bồi hoàn, điều khoản tranh chấp.</p>
+      <p>Không cho sửa (server lấy lại từ thuyết minh): loại và tên nhiệm vụ, số tháng, tháng/năm bắt đầu và kết thúc, tên, đại diện và email bên B, tổng kinh phí và kinh phí NSNN kèm bằng chữ.</p>
+      <p>Response của <code>PUT /clauses</code> cùng dạng <code>GET /flow</code>. Sau khi lưu, tải lại file DOCX.</p>
+      <h3>Sổ</h3>
+      <p>GET <code>/api/module56/budget/:outlineId</code></p>
+      <pre>[{ "code": "MUC_01", "label": "Công lao động trực tiếp", "planned": 0, "advanced": 0, "spent": 0, "settled": 0, "remaining": 0 }]</pre>
+      <p><code>overBudget: true</code> hoặc <code>remaining</code> âm: hiện cảnh báo, vẫn cho nộp phiếu.</p>
+    </section>
+
+    <section id="tien">
+      <h2>5. Tạm ứng, thanh toán, mua sắm</h2>
+      <h3>Tạm ứng / thanh toán</h3>
+      <p>GET <code>/api/module56/payments?outlineId=</code>. POST <code>/api/module56/payments</code>.</p>
+      <pre>{
+  "id": null,
+  "projectOutlineId": 1,
+  "submit": true,
+  "kind": "TAM_UNG",
+  "lineCode": "MUC_01",
+  "amount": 1000000,
+  "detail": "Nội dung",
+  "bankAccount": "0123",
+  "bankName": "VCB",
+  "attachments": [{ "fileName": "a.pdf", "fileUrl": "/storage/a.pdf", "fileSize": 1000 }]
+}</pre>
+      <ul>
+        <li><code>kind</code>: <code>TAM_UNG</code> hoặc <code>THANH_TOAN</code>. Không có loại mua sắm trên phiếu này.</li>
+        <li><code>submit: false</code> lưu nháp. Có <code>id</code> thì sửa khi <code>YCKT_DRAFT</code> hoặc <code>YCKT_BS</code>.</li>
+        <li>POST <code>/payments/:id/pkh</code> — <code>action</code>: <code>accept</code> (sang KH-TC), <code>return</code> (bổ sung), <code>reject</code> (về nháp). Kèm <code>reason</code> khi cần.</li>
+        <li>POST <code>/payments/:id/tc</code> — <code>{ "accept": true, "voucherNo": "CT-1", "voucherDate": "2026-10-09", "reason": "" }</code>. Duyệt thì ghi sổ. Từ chối bắt <code>reason</code>.</li>
+        <li>KH-TC gọi list không truyền <code>status</code> thì chỉ thấy phiếu đang chờ mình (<code>YCKT_TC</code>).</li>
+      </ul>
+      <h3>Mua sắm</h3>
+      <p>GET <code>/api/module56/procurements?outlineId=</code>. POST <code>/api/module56/procurements</code>.</p>
+      <pre>{
+  "projectOutlineId": 1,
+  "submit": true,
+  "kind": "VAT_TU",
+  "lineCode": "MUC_02",
+  "purpose": "Mua hóa chất",
+  "neededBy": "2026-11-01",
+  "overBudgetNote": "",
+  "items": [{ "name": "Hóa chất A", "unit": "lọ", "qty": 2, "unitPrice": 50000, "spec": "PA" }],
+  "attachments": []
+}</pre>
+      <ul>
+        <li><code>kind</code>: <code>VAT_TU</code>, <code>DUNG_CU</code>, <code>THIET_BI</code>, <code>THUE_NGOAI</code>. <code>lineCode</code> chỉ <code>MUC_02</code>, <code>MUC_03</code>, <code>MUC_05</code>.</li>
+        <li>Không gửi thành tiền. Server tính <code>qty * unitPrice</code>. Vượt dự toán mà nộp thì bắt <code>overBudgetNote</code>.</li>
+        <li>PKH <code>/procurements/:id/pkh</code> — <code>accept</code> sang CSVC, <code>return</code> bổ sung, <code>to_bs</code> mở lại sau từ chối hoặc đấu thầu hỏng, <code>close</code> đóng phiếu.</li>
+        <li>CSVC <code>/csvc</code> — <code>supply</code> cần <code>method</code> là <code>MUA_TRUC_TIEP</code> hoặc <code>DAU_THAU</code>; <code>reject</code>; <code>bid_fail</code>.</li>
+        <li>CNNV <code>/receive</code> không body. KH-TC <code>/tc</code> giống thanh toán.</li>
+        <li>Khi xong, dòng <code>MUC_03</code> xuất hiện ở tab tài sản màn thanh lý. Không làm màn giao hàng từng phần.</li>
+      </ul>
+    </section>
+
+    <section id="tien-do">
+      <h2>6. Báo cáo tiến độ và điều chỉnh</h2>
+      <h3>Tiến độ</h3>
+      <p>GET <code>/api/module56/progress?outlineId=</code>. <code>data.finance</code> là số đọc. <code>data.periods[]</code> có <code>id</code>, <code>title</code>, <code>dueOn</code>, <code>kind</code> (<code>MILESTONE</code> hoặc <code>MIDPOINT</code>), <code>overdue</code>, <code>report</code>.</p>
+      <p>POST <code>/api/module56/progress/periods/:periodId</code></p>
+      <pre>{
+  "outlineId": 1,
+  "submit": true,
+  "contentRows": [{ "milestone": "Đúng chữ trên thuyết minh", "progress": "50%", "done": "Đã làm" }],
+  "productRows": [{ "name": "Đúng tên sản phẩm", "achieved": "1 bài" }],
+  "nextPlan": "Bắt buộc khi nộp",
+  "recommendation": "",
+  "attachments": []
+}</pre>
+      <p>Sửa khi báo cáo còn <code>BCTD_DRAFT</code> hoặc <code>BCTD_BS</code>. PKH: POST <code>/api/module56/progress/:id/pkh</code> với <code>{ "accept": true, "note": "" }</code>. <code>id</code> là id báo cáo, không phải id kỳ.</p>
+      <h3>Điều chỉnh</h3>
+      <p>GET <code>/api/module56/adjustments?outlineId=</code>. POST <code>/api/module56/adjustments</code>. Một nhiệm vụ chỉ một phiếu chưa kết thúc. Lý do bắt buộc. Ít nhất một khóa trong <code>changes</code>. Nếu có <code>budgetLines</code> thì đủ 10 mã.</p>
+      <pre>{
+  "projectOutlineId": 1,
+  "submit": true,
+  "reason": "Bắt buộc",
+  "evidenceUrl": "/storage/minh-chung.pdf",
+  "changes": {
+    "endDate": "2027-06-30",
+    "principalUserId": 12,
+    "content": "Nội dung mới",
+    "milestones": [{ "content": "Mốc 1", "startDate": null, "endDate": "2027-01-01", "expectedResult": null }],
+    "budgetLines": [{ "code": "MUC_01", "amount": 0 }]
+  }
+}</pre>
+      <ul>
+        <li>POST <code>/adjustments/:id/lead-confirm</code> không body. Bắt buộc trước khi PKH trình BGH nếu gia hạn từ lần 2 (<code>extensionCount &gt;= 1</code> và phiếu có <code>endDate</code>).</li>
+        <li>POST <code>/adjustments/:id/pkh</code> — <code>{ "action": "accept" | "return", "note" }</code>.</li>
+        <li>POST <code>/adjustments/:id/bgh</code> — <code>{ "accept": true, "note": "" }</code>. Duyệt thì response có <code>appendixFileUrl</code>. Hiện nút tải DOCX phụ lục. Không sinh lại hợp đồng đã ký.</li>
+      </ul>
+    </section>
+
+    <section id="cuoi-ky">
+      <h2>7. Đánh giá cuối kỳ đến thanh lý</h2>
+      <p>Một nhiệm vụ một hồ sơ. Màn đọc GET <code>/api/module56/final/:outlineId</code>.</p>
+      <p><code>data</code> gồm <code>executionStatus</code>, <code>overdueExplanation</code>, <code>dossier</code>, <code>council</code>, <code>sheets</code>, <code>minutes</code>, <code>minutesLocked</code>, <code>minutesFileUrl</code>, <code>classification</code>, <code>explanation</code>, <code>settlement</code>, <code>liquidation</code>, <code>finance</code>, <code>assets</code>.</p>
+      <p>Nút nộp hồ sơ chính thức chỉ bật khi PKH đã thông báo (<code>dossier.notifiedAt</code>) hoặc còn không quá 30 ngày tới <code>endDate</code>.</p>
+      <table>
+        <thead><tr><th>Việc</th><th>Gọi</th><th>Ghi chú cho màn</th></tr></thead>
+        <tbody>
+          <tr><td>PKH thông báo</td><td>POST <code>/final/:outlineId/notify</code></td><td></td></tr>
+          <tr><td>Nộp hồ sơ</td><td>PUT <code>/final/:outlineId/dossier</code></td><td><code>summaryFile</code> ≤ 30MB, <code>briefFile</code> ≤ 10MB, <code>resultVi</code>, <code>resultEn</code>, <code>products: [{ name, fileUrl, link }]</code>, <code>councilFile</code>, <code>publicationsNote</code>. <code>name</code> đúng sản phẩm thuyết minh. Mỗi sản phẩm cần file hoặc link</td></tr>
+          <tr><td>PKH duyệt hồ sơ</td><td>POST <code>/dossier-review</code></td><td><code>{ "accept", "briefPagesOk", "note" }</code>. Checkbox số trang do PKH tích, không đếm tự động. Sang họp thì <code>briefPagesOk</code> phải true</td></tr>
+          <tr><td>Lập hội đồng</td><td>PUT <code>/council</code></td><td>Đúng 1 chủ tịch, 1 thư ký, ít nhất 2 phản biện. Ủy viên tùy chọn. Thành viên không được là người trong nhiệm vụ. Response có <code>reviewDeadlineTight</code> khi hạn nhận xét sát ngày họp</td></tr>
+          <tr><td>Nhắc một phản biện</td><td>POST <code>/remind/:userId</code></td><td></td></tr>
+          <tr><td>Phiếu nhận xét</td><td>PUT <code>/sheet</code></td><td>Người đang đăng nhập phải là phản biện. Bốn nhận xét, nhận xét chung ít nhất 100 ký tự. Không có điểm số</td></tr>
+          <tr><td>Biên bản</td><td>POST <code>/minutes</code></td><td>Có mặt ít nhất 2/3. Xếp loại <code>DAT_YEU_CAU</code>, <code>CAN_BO_SUNG</code>, <code>KHONG_DAT</code>. Mỗi kiến nghị một dòng. Sau khi lưu, khóa form và hiện <code>minutesFileUrl</code></td></tr>
+          <tr><td>Không đạt</td><td>POST <code>/fail-decision</code></td><td><code>{ "retry": true }</code> cho làm lại, <code>false</code> đình chỉ</td></tr>
+          <tr><td>Giải trình</td><td>PUT <code>/explanation</code></td><td>Số <code>items</code> bằng số dòng kiến nghị. Xác nhận: thư ký trước, chủ tịch sau</td></tr>
+          <tr><td>Gia hạn giải trình</td><td>POST <code>/explanation-extend</code></td><td><code>{ "deadline": "2026-12-20" }</code></td></tr>
+          <tr><td>Quyết toán</td><td>PUT <code>/settlement</code></td><td>Đủ 10 mã <code>declaredAmount</code>. Nếu lệch cột <code>spent</code>, PKH gọi POST <code>/variance</code> với lý do trước khi KH-TC duyệt</td></tr>
+          <tr><td>Thanh lý</td><td>PUT <code>/liquidation</code></td><td><code>surplusHandling</code>: <code>HOAN_TRA</code> hoặc <code>KHONG_PHAT_SINH</code>. <code>recognitionFileUrl</code> không bắt buộc. Gửi <code>assets</code> là thay cả danh sách</td></tr>
+          <tr><td>Trình và ký BM.14</td><td>POST <code>liquidation-submit</code>, <code>liquidation-bgh</code>, <code>liquidation-publish</code>, <code>liquidation-cnnv</code></td><td>Phát hành cần <code>issueNo</code>. CNNV xác nhận xong thì <code>executionStatus = HOAN_THANH</code></td></tr>
+        </tbody>
+      </table>
+      <p><code>liquidation.surplus</code> = đã tạm ứng + đã chi − đã quyết toán. <code>liquidation.fileUrl</code> là file BM.14 (DOCX). Sau <code>HOAN_THANH</code>, hồ sơ khoa học của chủ nhiệm và thành viên có thêm dòng trong <code>completedResearchTasks</code>. Không làm trang thành tựu mới.</p>
+      <p>Ký là bấm xác nhận trên hệ thống. Ô file scan là tùy chọn, không gắn cổng chữ ký số.</p>
+    </section>
+
+    <section id="khong-lam">
+      <h2>8. Không tự thêm trên giao diện</h2>
+      <p>Các nút sau không có API. Cách hiện trên màn đã nói ở các mục trên. Lý do để ở <a href="module-5-6-tong-quan.html">tài liệu cho người đọc</a>.</p>
+      <ul>
+        <li>Xuất PDF. Chỉ tải DOCX.</li>
+        <li>Mở lại biên bản khi <code>minutesLocked</code>.</li>
+        <li>Đếm giờ hạn xử lý nội bộ, ngưỡng tiền đấu thầu, giao hàng nhiều lần.</li>
+        <li>Cổng ký số. Chỉ nút xác nhận và ô file scan có thể bỏ trống.</li>
+        <li>Quyết định công nhận bắt buộc, trang thành tựu mới, thu tiền thừa tự động.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

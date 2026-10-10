@@ -2,6 +2,8 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ProjectOutline from '#models/project_outline'
 import PermissionService from '#services/permission_service'
 import ProjectContractService from '#services/project_contract_service'
+import ProjectContractFlowService from '#services/project_contract_flow_service'
+import { mapModule56Error } from '#utils/module56_http'
 
 /**
  * US-05-01 bước 1 — dự thảo hợp đồng BM.06.
@@ -123,6 +125,123 @@ export default class ProjectContractsController {
     }
   }
 
+  async flow({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.detail(Number(params.id), user.id)
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
+  async saveExternal({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.saveExternal(Number(params.id), user.id, request.body())
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
+  async updateClauses({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.updateClauses(Number(params.id), user.id, request.body())
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
+  async submitCnnv({ auth, params, response }: HttpContext) {
+    return this.act(auth, params, response, (id, userId) => ProjectContractFlowService.submitToCnnv(id, userId))
+  }
+
+  async cnnvConfirm({ auth, params, response }: HttpContext) {
+    return this.act(auth, params, response, (id, userId) => ProjectContractFlowService.cnnvConfirm(id, userId))
+  }
+
+  async cnnvReturn({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.cnnvReturn(
+        Number(params.id),
+        user.id,
+        String(request.input('reason', ''))
+      )
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
+  async submitBgh({ auth, params, response }: HttpContext) {
+    return this.act(auth, params, response, (id, userId) => ProjectContractFlowService.submitToBgh(id, userId))
+  }
+
+  async bghSign({ auth, params, response }: HttpContext) {
+    return this.act(auth, params, response, (id, userId) => ProjectContractFlowService.bghSign(id, userId))
+  }
+
+  async bghReturn({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.bghReturn(
+        Number(params.id),
+        user.id,
+        String(request.input('reason', ''))
+      )
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
+  async publish({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.publish(
+        Number(params.id),
+        user.id,
+        String(request.input('issueNo', ''))
+      )
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
+  async cnnvSign({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.cnnvSign(
+        Number(params.id),
+        user.id,
+        String(request.input('signedFileUrl', '')).trim() || null
+      )
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
+  private async act(
+    auth: HttpContext['auth'],
+    params: HttpContext['params'],
+    response: HttpContext['response'],
+    work: (id: number, userId: number) => Promise<unknown>
+  ) {
+    const user = auth.use('api').user!
+    try {
+      const data = await work(Number(params.id), user.id)
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
   async download({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
     if (!(await this.canView(user.id))) {
@@ -146,6 +265,7 @@ export default class ProjectContractsController {
   }
 
   private mapError(response: HttpContext['response'], err: unknown) {
+    if (mapModule56Error(response, err)) return
     const msg = (err as Error)?.message || ''
     const map: Record<string, [number, string]> = {
       CONTRACT_NOT_FOUND: [404, 'Không tìm thấy hợp đồng.'],

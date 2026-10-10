@@ -3,6 +3,8 @@ import { DateTime } from 'luxon'
 import ScientificProfile from '#models/scientific_profile'
 import ProfileLanguage from '#models/profile_language'
 import Publication from '#models/publication'
+import ResearchOutputType from '#models/research_output_type'
+import ResearchOutputTypesSeeder from './09_research_output_types_seeder.js'
 
 /**
  * Seed 5 hồ sơ khoa học mẫu (user_id 2,4,5,6,7) với languages và publications.
@@ -52,19 +54,34 @@ export default class ScientificProfileSeeder extends BaseSeeder {
       }
     }
 
-    const pubList: Array<{ profileIndex: number; title: string; authors: string; publicationType: string; journalOrConference: string; year: number; publicationStatus: string; rank: string | null }> = [
-      { profileIndex: 0, title: 'Deep Learning for Healthcare', authors: 'Nguyen Van A, Tran B', publicationType: 'JOURNAL', journalOrConference: 'IEEE Transactions', year: 2023, publicationStatus: 'PUBLISHED', rank: 'ISI' },
-      { profileIndex: 0, title: 'AI in Education', authors: 'Nguyen Van A et al.', publicationType: 'CONFERENCE', journalOrConference: 'ICCE 2023', year: 2023, publicationStatus: 'PUBLISHED', rank: 'SCOPUS' },
-      { profileIndex: 1, title: 'Economic Policy Analysis', authors: 'Tran Van B', publicationType: 'JOURNAL', journalOrConference: 'Journal of Economics', year: 2022, publicationStatus: 'PUBLISHED', rank: 'DOMESTIC' },
-      { profileIndex: 2, title: 'Science Management', authors: 'Phong KH', publicationType: 'JOURNAL', journalOrConference: 'National Journal', year: 2024, publicationStatus: 'UNDER_REVIEW', rank: null },
-      { profileIndex: 3, title: 'Information Systems', authors: 'Truong Khoa CNTT', publicationType: 'JOURNAL', journalOrConference: 'ACM SIGMIS', year: 2021, publicationStatus: 'PUBLISHED', rank: 'ISI' },
+    const pubList: Array<{ profileIndex: number; title: string; authors: string; publicationType: string; journalOrConference: string; year: number; publicationStatus: string; rank: string | null; typeCode: string }> = [
+      { profileIndex: 0, title: 'Deep Learning for Healthcare', authors: 'Nguyen Van A, Tran B', publicationType: 'JOURNAL', journalOrConference: 'IEEE Transactions', year: 2023, publicationStatus: 'PUBLISHED', rank: 'ISI', typeCode: 'PUB_WOS_Q1' },
+      { profileIndex: 0, title: 'AI in Education', authors: 'Nguyen Van A et al.', publicationType: 'CONFERENCE', journalOrConference: 'ICCE 2023', year: 2023, publicationStatus: 'PUBLISHED', rank: 'SCOPUS', typeCode: 'PUB_CONF_ISBN' },
+      { profileIndex: 1, title: 'Economic Policy Analysis', authors: 'Tran Van B', publicationType: 'JOURNAL', journalOrConference: 'Journal of Economics', year: 2022, publicationStatus: 'PUBLISHED', rank: 'DOMESTIC', typeCode: 'PUB_DOMESTIC_HDGNN' },
+      { profileIndex: 2, title: 'Science Management', authors: 'Phong KH', publicationType: 'JOURNAL', journalOrConference: 'National Journal', year: 2024, publicationStatus: 'UNDER_REVIEW', rank: null, typeCode: 'PUB_DOMESTIC_HDGNN' },
+      { profileIndex: 3, title: 'Information Systems', authors: 'Truong Khoa CNTT', publicationType: 'JOURNAL', journalOrConference: 'ACM SIGMIS', year: 2021, publicationStatus: 'PUBLISHED', rank: 'ISI', typeCode: 'PUB_WOS_Q1' },
     ]
+
+    // Seeder này chạy trước seeder danh mục, nên tự tạo cây loại kết quả nếu chưa có.
+    const daCoLoai = await ResearchOutputType.query().select('id').first()
+    if (!daCoLoai) {
+      await new ResearchOutputTypesSeeder(this.client).run()
+    }
+    const typeCodes = [...new Set(pubList.map((pub) => pub.typeCode))]
+    const types = await ResearchOutputType.query().whereIn('code', typeCodes).select('id', 'code')
+    const typeIdByCode = new Map(types.map((type) => [type.code, type.id]))
+
     for (const pub of pubList) {
       const profileId = profileIds[pub.profileIndex]
+      const researchOutputTypeId = typeIdByCode.get(pub.typeCode)
+      if (!researchOutputTypeId) {
+        throw new Error(`Không tìm thấy loại kết quả nghiên cứu khoa học mã ${pub.typeCode}`)
+      }
       const exists = await Publication.query().where('profile_id', profileId).where('title', pub.title).first()
       if (!exists) {
         await Publication.create({
           profileId,
+          researchOutputTypeId,
           title: pub.title,
           authors: pub.authors,
           publicationType: pub.publicationType,

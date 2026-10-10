@@ -8,6 +8,8 @@ import ProjectOutlineMember from '#models/project_outline_member'
 import ProjectOutlineBudgetLine from '#models/project_outline_budget_line'
 import ProjectOutlineReviewAssignment from '#models/project_outline_review_assignment'
 
+import type { ExecutionStatus } from '#constants/module56'
+
 export type ProjectOutlineStatus =
   | 'THUYETMINH_DRAFT'
   | 'THUYETMINH_PENDING'
@@ -237,10 +239,11 @@ export default class ProjectOutline extends BaseModel {
   @column()
   declare approvedBudget: number | null
 
-  @column.dateTime()
+  // snakeCase mặc định tách thành module_5_opened_at, lệch cột thật module5_opened_at
+  @column.dateTime({ columnName: 'module5_opened_at' })
   declare module5OpenedAt: DateTime | null
 
-  @column()
+  @column({ columnName: 'module5_opened' })
   declare module5Opened: boolean
 
   @column()
@@ -248,6 +251,12 @@ export default class ProjectOutline extends BaseModel {
 
   @column()
   declare contractStatus: string | null
+
+  @column()
+  declare executionStatus: ExecutionStatus | null
+
+  @column()
+  declare extensionCount: number
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Module 5–6 — Tài liệu đọc chung</title>
+  <style>
+    :root {
+      --ink: #1c2430;
+      --muted: #5c6b7a;
+      --line: #d9e0e7;
+      --bg: #f6f4ef;
+      --card: #fff;
+      --accent: #3d3428;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font: 17px/1.6 "Segoe UI", system-ui, sans-serif;
+    }
+    header { background: var(--accent); color: #fff; padding: 28px 20px 22px; }
+    header h1 { margin: 0 0 8px; font-size: 1.7rem; }
+    header p { margin: 0; max-width: 720px; }
+    header a { color: #f3e6c8; }
+    main { max-width: 860px; margin: 0 auto; padding: 20px 16px 64px; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px 8px;
+      margin: 0 0 16px;
+    }
+    h2 { margin: 0 0 10px; font-size: 1.25rem; }
+    h3 { margin: 14px 0 6px; font-size: 1.05rem; }
+    .muted { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 0.96rem; }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; text-align: left; }
+    th { background: #f3eee6; }
+    code { font-family: Consolas, monospace; font-size: 0.88rem; background: #f3eee6; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Module 5–6 — Tài liệu cho người đọc</h1>
+    <p>Dành cho người cần biết hệ thống đã làm tới đâu, không phải tài liệu gọi API. Người dựng màn hình đọc <a href="module-5-6-fe.html">module-5-6-fe.html</a>.</p>
+  </header>
+  <main>
+    <section>
+      <h2>Hai module này làm gì</h2>
+      <p>Module 5 là lúc nhiệm vụ đã được duyệt và bắt đầu làm: ký hợp đồng, chi tiền, mua sắm, báo cáo tiến độ, xin điều chỉnh.</p>
+      <p>Module 6 là lúc kết thúc: nộp hồ sơ, họp hội đồng, giải trình nếu cần, quyết toán, thanh lý hợp đồng.</p>
+      <p class="muted">Nguồn nghiệp vụ: user story phiên bản 4.0, ngày chốt 09/10/2026. Chỗ tài liệu gốc trống hoặc nói hai kiểu đã được chọn một hướng và ghi ở dưới. Không dùng phụ lục trạng thái trong file Word.</p>
+    </section>
+
+    <section>
+      <h2>Đã có trong hệ thống</h2>
+      <p>Phần máy chủ đã có đủ các bước. Repo này không có màn hình. Giao diện làm ở project frontend.</p>
+      <table>
+        <thead><tr><th>Việc</th><th>Tình trạng</th></tr></thead>
+        <tbody>
+          <tr><td>Sinh hợp đồng, phân 10 mục chi, chủ nhiệm xác nhận, ban giám hiệu ký, phòng tổ chức phát hành, chủ nhiệm ký</td><td>Đã có</td></tr>
+          <tr><td>Phòng KH sửa điều khoản trên mẫu khi hợp đồng còn nháp. Sinh lại file không xóa các điều khoản đã sửa</td><td>Đã có</td></tr>
+          <tr><td>Tạm ứng, thanh toán, sổ kinh phí</td><td>Đã có. Tạm ứng và mua sắm là hai phiếu riêng</td></tr>
+          <tr><td>Mua sắm: phòng cơ sở vật chất chọn mua trực tiếp hoặc đấu thầu, chủ nhiệm xác nhận đã nhận</td><td>Đã có. Tài sản cố định được đưa sang màn thanh lý</td></tr>
+          <tr><td>Báo cáo tiến độ theo mốc. Nhắc trước hạn 30, 14, 7 và 3 ngày khi server đang chạy</td><td>Đã có</td></tr>
+          <tr><td>Phiếu điều chỉnh gồm thời gian, chủ nhiệm, nội dung, mốc và kinh phí. Gia hạn từ lần 2 cần trưởng hoặc phó phòng KH xác nhận</td><td>Đã có. Khi được duyệt thì có file phụ lục</td></tr>
+          <tr><td>Hồ sơ cuối kỳ, hội đồng, phiếu nhận xét, biên bản, giải trình, quyết toán, thanh lý</td><td>Đã có. File văn bản là Word, chưa phải PDF</td></tr>
+          <tr><td>Ba vai riêng: Kế hoạch – Tài chính, Tổ chức – Hành chính, Cơ sở vật chất</td><td>Đã tạo. Tài khoản cũ thuộc vai nhân viên đơn vị vẫn còn đủ ba quyền, để không bị mất quyền đột ngột</td></tr>
+        </tbody>
+      </table>
+      <h3>Cách đọc trạng thái</h3>
+      <p>Trạng thái thuyết minh dừng ở “sẵn sàng thực hiện”. Từ lúc ký hợp đồng trở đi, vòng đời nằm ở cột triển khai: đang thực hiện, đánh giá cuối kỳ, quyết toán, thanh lý, hoàn thành hoặc đình chỉ.</p>
+      <p>Hợp đồng chỉ đi tới “đã ký”. Không dùng chữ “đang thực hiện” cho hợp đồng.</p>
+      <p>Dự toán lúc thẩm định vẫn là 4 nhóm cũ. Khi triển khai dùng 10 mục chi mới. Tổng 10 mục bằng kinh phí đã duyệt. Mục quản lý chung không quá 5%.</p>
+    </section>
+
+    <section>
+      <h2>Ai làm việc gì</h2>
+      <table>
+        <thead><tr><th>Người</th><th>Việc</th></tr></thead>
+        <tbody>
+          <tr><td>Phòng Khoa học</td><td>Soạn hợp đồng, phân kinh phí, duyệt các phiếu, lập hội đồng, duyệt hồ sơ cuối kỳ</td></tr>
+          <tr><td>Chủ nhiệm</td><td>Xác nhận và ký hợp đồng, nộp báo cáo, nộp hồ sơ, giải trình, xác nhận thanh lý</td></tr>
+          <tr><td>Ban giám hiệu</td><td>Ký hợp đồng và biên bản thanh lý</td></tr>
+          <tr><td>Kế hoạch – Tài chính</td><td>Xác nhận chứng từ chi và quyết toán</td></tr>
+          <tr><td>Tổ chức – Hành chính</td><td>Phát hành văn bản đã ký</td></tr>
+          <tr><td>Cơ sở vật chất</td><td>Xử lý phiếu mua sắm</td></tr>
+        </tbody>
+      </table>
+      <p>Ký trên hệ thống là bấm xác nhận. File scan đính kèm nếu có, không bắt buộc. Chưa nối cổng chữ ký số.</p>
+      <p>Vượt dự toán vẫn cho nộp, nhưng phải ghi giải trình và màn hình hiện cảnh báo. Tiền còn lại = dự toán − đã chi − đã tạm ứng.</p>
+      <p>Hội đồng cần đủ người: một chủ tịch, một thư ký, ít nhất hai phản biện. Biên bản chỉ lưu khi số người có mặt đạt hai phần ba và mọi phản biện đã nộp phiếu. Phiếu nhận xét không chấm điểm. Biên bản khóa sau khi lưu.</p>
+      <p>Nhiệm vụ chỉ hoàn thành sau khi chủ nhiệm xác nhận thanh lý. Hồ sơ khoa học của chủ nhiệm và thành viên được ghi thêm một dòng nhiệm vụ đã xong. Không có trang thành tựu riêng.</p>
+    </section>
+
+    <section>
+      <h2>Còn thiếu, và vì sao</h2>
+      <p>Mỗi mục là một việc người đọc có thể tưởng đã có. Dòng “Việc này là gì” mô tả đúng việc. Dòng sau nói vì sao hiện chưa làm được.</p>
+
+      <h3>Nhắc hạn</h3>
+      <p>Đã có lệnh <code>node ace remind:module56</code>. Repo không gắn cron. Máy chủ cần tự đặt lịch, nên một lần mỗi ngày.</p>
+      <p>Lệnh này nhắc báo cáo tiến độ đúng 30, 14, 7 và 3 ngày trước hạn, và nhắc giải trình vào ngày thứ 10 và 13 của hạn 14 ngày. Gửi thông báo trong app và email cho chủ nhiệm. Chạy lại cùng ngày không gửi trùng.</p>
+      <p>Khi API đang chạy, process web cũng gọi hai việc đó khoảng 15 giây sau lúc mở, rồi mỗi 6 giờ. Tắt API thì lịch này tắt theo. Không nhắc hộ hạn phiếu phản biện: phòng khoa học bấm nhắc từng người. Không nhắc sau khi đã quá hạn báo cáo.</p>
+
+      <h3>Mở lại biên bản hội đồng đã khóa</h3>
+      <p>Việc này là cho người quản trị mở lại biên bản họp sau khi đã lưu, sửa nội dung rồi lưu lại. Quy tắc đã chốt: lưu xong thì khóa, chỉ quản trị được mở lại và phải ghi lý do.</p>
+      <p>Hiện không làm được. Lúc lưu, hệ thống không chỉ khóa biên bản. Nó còn chuyển nhiệm vụ sang bước sau: đạt thì sang quyết toán, cần bổ sung thì sang chỉnh sửa và bắt đầu hạn 14 ngày, không đạt thì chờ phòng khoa học chọn làm lại hoặc đình chỉ. File Word cũng đã tạo. Mọi sửa hội đồng, phiếu nhận xét và biên bản sau đó đều bị chặn. Không có nút mở khóa, và không có bước kéo quyết toán, hạn giải trình cùng file Word về trước lúc lưu. Tắt khóa mà không hoàn tác thì các phiếu phía sau bám vào biên bản không còn là bản đã chốt.</p>
+
+      <h3>Trang thành tựu nghiên cứu</h3>
+      <p>Việc này là một danh sách nhiệm vụ đã hoàn thành, xem theo người, theo năm hoặc theo đơn vị, không cần mở từng hồ sơ.</p>
+      <p>Hiện không làm được vì không có danh sách thành tựu. Khi nhiệm vụ hoàn thành, hệ thống chỉ nối thêm một dòng vào hồ sơ khoa học của chủ nhiệm và thành viên đã có hồ sơ: mã, tên, vai trò, năm, xếp loại, kinh phí. Người chưa có hồ sơ khoa học không được ghi, vì không có chỗ chứa. Muốn có trang thành tựu thì phải có nguồn danh sách riêng. Dữ liệu hiện tại chỉ thấy khi mở đúng hồ sơ của người đó.</p>
+
+      <h3>Mẫu in biên bản, thanh lý và file PDF</h3>
+      <p>Việc này là in biên bản hội đồng và biên bản thanh lý theo mẫu của nhà trường, dạng PDF.</p>
+      <p>Biên bản hội đồng đang ghi file Word theo từng mục. Thanh lý đổ vào mẫu Word nếu quản trị đã tải mẫu thanh lý lên. Chưa có mẫu thì cũng là Word theo mục. Chưa có cách xuất PDF.</p>
+
+      <h3>Hạn giờ xử lý của từng phòng</h3>
+      <p>Việc này là đếm giờ phòng khoa học, tài chính, cơ sở vật chất và ban giám hiệu phải xử lý một phiếu.</p>
+      <p>Tài liệu gốc để trống số giờ. Không có mốc để gắn. Hệ thống chỉ nhắc những hạn đã có chữ: báo cáo tiến độ trước 30, 14, 7 và 3 ngày, giải trình trong 14 ngày và nhắc vào ngày 10, 13.</p>
+
+      <h3>Ngưỡng đấu thầu và giao hàng nhiều lần</h3>
+      <p>Việc này là tự bắt đấu thầu khi tiền vượt một mức, và cho nhận hàng từng đợt.</p>
+      <p>Không có mức tiền, và không có bước giao một phần. Phiếu chỉ ghi mua trực tiếp hoặc đấu thầu do phòng cơ sở vật chất chọn. Chủ nhiệm xác nhận đã nhận một lần.</p>
+
+      <h3>Cổng ký số</h3>
+      <p>Việc này là ký bằng nhà cung cấp chữ ký số.</p>
+      <p>Chưa có nhà cung cấp để nối. Các bước ký hiện là bấm xác nhận trên hệ thống. File scan đính kèm được, không bắt buộc.</p>
+
+      <h3>Quyết định công nhận tách khỏi thanh lý</h3>
+      <p>Việc này là một vòng ký riêng cho quyết định công nhận, xong vòng đó nhiệm vụ mới hoàn thành.</p>
+      <p>Luồng kết thúc chỉ có biên bản thanh lý. Nhiệm vụ hoàn thành khi chủ nhiệm xác nhận thanh lý. File quyết định đính kèm được nếu có, nhưng không chặn trạng thái, vì chưa có mẫu và chưa có vòng ký riêng.</p>
+
+      <h3>Thu hồi số tiền còn thừa</h3>
+      <p>Việc này là khi số đã cấp lớn hơn số quyết toán thì hệ thống lập phiếu thu hoặc chuyển khoản hoàn trả.</p>
+      <p>Thanh lý chỉ ghi số còn thừa và một lựa chọn: hoàn trả, hoặc không phát sinh. Không có phiếu thu và không có bước chuyển khoản.</p>
+    </section>
+  </main>
+</body>
+</html>

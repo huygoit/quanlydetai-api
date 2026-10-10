@@ -83,3 +83,16 @@ export const BM06_TEMPLATE_VARIABLES: Bm06VariableDef[] = [
 ]
 
 export const BM06_TEMPLATE_VARIABLE_KEYS = BM06_TEMPLATE_VARIABLES.map((v) => v.key)
+
+/** Biến đổ mẫu BM.14 khi admin đã upload mẫu THANH_LY. */
+export const BM14_TEMPLATE_VARIABLES: Bm06VariableDef[] = [
+  { key: 'ten_nhiem_vu', label: 'Tên nhiệm vụ', group: 'Thanh lý' },
+  { key: 'ma_nhiem_vu', label: 'Mã nhiệm vụ', group: 'Thanh lý' },
+  { key: 'xep_loai', label: 'Xếp loại', group: 'Thanh lý' },
+  { key: 'kinh_phi_da_cap', label: 'Kinh phí đã cấp', group: 'Kinh phí' },
+  { key: 'kinh_phi_quyet_toan', label: 'Kinh phí quyết toán', group: 'Kinh phí' },
+  { key: 'ton', label: 'Số tồn', group: 'Kinh phí' },
+  { key: 'xu_ly_ton', label: 'Cách xử lý tồn', group: 'Kinh phí' },
+  { key: 'ngay_quyet_toan', label: 'Ngày quyết toán', group: 'Kinh phí' },
+  { key: 'tai_san', label: 'Danh sách tài sản', group: 'Tài sản' },
+]

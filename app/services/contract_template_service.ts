@@ -1,6 +1,6 @@
 import ContractTemplate from '#models/contract_template'
 import type { ContractTemplateStatus, ContractTemplateType } from '#models/contract_template'
-import { BM06_TEMPLATE_VARIABLES } from '#constants/bm06_template_variables'
+import { BM06_TEMPLATE_VARIABLES, BM14_TEMPLATE_VARIABLES } from '#constants/bm06_template_variables'
 import {
   DOC_TEMPLATE_TYPES,
   getDocTemplateType,
@@ -41,6 +41,7 @@ interface MetaPayload {
 
 function knownVariablesForType(templateType: string) {
   if (templateType === 'HOP_DONG') return BM06_TEMPLATE_VARIABLES
+  if (templateType === 'THANH_LY') return BM14_TEMPLATE_VARIABLES
   return []
 }
 

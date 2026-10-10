@@ -11,6 +11,7 @@ import {
   mergeDocxTemplate,
 } from '#utils/docx_merge_helper'
 import { formatVndPlain, numberToVietnameseWords } from '#utils/vietnamese_number_words'
+import { mergeBm06Edits } from '#services/module56_rules'
 import fs from 'node:fs/promises'
 
 /**
@@ -189,13 +190,67 @@ export default class ProjectContractService {
       throw new Error('CANNOT_REGEN')
     }
 
+    const fresh = this.buildMergePayload(outline)
+    const mergePayload = mergeBm06Edits(fresh, existing?.mergePayload)
+    existing = await this.persistDocx(outline, existing, mergePayload, actorId)
+
+    outline.activeContractId = existing.id
+    outline.contractStatus = 'HOP_DONG_DRAFT'
+    await outline.save()
+
+    if (actorId != null) {
+      await ProjectOutlineService.writeAudit(
+        outline.id,
+        actorId,
+        opts?.forceRegen ? 'CONTRACT_DRAFT_REGENERATED' : 'CONTRACT_DRAFT_GENERATED',
+        outline.status,
+        outline.status,
+        {
+          contractId: existing.id,
+          templateId: existing.contractTemplateId,
+          contractNo: existing.contractNo,
+          version: existing.version,
+        }
+      )
+    }
+
+    if (!opts?.silent) {
+      await NotificationService.pushToPermission('project.review', {
+        type: 'PROJECT_UPDATE',
+        title: 'Đã sinh dự thảo hợp đồng BM.06',
+        message: `${outline.code}: ${existing.contractNo || ''} — chờ PKH rà soát`,
+        link: `/projects/contracts/${existing.id}`,
+      })
+      await NotificationService.pushToPermission('project.budget_propose', {
+        type: 'PROJECT_UPDATE',
+        title: 'Đã sinh dự thảo hợp đồng BM.06',
+        message: `${outline.code}: ${existing.contractNo || ''} — chờ PKH rà soát`,
+        link: `/projects/contracts/${existing.id}`,
+      })
+    }
+
+    return {
+      row: existing,
+      created: !(opts?.forceRegen),
+      regenerated: !!opts?.forceRegen,
+    }
+  }
+
+  /**
+   * Ghi lại file DOCX từ payload. Giữ trạng thái hiện tại nếu hợp đồng đã có.
+   */
+  static async persistDocx(
+    outline: ProjectOutline,
+    existing: ProjectContract | null,
+    mergePayload: Record<string, string>,
+    actorId: number | null
+  ) {
     const template = await ContractTemplateService.getDefaultActive('HOP_DONG')
     if (!template) throw new Error('NO_DEFAULT_TEMPLATE')
 
     const templatePath = await findContractTemplateFilePath(template.storedFileName)
     if (!templatePath) throw new Error('TEMPLATE_FILE_MISSING')
 
-    const mergePayload = this.buildMergePayload(outline)
     const merged = await mergeDocxTemplate({
       templatePath,
       data: mergePayload,
@@ -208,7 +263,6 @@ export default class ProjectContractService {
     if (existing) {
       const oldStored = existing.storedFileName
       existing.contractTemplateId = template.id
-      existing.status = 'HOP_DONG_DRAFT'
       existing.contractNo = contractNo
       existing.fileName = fileName
       existing.storedFileName = merged.storedFileName
@@ -225,66 +279,26 @@ export default class ProjectContractService {
         try {
           await fs.unlink(oldPath)
         } catch {
-          // bỏ qua
+          // bỏ qua file cũ đã mất
         }
       }
-    } else {
-      existing = await ProjectContract.create({
-        projectOutlineId: outline.id,
-        contractTemplateId: template.id,
-        status: 'HOP_DONG_DRAFT',
-        contractNo,
-        fileName,
-        storedFileName: merged.storedFileName,
-        fileUrl: merged.fileUrl,
-        fileSize: merged.fileSize,
-        mergePayload,
-        version: 1,
-        generatedBy: actorId,
-        generatedAt: DateTime.now(),
-      })
+      return existing
     }
 
-    outline.activeContractId = existing.id
-    outline.contractStatus = 'HOP_DONG_DRAFT'
-    await outline.save()
-
-    if (actorId != null) {
-      await ProjectOutlineService.writeAudit(
-        outline.id,
-        actorId,
-        opts?.forceRegen ? 'CONTRACT_DRAFT_REGENERATED' : 'CONTRACT_DRAFT_GENERATED',
-        outline.status,
-        outline.status,
-        {
-          contractId: existing.id,
-          templateId: template.id,
-          contractNo,
-          version: existing.version,
-        }
-      )
-    }
-
-    if (!opts?.silent) {
-      await NotificationService.pushToPermission('project.review', {
-        type: 'PROJECT_UPDATE',
-        title: 'Đã sinh dự thảo hợp đồng BM.06',
-        message: `${outline.code}: ${contractNo} — chờ PKH rà soát`,
-        link: `/projects/contracts/${existing.id}`,
-      })
-      await NotificationService.pushToPermission('project.budget_propose', {
-        type: 'PROJECT_UPDATE',
-        title: 'Đã sinh dự thảo hợp đồng BM.06',
-        message: `${outline.code}: ${contractNo} — chờ PKH rà soát`,
-        link: `/projects/contracts/${existing.id}`,
-      })
-    }
-
-    return {
-      row: existing,
-      created: !(opts?.forceRegen),
-      regenerated: !!opts?.forceRegen,
-    }
+    return ProjectContract.create({
+      projectOutlineId: outline.id,
+      contractTemplateId: template.id,
+      status: 'HOP_DONG_DRAFT',
+      contractNo,
+      fileName,
+      storedFileName: merged.storedFileName,
+      fileUrl: merged.fileUrl,
+      fileSize: merged.fileSize,
+      mergePayload,
+      version: 1,
+      generatedBy: actorId,
+      generatedAt: DateTime.now(),
+    })
   }
 
   static async resolveDownloadPath(id: number) {

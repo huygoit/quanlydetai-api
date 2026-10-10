@@ -873,6 +873,7 @@ export default class ProfileController {
       training_courses: p.trainingCourses ?? [],
       teachingWorkRecords: p.teachingWorkRecords ?? [],
       teaching_work_records: p.teachingWorkRecords ?? [],
+      completedResearchTasks: p.completedResearchTasks ?? [],
       mainResearchArea: p.mainResearchArea,
       researchFieldId: p.researchFieldId ?? null,
       specialization: p.specialization ?? null,

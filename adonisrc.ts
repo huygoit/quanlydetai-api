@@ -61,6 +61,10 @@ export default defineConfig({
     () => import('#start/validator'),
     () => import('#start/routes'),
     () => import('#start/kernel'),
+    {
+      file: () => import('#start/module56_reminder'),
+      environment: ['web'],
+    },
   ],
 
   /*

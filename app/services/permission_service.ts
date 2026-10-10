@@ -293,6 +293,24 @@ export default class PermissionService {
       module: 'project',
       action: 'contract_manage',
     },
+    {
+      code: 'project.contract_publish',
+      name: 'TC-HC phát hành hợp đồng và biên bản thanh lý',
+      module: 'project',
+      action: 'contract_publish',
+    },
+    {
+      code: 'project.contract_lead_confirm',
+      name: 'Trưởng/phó phòng KH xác nhận gia hạn lần 2',
+      module: 'project',
+      action: 'contract_lead_confirm',
+    },
+    {
+      code: 'project.procurement_handle',
+      name: 'CSVC xử lý đề nghị mua sắm',
+      module: 'project',
+      action: 'procurement_handle',
+    },
   ]
 
   static async syncMissingStandardPermissions(): Promise<{ added: number; permissions: Permission[] }> {

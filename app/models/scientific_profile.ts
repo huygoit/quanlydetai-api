@@ -143,6 +143,14 @@ export default class ScientificProfile extends BaseModel {
   })
   declare teachingWorkRecords: Record<string, unknown>[]
 
+  /** Nhiệm vụ KH đã hoàn thành (Module 6 ghi khi thanh lý). */
+  @column({
+    prepare: (v: unknown[] | null) => (v == null ? '[]' : JSON.stringify(v)),
+    consume: (v: string | unknown) =>
+      typeof v === 'string' ? JSON.parse(v) : Array.isArray(v) ? v : [],
+  })
+  declare completedResearchTasks: Record<string, unknown>[]
+
   /**
    * Quá trình đào tạo theo bậc (Đại học, Thạc sĩ, NCS…).
    * JSON: [{ id, level, major, institution, country, startYear, endYear, trainingForm, note }]
