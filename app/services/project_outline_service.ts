@@ -8,6 +8,7 @@ import type {
   ProjectOutlineStatus,
 } from '#models/project_outline'
 import ProjectOutlineMember from '#models/project_outline_member'
+import ProjectOutlineDefenseMember from '#models/project_outline_defense_member'
 import ProjectOutlineBudgetLine from '#models/project_outline_budget_line'
 import type { OutlineBudgetGroup } from '#models/project_outline_budget_line'
 import ProjectOutlineAudit from '#models/project_outline_audit'
@@ -205,6 +206,68 @@ export default class ProjectOutlineService {
     }
 
     return [...new Set([...owned, ...asPrincipal].map((p) => p.id))]
+  }
+
+  /** Thuyết minh user được theo dõi: là thành viên hoặc nằm trong hội đồng bảo vệ. */
+  static async outlineIdsFollowedByUser(userId: number): Promise<number[]> {
+    const ids = new Set<number>()
+    const profile = await ScientificProfile.query().where('user_id', userId).select('id').first()
+    if (profile) {
+      const rows = await ProjectOutlineMember.query()
+        .where('profile_id', profile.id)
+        .select('project_outline_id')
+      for (const row of rows) ids.add(row.projectOutlineId)
+    }
+    const sessions = await ProjectOutlineDefenseMember.query().where('user_id', userId).select('session_id')
+    const sessionIds = sessions.map((s) => s.sessionId)
+    if (sessionIds.length) {
+      const outlines = await ProjectOutline.query()
+        .whereIn('active_defense_session_id', sessionIds)
+        .select('id')
+      for (const row of outlines) ids.add(row.id)
+    }
+    return [...ids]
+  }
+
+  static async userFollowsOutline(
+    outline: { id: number; activeDefenseSessionId: number | null },
+    userId: number
+  ) {
+    const profile = await ScientificProfile.query().where('user_id', userId).select('id').first()
+    if (profile) {
+      const mem = await ProjectOutlineMember.query()
+        .where('project_outline_id', outline.id)
+        .where('profile_id', profile.id)
+        .first()
+      if (mem) return true
+    }
+    if (!outline.activeDefenseSessionId) return false
+    const hd = await ProjectOutlineDefenseMember.query()
+      .where('session_id', outline.activeDefenseSessionId)
+      .where('user_id', userId)
+      .first()
+    return !!hd
+  }
+
+  /** User id của thành viên đã có hồ sơ, trừ người được loại. */
+  static async memberUserIds(outlineId: number, exceptUserId?: number | null) {
+    const members = await ProjectOutlineMember.query()
+      .where('project_outline_id', outlineId)
+      .whereNotNull('profile_id')
+      .select('profile_id')
+    const profileIds = members.map((m) => m.profileId).filter((id): id is number => !!id)
+    if (!profileIds.length) return []
+    const profiles = await ScientificProfile.query()
+      .whereIn('id', profileIds)
+      .whereNotNull('user_id')
+      .select('user_id')
+    return [
+      ...new Set(
+        profiles
+          .map((p) => p.userId)
+          .filter((id): id is number => !!id && id !== exceptUserId)
+      ),
+    ]
   }
 
   /** Copy thông tin đề xuất → bản thuyết minh mới */

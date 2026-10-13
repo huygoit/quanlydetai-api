@@ -6,7 +6,13 @@ import SubmissionPeriod from '#models/submission_period'
 import CallForProposalAudit from '#models/call_for_proposal_audit'
 import type { ProjectProposalLevel } from '#models/project_proposal'
 
-export type CfpStatus = 'DRAFT' | 'PENDING_BGH' | 'RETURNED' | 'APPROVED' | 'PUBLISHED'
+export type CfpStatus =
+  | 'DRAFT'
+  | 'PENDING_TRUONG_PHONG'
+  | 'PENDING_BGH'
+  | 'RETURNED'
+  | 'APPROVED'
+  | 'PUBLISHED'
 export type CfpPeriodKind = 'ACADEMIC' | 'FINANCIAL'
 
 export default class CallForProposal extends BaseModel {
@@ -56,6 +62,10 @@ export default class CallForProposal extends BaseModel {
 
   @column()
   declare status: CfpStatus
+
+  /** false: nộp đề xuất đi thẳng phòng KH, không chờ khoa xác nhận */
+  @column()
+  declare requireUnitReview: boolean
 
   @column()
   declare createdBy: number

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bổ sung API — việc frontend cần sửa</title>
+  <style>
+    :root {
+      --ink: #1c2430;
+      --muted: #5c6b7a;
+      --line: #d9e0e7;
+      --bg: #f4f7fa;
+      --card: #fff;
+      --accent: #0f5c4c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font: 16px/1.55 "Segoe UI", system-ui, sans-serif;
+    }
+    header {
+      background: var(--accent);
+      color: #fff;
+      padding: 28px 20px 22px;
+    }
+    header h1 { margin: 0 0 8px; font-size: 1.7rem; }
+    header p { margin: 0; max-width: 760px; }
+    header a { color: #d7fff4; }
+    main { max-width: 980px; margin: 0 auto; padding: 20px 16px 64px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+    nav a {
+      color: var(--accent);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 12px;
+      text-decoration: none;
+      font-size: 0.92rem;
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 18px 8px;
+      margin: 0 0 16px;
+    }
+    h2 { margin: 0 0 10px; font-size: 1.25rem; }
+    h3 { margin: 16px 0 8px; font-size: 1.05rem; }
+    .muted { color: var(--muted); }
+    code, pre { font-family: Consolas, "Courier New", monospace; font-size: 0.88rem; }
+    code { background: #eef3f6; padding: 1px 5px; border-radius: 4px; }
+    pre {
+      background: #132028;
+      color: #e7f0ea;
+      padding: 12px 14px;
+      border-radius: 8px;
+      overflow: auto;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--line); padding: 7px 8px; vertical-align: top; text-align: left; }
+    th { background: #eef5f3; }
+    .todo { background: #f3faf7; border-left: 4px solid var(--accent); padding: 8px 12px; margin: 8px 0 14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bổ sung API — việc frontend cần sửa</h1>
+    <p>Chỉ các chỗ API vừa đổi so với tài liệu cũ. Phần còn lại vẫn theo <a href="module-5-6-fe.html">module-5-6-fe.html</a>. Base <code>http://localhost:3333</code>, header <code>Authorization: Bearer {token}</code>.</p>
+  </header>
+  <main>
+    <nav>
+      <a href="#ky">Kỳ tuyển chọn</a>
+      <a href="#hoan-thien">Bản hoàn thiện</a>
+      <a href="#ky-hd">Ký hợp đồng</a>
+      <a href="#bien-ban">Mở lại biên bản</a>
+      <a href="#thanh-tuu">Thành tựu</a>
+      <a href="#thanh-vien">Thành viên xem</a>
+    </nav>
+
+    <section id="ky">
+      <h2>1. Kỳ tuyển chọn và nộp đề xuất</h2>
+      <div class="todo">Form tạo / sửa thông báo tuyển chọn thêm một ô. Danh sách chờ duyệt thêm một trạng thái.</div>
+      <table>
+        <thead><tr><th>Việc</th><th>Cách làm</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Ô “Cần khoa xác nhận”</td>
+            <td>Gửi <code>requireUnitReview</code> (boolean) khi <code>POST/PUT /api/call-for-proposals</code>. Mặc định <code>true</code>. Response có cùng field. <code>false</code> thì người nộp đi thẳng phòng KH, không còn màn khoa.</td>
+          </tr>
+          <tr>
+            <td>Chuyên viên trình</td>
+            <td>Sau <code>POST /api/call-for-proposals/:id/submit</code>, nếu người trình không có quyền <code>cfp.approve</code> thì <code>status = PENDING_TRUONG_PHONG</code>. Hiện nút “Trưởng phòng duyệt” gọi <code>POST /api/call-for-proposals/:id/head-approve</code> (quyền <code>cfp.approve</code>). Xong thì <code>PENDING_BGH</code>, nút BGH giữ như cũ.</td>
+          </tr>
+          <tr>
+            <td>Trả lại</td>
+            <td><code>POST /:id/return</code> dùng được cả khi <code>PENDING_TRUONG_PHONG</code> và <code>PENDING_BGH</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Nhãn gợi ý: <code>PENDING_TRUONG_PHONG</code> = chờ trưởng phòng. <code>PENDING_BGH</code> = chờ ban giám hiệu.</p>
+    </section>
+
+    <section id="hoan-thien">
+      <h2>2. Bản thuyết minh hoàn thiện</h2>
+      <p>Nộp xong không còn nhảy thẳng sang xác nhận kinh phí. Đọc <code>revisionContext</code> trong <code>GET /api/project-outlines/:id</code>.</p>
+      <table>
+        <thead><tr><th>status</th><th>revisionGateStatus</th><th>Nút</th></tr></thead>
+        <tbody>
+          <tr><td><code>CHINH_SUA_TM</code></td><td>null</td><td>Chủ nhiệm sửa và nộp. Nếu có <code>revisionReturnReason</code> thì hiện lý do trả lại.</td></tr>
+          <tr><td><code>CHO_HD_XAC_NHAN_TM</code></td><td><code>CHO_THU_KY</code></td><td>Chỉ thư ký của phiên: Đồng ý / Trả lại.</td></tr>
+          <tr><td><code>CHO_HD_XAC_NHAN_TM</code></td><td><code>CHO_CHU_TICH</code></td><td>Chỉ chủ tịch của phiên: Đồng ý / Trả lại.</td></tr>
+          <tr><td><code>CHO_PKH_DUYET_TM</code></td><td><code>CHO_PKH</code></td><td>Phòng KH (<code>project.review</code> hoặc <code>project.budget_propose</code>): Đồng ý / Trả lại.</td></tr>
+          <tr><td><code>CHO_XAC_NHAN_KP</code></td><td>null</td><td>Màn kinh phí như cũ.</td></tr>
+        </tbody>
+      </table>
+      <pre>POST /api/project-outlines/:id/revision-council
+POST /api/project-outlines/:id/revision-pkh
+
+{ "accept": true }
+{ "accept": false, "reason": "Cần bổ sung mục kinh phí" }</pre>
+      <p><code>accept</code> bắt buộc <code>true</code> hoặc <code>false</code>. Trả lại thì <code>reason</code> tối thiểu 5 ký tự. Thư ký và chủ tịch không có cờ <code>roles</code> riêng: so <code>userId</code> đang đăng nhập với thư ký / chủ tịch của buổi bảo vệ. Gọi nhầm người thì API trả 422, hiện <code>message</code>.</p>
+    </section>
+
+    <section id="ky-hd">
+      <h2>3. Cách ký hợp đồng</h2>
+      <p>Trên màn hợp đồng, phòng KH chọn cách ký trước khi chủ nhiệm ký. Field nằm ở bản ghi <code>sign_mode</code> và trong <code>GET /api/project-contracts/:id/flow</code> → <code>workflow.signMode</code>.</p>
+      <pre>PUT /api/project-contracts/:id/sign-mode
+{ "signMode": "ONLINE" }</pre>
+      <ul>
+        <li><code>ONLINE</code>: nút ký như cũ. <code>signedFileUrl</code> được để trống.</li>
+        <li><code>GIAY</code>: bắt buộc upload scan rồi gửi <code>signedFileUrl</code> vào <code>POST /api/project-contracts/:id/cnnv-sign</code>. Thiếu file thì 422 “Ký bản giấy cần file scan hợp đồng đã ký.”</li>
+      </ul>
+      <p>Chỉ sửa được khi hợp đồng chưa <code>HOP_DONG_DA_KY</code>. Quyền <code>project.contract_manage</code>.</p>
+    </section>
+
+    <section id="bien-ban">
+      <h2>4. Mở lại biên bản đánh giá cuối kỳ</h2>
+      <p>Khi <code>minutesLocked = true</code> và user là ADMIN hoặc SUPER_ADMIN, hiện nút “Mở lại biên bản”. Không hiện cho phòng KH thường.</p>
+      <pre>POST /api/module56/final/:outlineId/minutes-reopen
+{ "reason": "Sai xếp loại, cần ghi lại" }</pre>
+      <p><code>reason</code> tối thiểu 5 ký tự. API chỉ cho mở khi quyết toán chưa nộp và giải trình chưa nộp. Nếu đã đi tiếp, 422 với message sẵn — hiện nguyên câu, không tự mở khóa trên giao diện. Mở được thì <code>executionStatus</code> về <code>DGCK_HOP_HD</code>, gọi lại <code>GET /api/module56/final/:outlineId</code>.</p>
+    </section>
+
+    <section id="thanh-tuu">
+      <h2>5. Trang thành tựu</h2>
+      <p>Màn danh sách nhiệm vụ đã hoàn thành. Không đọc mảng trong hồ sơ khoa học.</p>
+      <pre>GET /api/module56/achievements?year=2026&amp;userId=12&amp;departmentId=3</pre>
+      <p>Cả ba query đều tùy chọn. Người không có <code>project.view</code> hoặc <code>project.review</code> chỉ thấy nhiệm vụ của chính mình.</p>
+      <pre>{
+  "outlineId": 1,
+  "code": "TM-2026-0001",
+  "title": "Tên nhiệm vụ",
+  "ownerId": 4,
+  "ownerName": "Nguyễn A",
+  "ownerUnit": "Khoa Tin",
+  "budget": 50000000,
+  "classification": "DAT_YEU_CAU",
+  "completedAt": "2026-10-01T08:00:00.000+07:00",
+  "members": [{ "fullName": "Trần B", "role": "MEMBER", "profileId": 9, "departmentId": 3 }]
+}</pre>
+      <p>Nhãn xếp loại: <code>DAT_YEU_CAU</code> đạt, <code>CAN_BO_SUNG</code> cần bổ sung, <code>KHONG_DAT</code> không đạt. Lọc năm theo ngày chủ nhiệm xác nhận thanh lý.</p>
+    </section>
+
+    <section id="thanh-vien">
+      <h2>6. Thành viên và hội đồng xem thuyết minh</h2>
+      <p><code>GET /api/project-outlines</code> (không gửi <code>scope=pkh</code>) đã gồm thuyết minh mà user là thành viên hoặc nằm trong hội đồng bảo vệ. Không cần API mới. Màn “Nhiệm vụ của tôi” đừng lọc chỉ <code>ownerId</code>.</p>
+      <p>Khi chủ nhiệm nộp thuyết minh, thành viên có tài khoản nhận thông báo in-app. Link: <code>/projects/outlines/form/{id}</code>. Họ xem được, không sửa được.</p>
+    </section>
+  </main>
+</body>
+</html>

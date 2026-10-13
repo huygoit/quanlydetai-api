@@ -8,6 +8,7 @@ export type CfpAuditAction =
   | 'CREATE'
   | 'UPDATE'
   | 'SUBMIT'
+  | 'HEAD_APPROVE'
   | 'APPROVE'
   | 'RETURN'
   | 'PUBLISH'

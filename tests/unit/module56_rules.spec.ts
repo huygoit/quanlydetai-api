@@ -1,5 +1,11 @@
 import { test } from '@japa/runner'
-import { assertBudgetAmounts, applyBm06Edits, hasCouncilQuorum, mergeBm06Edits } from '#services/module56_rules'
+import {
+  assertBudgetAmounts,
+  applyBm06Edits,
+  canReopenFinalMinutes,
+  hasCouncilQuorum,
+  mergeBm06Edits,
+} from '#services/module56_rules'
 import { BUDGET_LINE_CODES } from '#constants/module56'
 
 function du10(muc09 = 0) {
@@ -30,6 +36,25 @@ test.group('Module 5–6 — quy tắc thuần', () => {
     assert.equal(next.dia_diem_ky, 'TP.HCM')
     assert.equal(next.ten_nhiem_vu, 'A')
     assert.throws(() => applyBm06Edits(current, { ten_nhiem_vu: 'B' }), 'FIELDS_REQUIRED')
+  })
+
+  test('chỉ mở lại biên bản khi chưa có quyết toán hoặc giải trình đã nộp', ({ assert }) => {
+    const base = {
+      minutesLocked: true,
+      executionStatus: 'DGCK_CHO_QUYET_TOAN',
+      settlementStatus: 'QT_DRAFT',
+      settlementLineCount: 0,
+      settlementFileCount: 0,
+      explanationStatus: null,
+    }
+    assert.isTrue(canReopenFinalMinutes(base))
+    assert.isTrue(canReopenFinalMinutes({ ...base, executionStatus: 'DGCK_CHINH_SUA', settlementStatus: null }))
+    assert.isTrue(canReopenFinalMinutes({ ...base, executionStatus: 'DGCK_KHONG_DAT', settlementStatus: null }))
+    assert.isFalse(canReopenFinalMinutes({ ...base, minutesLocked: false }))
+    assert.isFalse(canReopenFinalMinutes({ ...base, settlementStatus: 'QT_CHO_PKH' }))
+    assert.isFalse(canReopenFinalMinutes({ ...base, settlementLineCount: 1 }))
+    assert.isFalse(canReopenFinalMinutes({ ...base, explanationStatus: 'CHO_THU_KY', executionStatus: 'DGCK_CHINH_SUA' }))
+    assert.isFalse(canReopenFinalMinutes({ ...base, executionStatus: 'DGCK_DINH_CHI', settlementStatus: null }))
   })
 
   test('sinh lại hợp đồng giữ điều khoản đã sửa', ({ assert }) => {

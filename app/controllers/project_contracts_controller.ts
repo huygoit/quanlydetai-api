@@ -213,6 +213,20 @@ export default class ProjectContractsController {
     }
   }
 
+  async signMode({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const data = await ProjectContractFlowService.setSignMode(
+        Number(params.id),
+        user.id,
+        String(request.input('signMode', request.input('sign_mode', '')))
+      )
+      return response.ok({ success: true, data })
+    } catch (err) {
+      return this.mapError(response, err)
+    }
+  }
+
   async cnnvSign({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
     try {

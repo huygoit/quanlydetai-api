@@ -16,6 +16,8 @@ export type ProjectOutlineStatus =
   | 'PHANBIEN_KIN'
   | 'BAOVE_PENDING'
   | 'CHINH_SUA_TM'
+  | 'CHO_HD_XAC_NHAN_TM'
+  | 'CHO_PKH_DUYET_TM'
   | 'CHO_XAC_NHAN_KP'
   | 'CHO_TC_THAM_TRA'
   | 'LDPD_PENDING'
@@ -226,6 +228,13 @@ export default class ProjectOutline extends BaseModel {
 
   @column.dateTime()
   declare revisionSubmittedAt: DateTime | null
+
+  /** CHO_THU_KY | CHO_CHU_TICH | CHO_PKH — cổng sau khi nộp bản hoàn thiện */
+  @column()
+  declare revisionGateStatus: 'CHO_THU_KY' | 'CHO_CHU_TICH' | 'CHO_PKH' | null
+
+  @column()
+  declare revisionReturnReason: string | null
 
   @column.dateTime()
   declare revisionReminderSentAt: DateTime | null

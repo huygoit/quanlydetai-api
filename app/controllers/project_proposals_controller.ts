@@ -553,24 +553,38 @@ export default class ProjectProposalsController {
       const ownerUnit = await resolveUserUnitLabel(user)
       if (ownerUnit) proposal.ownerUnit = ownerUnit
     }
-    proposal.status = 'SUBMITTED'
+    const boQuaKhoa = active.callForProposal.requireUnitReview === false
     proposal.callForProposalId = active.callForProposal.id
-    proposal.unitApproved = null
+    if (boQuaKhoa) {
+      proposal.status = 'CHO_PKH'
+      proposal.unitApproved = true
+    } else {
+      proposal.status = 'SUBMITTED'
+      proposal.unitApproved = null
+    }
     await proposal.save()
 
-    await this.writeAudit(proposal.id, user.id, 'SUBMIT', from, 'SUBMITTED')
+    await this.writeAudit(proposal.id, user.id, boQuaKhoa ? 'SUBMIT_SKIP_UNIT' : 'SUBMIT', from, proposal.status)
     await AuditLogService.log({
       userId: user.id,
       userName: user.fullName,
-      action: 'SUBMIT',
+      action: boQuaKhoa ? 'SUBMIT_SKIP_UNIT' : 'SUBMIT',
       entityType: 'PROJECT_PROPOSAL',
       entityId: String(proposal.id),
       newData: this.serialize(proposal),
       ctx,
     })
 
-    // AC3: thông báo Trưởng Khoa (user có project.assign_reviewer cùng đơn vị)
-    await NotificationService.notifyUnitHeadsProposalSubmitted(proposal)
+    if (boQuaKhoa) {
+      await NotificationService.pushToPermission('project.review', {
+        type: 'PROJECT_UPDATE',
+        title: 'Đề xuất chờ PKH kiểm tra',
+        message: `${proposal.ownerName} nộp "${proposal.title}" (${proposal.code}). Kỳ này không yêu cầu khoa xác nhận.`,
+        link: `/projects/pkh-review?id=${proposal.id}`,
+      })
+    } else {
+      await NotificationService.notifyUnitHeadsProposalSubmitted(proposal)
+    }
 
     return response.ok({ success: true, data: this.serialize(proposal) })
   }

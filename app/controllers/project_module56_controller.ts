@@ -5,6 +5,7 @@ import ProjectProcurementService from '#services/project_procurement_service'
 import ProjectProgressService from '#services/project_progress_service'
 import ProjectAdjustmentService from '#services/project_adjustment_service'
 import ProjectFinalService from '#services/project_final_service'
+import ProjectAchievementService from '#services/project_achievement_service'
 import { mapModule56Error } from '#utils/module56_http'
 
 /**
@@ -257,10 +258,35 @@ export default class ProjectModule56Controller {
     )
   }
 
+  async achievements({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const yearRaw = Number(request.input('year'))
+    const userRaw = Number(request.input('userId'))
+    const deptRaw = Number(request.input('departmentId'))
+    return this.run(response, () =>
+      ProjectAchievementService.list(user.id, {
+        year: Number.isFinite(yearRaw) && yearRaw > 0 ? yearRaw : null,
+        userId: Number.isFinite(userRaw) && userRaw > 0 ? userRaw : null,
+        departmentId: Number.isFinite(deptRaw) && deptRaw > 0 ? deptRaw : null,
+      })
+    )
+  }
+
   async finalMinutes({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
     return this.run(response, () =>
       ProjectFinalService.saveMinutes(Number(params.outlineId), user.id, request.body())
+    )
+  }
+
+  async finalMinutesReopen({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () =>
+      ProjectFinalService.reopenMinutes(
+        Number(params.outlineId),
+        user.id,
+        String(request.input('reason', ''))
+      )
     )
   }
 

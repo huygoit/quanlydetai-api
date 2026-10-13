@@ -73,3 +73,25 @@ export function assertBudgetAmounts(amounts: Map<string, number>, approvedTotal:
 export function hasCouncilQuorum(present: number, total: number) {
   return total > 0 && present * 3 >= total * 2
 }
+
+/**
+ * ADMIN chỉ mở lại biên bản cuối kỳ khi chưa có việc phía sau
+ * (quyết toán đã nộp, giải trình đã nộp, hoặc đã đình chỉ).
+ */
+export function canReopenFinalMinutes(input: {
+  minutesLocked: boolean
+  executionStatus: string | null
+  settlementStatus: string | null
+  settlementLineCount: number
+  settlementFileCount: number
+  explanationStatus: string | null
+}) {
+  if (!input.minutesLocked) return false
+  if (input.settlementLineCount > 0 || input.settlementFileCount > 0) return false
+  if (input.explanationStatus) return false
+  if (input.settlementStatus && input.settlementStatus !== 'QT_DRAFT') return false
+  if (input.executionStatus === 'DGCK_CHO_QUYET_TOAN') return true
+  if (input.executionStatus === 'DGCK_CHINH_SUA') return true
+  if (input.executionStatus === 'DGCK_KHONG_DAT') return true
+  return false
+}

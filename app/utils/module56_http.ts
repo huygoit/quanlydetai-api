@@ -44,6 +44,12 @@ const MAP: Record<string, [number, string]> = {
   COUNCIL_CONFLICT: [422, 'Thành viên hội đồng không được là thành viên nhiệm vụ.'],
   SHEET_INCOMPLETE: [422, 'Phiếu nhận xét còn thiếu hoặc nhận xét chung dưới 100 ký tự.'],
   MINUTES_LOCKED: [422, 'Biên bản đã khóa.'],
+  MINUTES_REOPEN_BLOCKED: [
+    422,
+    'Không mở lại được vì quyết toán hoặc giải trình đã đi tiếp. Chỉ mở khi chưa nộp các phiếu đó.',
+  ],
+  SIGNED_FILE_REQUIRED: [422, 'Ký bản giấy cần file scan hợp đồng đã ký.'],
+  INVALID_SIGN_MODE: [422, 'Cách ký chỉ nhận trực tuyến hoặc bản giấy.'],
   COUNCIL_REQUIRED: [422, 'Chưa lập hội đồng hoặc chưa có ngày họp.'],
   QUORUM: [422, 'Số thành viên có mặt chưa đủ 2/3.'],
   SHEET_MISSING: [422, 'Còn phản biện chưa nộp phiếu nhận xét.'],
