@@ -14,6 +14,7 @@ const cfpBody = {
   levels: vine.array(vine.enum(LEVEL_OPTIONS)).minLength(1).optional(),
   contentHtml: vine.string().trim().optional().nullable(),
   attachmentUrls: vine.array(vine.string().trim().maxLength(500)).optional(),
+  requireUnitReview: vine.boolean().optional(),
 }
 
 export const createCfpValidator = vine.compile(
@@ -32,6 +33,7 @@ export const updateCfpValidator = vine.compile(
     levels: vine.array(vine.enum(LEVEL_OPTIONS)).minLength(1).optional(),
     contentHtml: vine.string().trim().optional().nullable(),
     attachmentUrls: vine.array(vine.string().trim().maxLength(500)).optional(),
+    requireUnitReview: vine.boolean().optional(),
   })
 )
 

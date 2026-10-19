@@ -11,6 +11,8 @@ export type ProjectContractStatus =
   | 'HOP_DONG_CHO_PHAT_HANH'
   | 'HOP_DONG_DA_KY'
 
+export type ContractSignMode = 'ONLINE' | 'GIAY'
+
 /**
  * Hợp đồng nhiệm vụ (BM.06) — Module 5.
  */
@@ -28,6 +30,10 @@ export default class ProjectContract extends BaseModel {
 
   @column()
   declare status: ProjectContractStatus
+
+  /** ONLINE: bấm xác nhận. GIAY: bắt buộc file scan bản giấy. */
+  @column()
+  declare signMode: ContractSignMode
 
   @column()
   declare contractNo: string | null

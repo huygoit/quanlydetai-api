@@ -24,6 +24,7 @@ export default class ProjectContractService {
       project_outline_id: row.projectOutlineId,
       contract_template_id: row.contractTemplateId,
       status: row.status,
+      sign_mode: row.signMode || 'ONLINE',
       contract_no: row.contractNo,
       file_name: row.fileName,
       stored_file_name: row.storedFileName,

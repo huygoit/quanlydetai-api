@@ -36,6 +36,15 @@ export default class ProjectOutlinesController {
     )
   }
 
+  private coNguCanhChinhSua(status: string) {
+    return (
+      status === 'CHINH_SUA_TM' ||
+      status === 'CHO_HD_XAC_NHAN_TM' ||
+      status === 'CHO_PKH_DUYET_TM' ||
+      status === 'CHO_XAC_NHAN_KP'
+    )
+  }
+
   private async canManageOwn(userId: number) {
     return (
       (await PermissionService.userHasPermission(userId, 'project.outline_manage')) ||
@@ -115,7 +124,8 @@ export default class ProjectOutlinesController {
   async index({ auth, request, response }: HttpContext) {
     const user = auth.use('api').user!
     const isPkh = await this.canViewPkh(user.id)
-    if (!(await this.canManageOwn(user.id)) && !isPkh) {
+    const theoDoi = await ProjectOutlineService.outlineIdsFollowedByUser(user.id)
+    if (!(await this.canManageOwn(user.id)) && !isPkh && !theoDoi.length) {
       return response.forbidden({ success: false, message: 'Không có quyền.' })
     }
 
@@ -125,11 +135,19 @@ export default class ProjectOutlinesController {
       if (status) q.where('status', status)
       else q.where('status', 'THUYETMINH_PENDING')
     } else {
-      const writableIds = await ProjectOutlineService.proposalIdsWritableByUser(user.id)
-      if (!writableIds.length) {
+      const writableIds = (await this.canManageOwn(user.id))
+        ? await ProjectOutlineService.proposalIdsWritableByUser(user.id)
+        : []
+      if (!writableIds.length && !theoDoi.length) {
         return response.ok({ success: true, data: [] })
       }
-      q.whereIn('project_proposal_id', writableIds)
+      q.where((b) => {
+        if (writableIds.length) b.whereIn('project_proposal_id', writableIds)
+        if (theoDoi.length) {
+          if (writableIds.length) b.orWhereIn('id', theoDoi)
+          else b.whereIn('id', theoDoi)
+        }
+      })
       if (status) q.where('status', status)
     }
 
@@ -212,10 +230,9 @@ export default class ProjectOutlinesController {
         }
       }
       const full = await this.loadFull(existing.id)
-      const revisionContext =
-        full!.status === 'CHINH_SUA_TM' || full!.status === 'CHO_XAC_NHAN_KP'
-          ? await ProjectOutlineRevisionService.getRevisionContext(full!)
-          : null
+      const revisionContext = this.coNguCanhChinhSua(full!.status)
+        ? await ProjectOutlineRevisionService.getRevisionContext(full!)
+        : null
       return response.ok({
         success: true,
         data: {
@@ -243,15 +260,15 @@ export default class ProjectOutlinesController {
       return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
     }
     const isPkh = await this.canViewPkh(user.id)
-    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh) {
+    const theoDoi = await ProjectOutlineService.userFollowsOutline(outline, user.id)
+    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh && !theoDoi) {
       return response.forbidden({ success: false, message: 'Không có quyền xem.' })
     }
     if (outline.status === 'CHINH_SUA_TM') {
       await ProjectOutlineRevisionService.maybeSendReminder(outline)
     }
     const revisionContext =
-      outline.status === 'CHINH_SUA_TM' ||
-      outline.status === 'CHO_XAC_NHAN_KP' ||
+      this.coNguCanhChinhSua(outline.status) ||
       outline.defenseConclusion === 'THONG_QUA_DIEU_CHINH'
         ? await ProjectOutlineRevisionService.getRevisionContext(outline)
         : null
@@ -344,10 +361,9 @@ export default class ProjectOutlinesController {
     }
 
     const full = await this.loadFull(outline.id)
-    const revisionContext =
-      full!.status === 'CHINH_SUA_TM'
-        ? await ProjectOutlineRevisionService.getRevisionContext(full!)
-        : null
+    const revisionContext = this.coNguCanhChinhSua(full!.status)
+      ? await ProjectOutlineRevisionService.getRevisionContext(full!)
+      : null
     return response.ok({
       success: true,
       data: {
@@ -422,6 +438,13 @@ export default class ProjectOutlinesController {
       title: outline.title,
       ownerName: outline.ownerName,
     })
+    const thanhVien = await ProjectOutlineService.memberUserIds(outline.id, outline.ownerId)
+    await NotificationService.pushMany(thanhVien, {
+      type: 'PROJECT_UPDATE',
+      title: 'Bạn đang tham gia nhiệm vụ',
+      message: `${outline.code} — ${outline.title}. Có thể theo dõi tiến độ thuyết minh.`,
+      link: `/projects/outlines/form/${outline.id}`,
+    })
 
     const full = await this.loadFull(outline.id)
     return response.ok({
@@ -493,7 +516,8 @@ export default class ProjectOutlinesController {
       return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
     }
     const isPkh = await this.canViewPkh(user.id)
-    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh) {
+    const theoDoi = await ProjectOutlineService.userFollowsOutline(outline, user.id)
+    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh && !theoDoi) {
       return response.forbidden({ success: false, message: 'Không có quyền.' })
     }
     if (outline.status === 'CHINH_SUA_TM') {
@@ -511,7 +535,8 @@ export default class ProjectOutlinesController {
       return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
     }
     const isPkh = await this.canViewPkh(user.id)
-    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh) {
+    const theoDoi = await ProjectOutlineService.userFollowsOutline(outline, user.id)
+    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh && !theoDoi) {
       return response.forbidden({ success: false, message: 'Không có quyền.' })
     }
     const { default: ProjectOutlineVersion } = await import('#models/project_outline_version')
@@ -532,7 +557,8 @@ export default class ProjectOutlinesController {
       return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
     }
     const isPkh = await this.canViewPkh(user.id)
-    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh) {
+    const theoDoi = await ProjectOutlineService.userFollowsOutline(outline, user.id)
+    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh && !theoDoi) {
       return response.forbidden({ success: false, message: 'Không có quyền.' })
     }
     const fromId = request.input('fromVersionId')
@@ -571,7 +597,7 @@ export default class ProjectOutlinesController {
         success: true,
         message: result.idempotent
           ? 'Bản hoàn thiện đã được nộp trước đó.'
-          : 'Đã nộp bản hoàn thiện — chuyển chờ xác nhận kinh phí.',
+          : 'Đã nộp bản hoàn thiện — chờ thư ký và chủ tịch hội đồng xác nhận.',
         data: {
           ...ProjectOutlineService.serialize(full!),
           revisionContext,
@@ -582,6 +608,88 @@ export default class ProjectOutlinesController {
       return response.unprocessableEntity({
         success: false,
         message: e?.message || 'Nộp bản hoàn thiện thất bại.',
+      })
+    }
+  }
+
+  /** POST /api/project-outlines/:id/revision-council — thư ký hoặc chủ tịch */
+  async revisionCouncil({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const outline = await this.loadFull(Number(params.id))
+    if (!outline) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
+    }
+    const rawAccept = request.input('accept')
+    if (rawAccept !== true && rawAccept !== false && rawAccept !== 'true' && rawAccept !== 'false') {
+      return response.unprocessableEntity({
+        success: false,
+        message: 'Cần chọn đồng ý hoặc trả lại.',
+      })
+    }
+    const accept = rawAccept === true || rawAccept === 'true'
+    try {
+      await ProjectOutlineRevisionService.confirmCouncil(
+        outline,
+        user.id,
+        accept,
+        String(request.input('reason', ''))
+      )
+      const full = await this.loadFull(outline.id)
+      return response.ok({
+        success: true,
+        message: accept ? 'Đã xác nhận bản hoàn thiện.' : 'Đã trả bản hoàn thiện cho chủ nhiệm.',
+        data: {
+          ...ProjectOutlineService.serialize(full!),
+          revisionContext: await ProjectOutlineRevisionService.getRevisionContext(full!),
+        },
+      })
+    } catch (e: any) {
+      const status = e?.message === 'Không có quyền duyệt bản hoàn thiện.' ? 403 : 422
+      return response.status(status).send({
+        success: false,
+        message: e?.message || 'Xác nhận thất bại.',
+      })
+    }
+  }
+
+  /** POST /api/project-outlines/:id/revision-pkh — phòng KH sau hội đồng */
+  async revisionPkh({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const outline = await this.loadFull(Number(params.id))
+    if (!outline) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
+    }
+    const rawAccept = request.input('accept')
+    if (rawAccept !== true && rawAccept !== false && rawAccept !== 'true' && rawAccept !== 'false') {
+      return response.unprocessableEntity({
+        success: false,
+        message: 'Cần chọn đồng ý hoặc trả lại.',
+      })
+    }
+    const accept = rawAccept === true || rawAccept === 'true'
+    try {
+      await ProjectOutlineRevisionService.pkhReviewRevision(
+        outline,
+        user.id,
+        accept,
+        String(request.input('reason', ''))
+      )
+      const full = await this.loadFull(outline.id)
+      return response.ok({
+        success: true,
+        message: accept
+          ? 'Đã chuyển bản hoàn thiện sang xác nhận kinh phí.'
+          : 'Đã trả bản hoàn thiện cho chủ nhiệm.',
+        data: {
+          ...ProjectOutlineService.serialize(full!),
+          revisionContext: await ProjectOutlineRevisionService.getRevisionContext(full!),
+        },
+      })
+    } catch (e: any) {
+      const status = String(e?.message || '').includes('Không có quyền') ? 403 : 422
+      return response.status(status).send({
+        success: false,
+        message: e?.message || 'Duyệt thất bại.',
       })
     }
   }

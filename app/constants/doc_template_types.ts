@@ -22,7 +22,7 @@ export const DOC_TEMPLATE_TYPES: DocTemplateTypeDef[] = [
     code: 'THANH_LY',
     label: 'Biên bản thanh lý hợp đồng',
     defaultFormCode: null,
-    description: 'Biên bản thanh lý sau khi kết thúc / nghiệm thu nhiệm vụ',
+    description: 'Biên bản thanh lý sau khi kết thúc nhiệm vụ',
   },
   {
     code: 'THONG_BAO',

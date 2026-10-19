@@ -210,6 +210,21 @@ export default class CallForProposalsController {
     }
   }
 
+  async headApprove({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    try {
+      const updated = await CallForProposalService.headApprove(cfp, user.id)
+      return response.ok({
+        success: true,
+        data: await CallForProposalService.serialize(updated),
+      })
+    } catch (e) {
+      return mapServiceError(response, e)
+    }
+  }
+
   async approve({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
     const cfp = await CallForProposal.find(params.id)

@@ -4,6 +4,8 @@ import ProjectOutlineMember from '#models/project_outline_member'
 import ProjectOutlineBudgetLine from '#models/project_outline_budget_line'
 import ProjectOutlineVersion from '#models/project_outline_version'
 import ProjectOutlineDefenseSession from '#models/project_outline_defense_session'
+import ProjectOutlineDefenseMember from '#models/project_outline_defense_member'
+import PermissionService from '#services/permission_service'
 import NotificationService from '#services/notification_service'
 import EmailLogService from '#services/email_log_service'
 import ProjectOutlineService from '#services/project_outline_service'
@@ -287,6 +289,8 @@ export default class ProjectOutlineRevisionService {
 
     return {
       status: outline.status,
+      revisionGateStatus: outline.revisionGateStatus,
+      revisionReturnReason: outline.revisionReturnReason,
       revisionDeadline: outline.revisionDeadline?.toISO() ?? null,
       pastDeadline,
       needsReminder: remind && outline.status === 'CHINH_SUA_TM',
@@ -335,8 +339,8 @@ export default class ProjectOutlineRevisionService {
   }
 
   static async submitRevision(outline: ProjectOutline, actorId: number, explanation: string) {
-    // Idempotent
-    if (outline.status === 'CHO_XAC_NHAN_KP' && outline.revisionSubmittedVersionId) {
+    const daNop = ['CHO_HD_XAC_NHAN_TM', 'CHO_PKH_DUYET_TM', 'CHO_XAC_NHAN_KP']
+    if (daNop.includes(outline.status) && outline.revisionSubmittedVersionId) {
       const ver = await ProjectOutlineVersion.find(outline.revisionSubmittedVersionId)
       return { outline, version: ver!, idempotent: true }
     }
@@ -366,18 +370,9 @@ export default class ProjectOutlineRevisionService {
       baselineId = baseline?.id ?? null
     }
 
-    // Chống nộp trùng đồng thời: nếu đã có REVISION_SUBMITTED thì trả về
-    const existingSubmitted = await ProjectOutlineVersion.query()
-      .where('project_outline_id', outline.id)
-      .where('version_type', 'REVISION_SUBMITTED')
-      .first()
-    if (existingSubmitted) {
-      outline.status = 'CHO_XAC_NHAN_KP'
-      outline.revisionSubmittedVersionId = existingSubmitted.id
-      outline.revisionSubmittedAt = existingSubmitted.lockedAt || DateTime.now()
-      outline.revisionExplanation = explanation.trim()
-      await outline.save()
-      return { outline, version: existingSubmitted, idempotent: true }
+    const hoiDong = await this.hoiDongBaoVe(outline)
+    if (!hoiDong.thuKy?.userId || !hoiDong.chuTich?.userId) {
+      throw new Error('Buổi bảo vệ chưa có thư ký và chủ tịch có tài khoản để xác nhận bản hoàn thiện.')
     }
 
     const snapshot = await this.buildSnapshot(outline.id)
@@ -401,7 +396,9 @@ export default class ProjectOutlineRevisionService {
     outline.revisionSubmittedVersionId = version.id
     outline.revisionSubmittedAt = DateTime.now()
     outline.revisionBaselineVersionId = baselineId
-    outline.status = 'CHO_XAC_NHAN_KP'
+    outline.revisionGateStatus = 'CHO_THU_KY'
+    outline.revisionReturnReason = null
+    outline.status = 'CHO_HD_XAC_NHAN_TM'
     outline.completionPercent = 100
     await outline.save()
 
@@ -410,14 +407,14 @@ export default class ProjectOutlineRevisionService {
       actorId,
       'SUBMIT_REVISION',
       from,
-      'CHO_XAC_NHAN_KP',
+      'CHO_HD_XAC_NHAN_TM',
       { versionId: version.id, parentVersionId: baselineId }
     )
 
-    await NotificationService.pushToPermission('project.review', {
+    await NotificationService.push(hoiDong.thuKy.userId, {
       type: 'PROJECT_UPDATE',
-      title: 'Đã nộp bản thuyết minh hoàn thiện',
-      message: `${outline.code} — chờ xác nhận kinh phí.`,
+      title: 'Bản hoàn thiện chờ thư ký xác nhận',
+      message: outline.code,
       link: `/projects/outlines/form/${outline.id}`,
     })
 
@@ -425,13 +422,129 @@ export default class ProjectOutlineRevisionService {
       await EmailLogService.logStubToUser(
         outline.ownerId,
         `[KH&CN] Đã nộp bản hoàn thiện ${outline.code}`,
-        `Thuyết minh ${outline.code} đã được nộp bản hoàn thiện và chuyển sang chờ xác nhận kinh phí.`,
+        `Thuyết minh ${outline.code} đã nộp và chờ thư ký, chủ tịch hội đồng rồi phòng KH xác nhận.`,
         'project_outline',
         outline.id
       )
     }
 
     return { outline, version, idempotent: false }
+  }
+
+  /** Thư ký rồi chủ tịch xác nhận bản hoàn thiện trước khi sang phòng KH. */
+  static async confirmCouncil(outline: ProjectOutline, actorId: number, accept: boolean, reason: string) {
+    if (outline.status !== 'CHO_HD_XAC_NHAN_TM') {
+      throw new Error('Hồ sơ không chờ hội đồng xác nhận bản hoàn thiện.')
+    }
+    const hoiDong = await this.hoiDongBaoVe(outline)
+    const note = reason.trim()
+    if (outline.revisionGateStatus === 'CHO_THU_KY') {
+      if (!hoiDong.thuKy?.userId || hoiDong.thuKy.userId !== actorId) {
+        throw new Error('Chỉ thư ký hội đồng của phiên này được xác nhận.')
+      }
+      if (!accept) return this.traLaiBanHoanThien(outline, actorId, note, 'REVISION_SECRETARY_RETURN')
+      outline.revisionGateStatus = 'CHO_CHU_TICH'
+      await outline.save()
+      await ProjectOutlineService.writeAudit(
+        outline.id,
+        actorId,
+        'REVISION_SECRETARY_OK',
+        'CHO_HD_XAC_NHAN_TM',
+        'CHO_HD_XAC_NHAN_TM'
+      )
+      if (hoiDong.chuTich?.userId) {
+        await NotificationService.push(hoiDong.chuTich.userId, {
+          type: 'PROJECT_UPDATE',
+          title: 'Bản hoàn thiện chờ chủ tịch xác nhận',
+          message: outline.code,
+          link: `/projects/outlines/form/${outline.id}`,
+        })
+      }
+      return outline
+    }
+    if (outline.revisionGateStatus === 'CHO_CHU_TICH') {
+      if (!hoiDong.chuTich?.userId || hoiDong.chuTich.userId !== actorId) {
+        throw new Error('Chỉ chủ tịch hội đồng của phiên này được xác nhận.')
+      }
+      if (!accept) return this.traLaiBanHoanThien(outline, actorId, note, 'REVISION_CHAIR_RETURN')
+      const from = outline.status
+      outline.revisionGateStatus = 'CHO_PKH'
+      outline.status = 'CHO_PKH_DUYET_TM'
+      await outline.save()
+      await ProjectOutlineService.writeAudit(
+        outline.id,
+        actorId,
+        'REVISION_CHAIR_OK',
+        from,
+        'CHO_PKH_DUYET_TM'
+      )
+      await NotificationService.pushToPermission('project.review', {
+        type: 'PROJECT_UPDATE',
+        title: 'Bản hoàn thiện chờ phòng KH',
+        message: `${outline.code} — hội đồng đã xác nhận.`,
+        link: `/projects/outlines/form/${outline.id}`,
+      })
+      return outline
+    }
+    throw new Error('Hồ sơ đã đổi trạng thái — vui lòng tải lại dữ liệu.')
+  }
+
+  /** Phòng KH nhận bản hoàn thiện rồi mới chuyển xác nhận kinh phí. */
+  static async pkhReviewRevision(outline: ProjectOutline, actorId: number, accept: boolean, reason: string) {
+    const duoc =
+      (await PermissionService.userHasPermission(actorId, 'project.review')) ||
+      (await PermissionService.userHasPermission(actorId, 'project.budget_propose'))
+    if (!duoc) throw new Error('Không có quyền duyệt bản hoàn thiện.')
+    if (outline.status !== 'CHO_PKH_DUYET_TM') {
+      throw new Error('Hồ sơ không chờ phòng KH duyệt bản hoàn thiện.')
+    }
+    if (!accept) return this.traLaiBanHoanThien(outline, actorId, reason.trim(), 'REVISION_PKH_RETURN')
+    const from = outline.status
+    outline.revisionGateStatus = null
+    outline.status = 'CHO_XAC_NHAN_KP'
+    await outline.save()
+    await ProjectOutlineService.writeAudit(outline.id, actorId, 'REVISION_PKH_OK', from, 'CHO_XAC_NHAN_KP')
+    await NotificationService.pushToPermission('project.budget_propose', {
+      type: 'PROJECT_UPDATE',
+      title: 'Bản hoàn thiện đã sang xác nhận kinh phí',
+      message: outline.code,
+      link: `/projects/budget-approvals/${outline.id}`,
+    })
+    return outline
+  }
+
+  private static async hoiDongBaoVe(outline: ProjectOutline) {
+    const sessionId = outline.activeDefenseSessionId
+    if (!sessionId) return { thuKy: null, chuTich: null }
+    const members = await ProjectOutlineDefenseMember.query().where('session_id', sessionId)
+    return {
+      thuKy: members.find((m) => m.roleInCouncil === 'THU_KY') || null,
+      chuTich: members.find((m) => m.roleInCouncil === 'CHU_TICH') || null,
+    }
+  }
+
+  private static async traLaiBanHoanThien(
+    outline: ProjectOutline,
+    actorId: number,
+    reason: string,
+    action: string
+  ) {
+    if (reason.length < 5) throw new Error('Cần nhập lý do trả lại (tối thiểu 5 ký tự).')
+    const from = outline.status
+    outline.status = 'CHINH_SUA_TM'
+    outline.revisionGateStatus = null
+    outline.revisionReturnReason = reason
+    await outline.save()
+    await ProjectOutlineService.writeAudit(outline.id, actorId, action, from, 'CHINH_SUA_TM', { reason })
+    if (outline.ownerId) {
+      await NotificationService.push(outline.ownerId, {
+        type: 'PROJECT_UPDATE',
+        title: 'Bản hoàn thiện bị trả lại',
+        message: `${outline.code}: ${reason}`,
+        link: `/projects/outlines/form/${outline.id}`,
+      })
+    }
+    return outline
   }
 
   static async extendDeadline(

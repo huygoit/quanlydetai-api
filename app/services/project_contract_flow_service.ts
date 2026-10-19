@@ -63,7 +63,20 @@ export default class ProjectContractFlowService {
       cnnvSignedAt: iso(row.cnnvSignedAt),
       signedFileUrl: row.signedFileUrl,
       effectiveAt: iso(row.effectiveAt),
+      signMode: row.signMode || 'ONLINE',
     }
+  }
+
+  /** Phòng KH chọn ký trên hệ thống hoặc ký bản giấy (bắt buộc file scan). */
+  static async setSignMode(contractId: number, userId: number, mode: string) {
+    await assertPerm(userId, 'project.contract_manage')
+    const row = await ProjectContractService.findById(contractId)
+    if (row.status === 'HOP_DONG_DA_KY') throw new Error('BAD_CONTRACT_STATUS')
+    const next = String(mode || '').trim().toUpperCase()
+    if (next !== 'ONLINE' && next !== 'GIAY') throw new Error('INVALID_SIGN_MODE')
+    row.signMode = next === 'GIAY' ? 'GIAY' : 'ONLINE'
+    await row.save()
+    return this.workflow(row)
   }
 
   static async saveExternal(contractId: number, userId: number, body: Record<string, unknown>) {
@@ -215,6 +228,7 @@ export default class ProjectContractFlowService {
     if (!row.publishedAt) throw new Error('NOT_PUBLISHED')
     const outline = await loadOutline(row.projectOutlineId)
     await assertCnnv(userId, outline)
+    if ((row.signMode || 'ONLINE') === 'GIAY' && !signedFileUrl) throw new Error('SIGNED_FILE_REQUIRED')
 
     const now = DateTime.now()
     await db.transaction(async (trx) => {

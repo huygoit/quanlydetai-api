@@ -10,7 +10,10 @@ import ProjectBudgetEntry from '#models/project_budget_entry'
 import ProjectOutlineMember from '#models/project_outline_member'
 import ScientificProfile from '#models/scientific_profile'
 import ContractTemplateService from '#services/contract_template_service'
+import ProjectOutlineService from '#services/project_outline_service'
 import NotificationService from '#services/notification_service'
+import AuditLogService from '#services/audit_log_service'
+import PermissionService from '#services/permission_service'
 import EmailLogService from '#services/email_log_service'
 import { findContractTemplateFilePath } from '#utils/contract_template_storage'
 import {
@@ -19,7 +22,7 @@ import {
   resolveGeneratedContractDir,
 } from '#utils/docx_merge_helper'
 import { buildFormDocx } from '#utils/simple_docx'
-import { hasCouncilQuorum } from '#services/module56_rules'
+import { canReopenFinalMinutes, hasCouncilQuorum } from '#services/module56_rules'
 import {
   BUDGET_LINE_CODES,
   CLASSIFICATION_LABEL,
@@ -329,6 +332,72 @@ export default class ProjectFinalService {
         link: `/projects/final/${outline.id}`,
       })
     }
+    return this.show(outline.id, userId)
+  }
+
+  /**
+   * ADMIN mở lại biên bản đã khóa và kéo nhiệm vụ về bước họp,
+   * chỉ khi quyết toán / giải trình chưa được nộp.
+   */
+  static async reopenMinutes(outlineId: number, userId: number, reason: string) {
+    const note = String(reason || '').trim()
+    if (note.length < 5) throw new Error('REASON_REQUIRED')
+    const roles = await PermissionService.getUserRoles(userId)
+    if (!roles.includes('ADMIN') && !roles.includes('SUPER_ADMIN')) throw new Error('FORBIDDEN')
+    const outline = await loadOutline(outlineId)
+    const row = await this.ensure(outline.id)
+    const duoc = canReopenFinalMinutes({
+      minutesLocked: !!row.minutesLocked,
+      executionStatus: outline.executionStatus,
+      settlementStatus: row.settlementStatus,
+      settlementLineCount: (row.settlementLines || []).length,
+      settlementFileCount: (row.settlementFiles || []).length,
+      explanationStatus: row.explanationStatus,
+    })
+    if (!duoc) throw new Error('MINUTES_REOPEN_BLOCKED')
+
+    const truoc = {
+      executionStatus: outline.executionStatus,
+      classification: row.classification,
+      settlementStatus: row.settlementStatus,
+      minutesFileUrl: row.minutesFileUrl,
+    }
+    row.minutesLocked = false
+    row.classification = null
+    row.minutesFileName = null
+    row.minutesStoredFileName = null
+    row.minutesFileUrl = null
+    row.settlementStatus = null
+    row.explanationItems = []
+    row.explanationReportFile = null
+    row.explanationReturnReason = null
+    row.explanationStartedAt = null
+    row.explanationDeadline = null
+    row.explanationStatus = null
+    row.remindedDay10 = false
+    row.remindedDay13 = false
+    outline.executionStatus = 'DGCK_HOP_HD'
+    await row.save()
+    await outline.save()
+
+    await ProjectOutlineService.writeAudit(
+      outline.id,
+      userId,
+      'REOPEN_FINAL_MINUTES',
+      truoc.executionStatus,
+      'DGCK_HOP_HD',
+      { reason: note }
+    )
+    const actor = await User.find(userId)
+    await AuditLogService.log({
+      userId,
+      userName: actor?.fullName || 'ADMIN',
+      action: 'REOPEN',
+      entityType: 'PROJECT_FINAL_MINUTES',
+      entityId: String(outline.id),
+      oldData: truoc,
+      newData: { executionStatus: 'DGCK_HOP_HD', reason: note },
+    })
     return this.show(outline.id, userId)
   }
 

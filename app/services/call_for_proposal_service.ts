@@ -51,6 +51,8 @@ export type CfpWritePayload = {
   levels?: ProjectProposalLevel[]
   contentHtml?: string | null
   attachmentUrls?: string[]
+  /** Mặc định true. false thì đề xuất nộp thẳng phòng KH. */
+  requireUnitReview?: boolean
 }
 
 export default class CallForProposalService {
@@ -147,6 +149,7 @@ export default class CallForProposalService {
       projectProcessTypes,
       contentHtml: cfp.contentHtml,
       attachmentUrls: cfp.attachmentUrls ?? [],
+      requireUnitReview: cfp.requireUnitReview !== false,
       status: cfp.status,
       createdBy: Number(cfp.createdBy),
       submittedAt: cfp.submittedAt?.toISO() ?? null,
@@ -199,6 +202,7 @@ export default class CallForProposalService {
       projectProcessTypeIds: resolved.projectProcessTypeIds,
       contentHtml: payload.contentHtml ?? null,
       attachmentUrls: payload.attachmentUrls ?? [],
+      requireUnitReview: payload.requireUnitReview !== false,
       status: 'DRAFT',
       createdBy: userId,
     })
@@ -234,6 +238,7 @@ export default class CallForProposalService {
     }
     if (payload.contentHtml !== undefined) cfp.contentHtml = payload.contentHtml
     if (payload.attachmentUrls != null) cfp.attachmentUrls = payload.attachmentUrls
+    if (payload.requireUnitReview != null) cfp.requireUnitReview = payload.requireUnitReview !== false
     await cfp.save()
     await this.writeAudit(cfp.id, userId, 'UPDATE', null, {
       before,
@@ -254,7 +259,8 @@ export default class CallForProposalService {
       throw new Error('INVALID_STATUS')
     }
     this.assertDeadlineMin10Days(cfp.deadlineAt.toISODate()!)
-    cfp.status = 'PENDING_BGH'
+    const laLanhDao = await PermissionService.userHasPermission(userId, 'cfp.approve')
+    cfp.status = laLanhDao ? 'PENDING_BGH' : 'PENDING_TRUONG_PHONG'
     cfp.submittedAt = DateTime.local()
     cfp.returnReason = null
     await cfp.save()
@@ -262,8 +268,26 @@ export default class CallForProposalService {
 
     await NotificationService.pushToPermission('cfp.approve', {
       type: 'SYSTEM',
-      title: 'Thông báo tuyển chọn chờ duyệt',
-      message: `"${cfp.title}" đã được trình duyệt.`,
+      title: laLanhDao ? 'Thông báo tuyển chọn chờ BGH' : 'Thông báo tuyển chọn chờ trưởng phòng',
+      message: laLanhDao
+        ? `"${cfp.title}" đã được trình BGH.`
+        : `"${cfp.title}" do chuyên viên trình, cần trưởng phòng duyệt trước khi sang BGH.`,
+      link: LINK_DETAIL(cfp.id),
+    })
+    return cfp
+  }
+
+  /** Trưởng phòng duyệt bản chuyên viên trình, rồi mới sang BGH. */
+  static async headApprove(cfp: CallForProposal, userId: number) {
+    if (cfp.status !== 'PENDING_TRUONG_PHONG') throw new Error('INVALID_STATUS')
+    cfp.status = 'PENDING_BGH'
+    cfp.returnReason = null
+    await cfp.save()
+    await this.writeAudit(cfp.id, userId, 'HEAD_APPROVE')
+    await NotificationService.pushToPermission('cfp.approve', {
+      type: 'SYSTEM',
+      title: 'Thông báo tuyển chọn chờ BGH',
+      message: `"${cfp.title}" đã được trưởng phòng duyệt.`,
       link: LINK_DETAIL(cfp.id),
     })
     return cfp
@@ -294,7 +318,9 @@ export default class CallForProposalService {
   }
 
   static async returnToPkh(cfp: CallForProposal, userId: number, reason: string) {
-    if (cfp.status !== 'PENDING_BGH') throw new Error('INVALID_STATUS')
+    if (cfp.status !== 'PENDING_BGH' && cfp.status !== 'PENDING_TRUONG_PHONG') {
+      throw new Error('INVALID_STATUS')
+    }
     cfp.status = 'RETURNED'
     cfp.returnReason = reason.trim()
     await cfp.save()
