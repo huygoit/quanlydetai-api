@@ -10,5 +10,8 @@ export type NotificationType =
   | 'PUBLICATION_CORRECTED' // Người kê khai đã hiệu chỉnh — chờ kiểm tra/duyệt
   | 'IDEA_SUBMITTED' // NCV gửi ý tưởng mới (thông báo PHONG_KH)
   | 'IDEA_STATUS_CHANGED' // Ý tưởng thay đổi trạng thái
+  | 'IDEA_ORDER_APPROVAL_NEEDED' // Khóa phiên: có ý tưởng đề xuất đặt hàng, báo lãnh đạo phê duyệt
   | 'PROJECT_UPDATE' // Cập nhật đề tài
+  | 'COUNCIL_SESSION_OPENED' // Phiên hội đồng chấm điểm đã mở
+  | 'COUNCIL_SESSION_READY_TO_CLOSE' // Cả hội đồng đã chấm xong, người tạo phiên khóa phiên
   | 'SYSTEM' // Thông báo hệ thống

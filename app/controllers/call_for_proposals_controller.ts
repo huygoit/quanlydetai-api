@@ -8,6 +8,7 @@ import {
   returnCfpValidator,
   publishCfpValidator,
   extendCfpValidator,
+  cfpProposalIdsValidator,
 } from '#validators/call_for_proposal_validator'
 import type { ProjectProposalLevel } from '#models/project_proposal'
 
@@ -25,6 +26,9 @@ function mapServiceError(response: HttpContext['response'], e: unknown) {
     ALREADY_CLOSED: 'Kỳ đã đóng.',
     INVALID_PROCESS_TYPES: 'Cấp ý tưởng/đề tài không hợp lệ hoặc đã ngừng hoạt động.',
     MISSING_LEVELS: 'Chọn ít nhất một loại / cấp đề tài từ danh mục.',
+    NO_DEFAULT_TEMPLATE: 'Chưa có mẫu thông báo mặc định. Vào Admin → Mẫu biểu mẫu DOCX, tab Thông báo.',
+    TEMPLATE_FILE_MISSING: 'Không tìm thấy file mẫu thông báo trên máy chủ.',
+    TEMPLATE_RENDER_FAILED: 'Không đổ được dữ liệu vào mẫu thông báo.',
   }
   if (messages[code]) {
     return response.unprocessableEntity({ success: false, message: messages[code] })
@@ -113,12 +117,14 @@ export default class CallForProposalsController {
     if (!canManage && cfp.status !== 'PUBLISHED') {
       return response.forbidden({ success: false, message: 'Bạn không có quyền xem thông báo này.' })
     }
+    const data = await CallForProposalService.serialize(cfp, {
+      includePeriod: true,
+      includeAudits: true,
+    })
+    data.soVanBan = await CallForProposalService.soVanBanHienThi(cfp)
     return response.ok({
       success: true,
-      data: await CallForProposalService.serialize(cfp, {
-        includePeriod: true,
-        includeAudits: true,
-      }),
+      data,
     })
   }
 
@@ -272,6 +278,124 @@ export default class CallForProposalsController {
     } catch (e) {
       return mapServiceError(response, e)
     }
+  }
+
+  /** GET /api/call-for-proposals/:id/proposals — nhiệm vụ đã gắn */
+  async proposals({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    }
+    const canManage = await CallForProposalService.userCanManageList(user.id)
+    if (!canManage && cfp.status !== 'PUBLISHED') {
+      return response.forbidden({ success: false, message: 'Bạn không có quyền xem thông báo này.' })
+    }
+    const data = await CallForProposalService.danhSachNhiemVu(cfp)
+    return response.ok({ success: true, data })
+  }
+
+  /** GET /api/call-for-proposals/proposal-candidates — chọn nhiệm vụ khi đang tạo thông báo */
+  async proposalCandidatesByTypes({ request, response }: HttpContext) {
+    const raw = request.input('projectProcessTypeIds', '')
+    const ids = (Array.isArray(raw) ? raw : String(raw).split(','))
+      .map((n) => Number(String(n).trim()))
+      .filter((n) => Number.isFinite(n) && n > 0)
+    const page = Math.max(1, Number(request.input('page', 1)) || 1)
+    const perPage = Math.min(50, Math.max(1, Number(request.input('perPage', 10)) || 10))
+    const keyword = String(request.input('keyword', '') || '')
+    const result = await CallForProposalService.ungVienTheoLoaiQuyTrinh(ids, {
+      page,
+      perPage,
+      keyword,
+    })
+    return response.ok({ success: true, data: result.data, meta: result.meta })
+  }
+
+  /** GET /api/call-for-proposals/:id/proposal-candidates — chọn từ danh mục đề xuất */
+  async proposalCandidates({ params, request, response }: HttpContext) {
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    }
+    const page = Math.max(1, Number(request.input('page', 1)) || 1)
+    const perPage = Math.min(50, Math.max(1, Number(request.input('perPage', 10)) || 10))
+    const keyword = String(request.input('keyword', '') || '')
+    const result = await CallForProposalService.ungVienNhiemVu(cfp, { page, perPage, keyword })
+    return response.ok({ success: true, data: result.data, meta: result.meta })
+  }
+
+  /** GET /api/call-for-proposals/:id/notice-view — dữ liệu trang xem HTML */
+  async noticeView({ params, response }: HttpContext) {
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    }
+    const data = await CallForProposalService.duLieuXemThongBao(cfp)
+    return response.ok({ success: true, data })
+  }
+
+  /** GET /api/call-for-proposals/:id/notice-preview */
+  async noticePreview({ params, response }: HttpContext) {
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    }
+    try {
+      const text = await CallForProposalService.xemTruocThongBao(cfp)
+      return response.ok({ success: true, data: { text } })
+    } catch (e) {
+      return mapServiceError(response, e)
+    }
+  }
+
+  /** GET /api/call-for-proposals/:id/notice-file */
+  async noticeFile({ params, response }: HttpContext) {
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    }
+    try {
+      const { buffer, fileName } = await CallForProposalService.renderMauThongBao(cfp)
+      response.header(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      )
+      response.header('Content-Disposition', `attachment; filename="${fileName}"`)
+      return response.send(buffer)
+    } catch (e) {
+      return mapServiceError(response, e)
+    }
+  }
+
+  /** POST /api/call-for-proposals/:id/proposals — gắn nhiệm vụ */
+  async attachProposals({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    }
+    const payload = await request.validateUsing(cfpProposalIdsValidator)
+    const result = await CallForProposalService.ganNhiemVu(cfp, user.id, payload.proposalIds)
+    if (!result.ok) {
+      return response.unprocessableEntity({ success: false, message: result.message })
+    }
+    return response.ok({ success: true, data: result })
+  }
+
+  /** POST /api/call-for-proposals/:id/proposals/detach — gỡ nhiệm vụ */
+  async detachProposals({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const cfp = await CallForProposal.find(params.id)
+    if (!cfp) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thông báo.' })
+    }
+    const payload = await request.validateUsing(cfpProposalIdsValidator)
+    const result = await CallForProposalService.goNhiemVu(cfp, user.id, payload.proposalIds)
+    if (!result.ok) {
+      return response.unprocessableEntity({ success: false, message: result.message })
+    }
+    return response.ok({ success: true, data: result })
   }
 
   async close({ auth, params, response }: HttpContext) {

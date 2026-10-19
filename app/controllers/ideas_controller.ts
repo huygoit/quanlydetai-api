@@ -77,6 +77,19 @@ export default class IdeasController {
       priority: idea.priority,
       linkedProjectId: idea.linkedProjectId,
       linkedProposalId: linkedProposalId ?? null,
+      councilAvgWeightedScore:
+        idea.councilAvgWeightedScore != null ? Number(idea.councilAvgWeightedScore) : null,
+      councilAvgNoveltyScore: idea.councilAvgNoveltyScore != null ? Number(idea.councilAvgNoveltyScore) : null,
+      councilAvgFeasibilityScore:
+        idea.councilAvgFeasibilityScore != null ? Number(idea.councilAvgFeasibilityScore) : null,
+      councilAvgAlignmentScore:
+        idea.councilAvgAlignmentScore != null ? Number(idea.councilAvgAlignmentScore) : null,
+      councilAvgAuthorCapacityScore:
+        idea.councilAvgAuthorCapacityScore != null ? Number(idea.councilAvgAuthorCapacityScore) : null,
+      councilSubmittedCount: idea.councilSubmittedCount,
+      councilMemberCount: idea.councilMemberCount,
+      councilRecommendation: idea.councilRecommendation,
+      councilScoredAt: idea.councilScoredAt ? idea.councilScoredAt.toISO() : null,
       createdAt: idea.createdAt.toISO(),
       updatedAt: idea.updatedAt.toISO(),
     }
@@ -93,6 +106,28 @@ export default class IdeasController {
       if (row.sourceIdeaId != null) map.set(Number(row.sourceIdeaId), Number(row.id))
     }
     return map
+  }
+
+  /**
+   * Id từ Postgres bigint là chuỗi. Map khóa bằng số, nên phải Number() khi tra.
+   */
+  private layIdDeXuat(linkMap: Map<number, number>, ideaId: number | string) {
+    return linkMap.get(Number(ideaId)) ?? null
+  }
+
+  /** Ý tưởng đã phê duyệt mà chưa có đề xuất thì tạo nháp, để danh sách có link. */
+  private async damBaoDeXuatDaPheDuyet(ideas: Idea[]) {
+    const thieu = ideas.filter((idea) => idea.status === 'APPROVED_FOR_ORDER')
+    if (!thieu.length) return
+    const daCo = await this.mapLinkedProposalIds(thieu.map((idea) => Number(idea.id)))
+    for (const idea of thieu) {
+      if (daCo.has(Number(idea.id))) continue
+      try {
+        await IdeaToProposalService.createDraftFromIdea(idea, Number(idea.ownerId))
+      } catch {
+        // Thiếu danh mục cấp đề tài thì giữ nguyên dòng, không chặn danh sách.
+      }
+    }
   }
 
   /**
@@ -124,8 +159,9 @@ export default class IdeasController {
 
     const paginated = await q.paginate(page, perPage)
     const rows = paginated.all()
-    const linkMap = await this.mapLinkedProposalIds(rows.map((i) => i.id))
-    const data = rows.map((i) => this.serializeListItem(i, linkMap.get(i.id) ?? null))
+    await this.damBaoDeXuatDaPheDuyet(rows)
+    const linkMap = await this.mapLinkedProposalIds(rows.map((i) => Number(i.id)))
+    const data = rows.map((i) => this.serializeListItem(i, this.layIdDeXuat(linkMap, i.id)))
     return response.ok({
       success: true,
       data,
@@ -162,8 +198,9 @@ export default class IdeasController {
 
     const paginated = await q.paginate(page, perPage)
     const rows = paginated.all()
-    const linkMap = await this.mapLinkedProposalIds(rows.map((i) => i.id))
-    const data = rows.map((i) => this.serializeListItem(i, linkMap.get(i.id) ?? null))
+    await this.damBaoDeXuatDaPheDuyet(rows)
+    const linkMap = await this.mapLinkedProposalIds(rows.map((i) => Number(i.id)))
+    const data = rows.map((i) => this.serializeListItem(i, this.layIdDeXuat(linkMap, i.id)))
     return response.ok({
       success: true,
       data,
@@ -174,10 +211,11 @@ export default class IdeasController {
   async show({ params, response }: HttpContext) {
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
-    const linkMap = await this.mapLinkedProposalIds([idea.id])
+    await this.damBaoDeXuatDaPheDuyet([idea])
+    const linkMap = await this.mapLinkedProposalIds([Number(idea.id)])
     return response.ok({
       success: true,
-      data: this.serializeIdea(idea, linkMap.get(idea.id) ?? null),
+      data: this.serializeIdea(idea, this.layIdDeXuat(linkMap, idea.id)),
     })
   }
 
@@ -311,23 +349,23 @@ export default class IdeasController {
 
   async approveOrder({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    const canApprove = await IdeaPermissionService.canApproveOrder(user)
-    if (!canApprove) return response.forbidden({ success: false, message: 'Chỉ Lãnh đạo được phê duyệt đặt hàng.' })
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
+    const canApprove = await IdeaPermissionService.canApproveOrder(user)
+    if (!canApprove) {
+      return response.forbidden({ success: false, message: 'Chỉ lãnh đạo được phê duyệt đặt hàng.' })
+    }
     if (idea.status !== 'PROPOSED_FOR_ORDER') {
       return response.badRequest({
         success: false,
-        message: 'Chỉ phê duyệt đặt hàng khi trạng thái PROPOSED_FOR_ORDER.',
+        message: 'Chỉ phê duyệt đặt hàng khi ý tưởng đã được đề xuất đặt hàng.',
       })
     }
     const payload = await request.validateUsing(approveOrderValidator)
-    idea.status = 'APPROVED_FOR_ORDER'
     if (payload.noteForReview !== undefined) idea.noteForReview = payload.noteForReview ?? null
-    await idea.save()
 
-    // Tự động tạo đề xuất đề tài (DRAFT) và copy thông tin từ ý tưởng
-    let proposalPayload: { id: number; code: string; created: boolean } | null = null
+    // Tạo nháp trước. Thất bại thì chưa đổi trạng thái, nút Phê duyệt vẫn còn.
+    let proposalPayload: { id: number; code: string; created: boolean }
     try {
       const result = await IdeaToProposalService.createDraftFromIdea(idea, user.id)
       proposalPayload = {
@@ -339,22 +377,31 @@ export default class IdeasController {
       if ((err as Error).message === 'NO_ACTIVE_PROCESS_TYPE') {
         return response.unprocessableEntity({
           success: false,
-          message:
-            'Đã phê duyệt đặt hàng nhưng chưa tạo được đề xuất: thiếu danh mục Cấp ý tưởng/đề tài (QT).',
+          message: 'Chưa phê duyệt được: thiếu danh mục Cấp ý tưởng/đề tài (QT).',
           data: this.serializeIdea(idea),
         })
       }
       throw err
     }
 
-    await NotificationService.notifyIdeaStatusChanged(idea.ownerId, idea.code, 'APPROVED_FOR_ORDER', idea.id)
+    idea.status = 'APPROVED_FOR_ORDER'
+    await idea.save()
+
+    await NotificationService.notifyIdeaStatusChanged(
+      idea.ownerId,
+      idea.code,
+      'APPROVED_FOR_ORDER',
+      idea.id,
+      proposalPayload.id,
+      idea.title,
+    )
     await idea.refresh()
     return response.ok({
       success: true,
-      message: proposalPayload?.created
-        ? `Đã phê duyệt đặt hàng và tạo đề xuất ${proposalPayload.code}.`
-        : 'Đã phê duyệt đặt hàng.',
-      data: this.serializeIdea(idea, proposalPayload?.id ?? null),
+      message: proposalPayload.created
+        ? `Đã phê duyệt và lưu đề xuất nháp ${proposalPayload.code}. Tác giả gửi lên khoa khi sẵn sàng.`
+        : `Đã phê duyệt. Đề xuất ${proposalPayload.code} đã có trong danh sách.`,
+      data: this.serializeIdea(idea, proposalPayload.id),
       proposal: proposalPayload,
     })
   }
@@ -387,19 +434,18 @@ export default class IdeasController {
 
   async createProject({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    const canCreate = await IdeaPermissionService.canCreateProjectFromIdea(user)
-    if (!canCreate) {
-      return response.forbidden({
-        success: false,
-        message: 'Chỉ Phòng KH hoặc Admin được tạo đề tài từ ý tưởng.',
-      })
-    }
     const idea = await Idea.find(params.id)
     if (!idea) return response.notFound({ success: false, message: 'Không tìm thấy ý tưởng.' })
+    if (!this.isOwner(idea, user.id)) {
+      return response.forbidden({
+        success: false,
+        message: 'Chỉ tác giả ý tưởng được tạo đề xuất đề tài.',
+      })
+    }
     if (idea.status !== 'APPROVED_FOR_ORDER') {
       return response.badRequest({
         success: false,
-        message: 'Chỉ tạo đề tài khi trạng thái APPROVED_FOR_ORDER.',
+        message: 'Chỉ tạo đề xuất đề tài khi lãnh đạo đã phê duyệt đặt hàng.',
       })
     }
 
@@ -409,8 +455,8 @@ export default class IdeasController {
       return response.ok({
         success: true,
         message: result.created
-          ? `Đã tạo đề xuất ${result.proposal.code} từ ý tưởng.`
-          : `Đề xuất ${result.proposal.code} đã tồn tại.`,
+          ? `Đã tạo đề xuất đề tài ${result.proposal.code}.`
+          : `Đề xuất đề tài ${result.proposal.code} đã tồn tại.`,
         data: {
           ideaId: idea.id,
           linkedProjectId: result.proposal.code,

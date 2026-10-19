@@ -3,8 +3,10 @@ import CouncilSession from '#models/council_session'
 import SessionMember from '#models/session_member'
 import ScientificProfile from '#models/scientific_profile'
 import Role from '#models/role'
+import { extractVietnameseLabel } from '#constants/udn_affiliation_units'
 import CouncilPermissionService from '#services/council_permission_service'
 import PermissionService from '#services/permission_service'
+import ScientificProfileAdminService from '#services/scientific_profile_admin_service'
 import UserRoleAssignmentService from '#services/user_role_assignment_service'
 import { addSessionMemberValidator } from '#validators/council_validator'
 
@@ -20,11 +22,14 @@ export default class SessionMembersController {
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     const existingIds = (await SessionMember.query().where('session_id', params.id).select('member_id')).map((m) => m.memberId)
+    const adminUserIds = await ScientificProfileAdminService.getUserIdsWithAdminKeKhaiRole()
+    const loaiUserIds = [...new Set([...existingIds, ...adminUserIds])]
     const keyword = request.input('keyword', '')
 
     const q = ScientificProfile.query()
-      .select('id', 'user_id', 'full_name', 'work_email', 'degree', 'academic_title', 'organization', 'faculty', 'department', 'current_title', 'main_research_area', 'phone')
-      .whereNotIn('user_id', existingIds.length > 0 ? existingIds : [0])
+      .select('id', 'user_id', 'full_name', 'work_email', 'degree', 'academic_title', 'organization', 'faculty', 'department', 'department_id', 'current_title', 'main_research_area', 'phone')
+      .preload('departmentUnit')
+      .whereNotIn('user_id', loaiUserIds.length > 0 ? loaiUserIds : [0])
       .orderBy('full_name', 'asc')
       .limit(100)
 
@@ -40,7 +45,12 @@ export default class SessionMembersController {
 
     const profiles = await q
     const data = profiles.map((p) => {
-      const unit = [p.department, p.faculty, p.organization].filter(Boolean).join(' – ') || null
+      // Tên đơn vị lấy từ danh mục Đơn vị (departments). Tên trường lấy phần tiếng Việt của cơ quan công tác.
+      const tenDonVi = p.departmentUnit?.name?.trim() || p.faculty?.trim() || null
+      const tenTruong = (p.organization ? extractVietnameseLabel(p.organization) : null) || p.organization?.trim() || null
+      const unit =
+        [tenDonVi, tenTruong && tenDonVi?.includes(tenTruong) ? null : tenTruong].filter(Boolean).join(', ') ||
+        null
       return {
         userId: p.userId,
         fullName: p.fullName,

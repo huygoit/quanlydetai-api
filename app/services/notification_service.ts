@@ -22,7 +22,12 @@ export default class NotificationService {
 
   /** Gửi thông báo đến nhiều users */
   static async pushMany(userIds: number[], data: NotifyPayload) {
-    const unique = [...new Set(userIds.filter((id) => Number.isFinite(id)))]
+    // id từ cột bigint đôi khi là chuỗi. Number.isFinite("2129") ra false nên bị bỏ hết.
+    const unique = [
+      ...new Set(
+        userIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    ]
     if (!unique.length) return []
     const rows = unique.map((userId) => ({
       userId,
@@ -152,7 +157,9 @@ export default class NotificationService {
     userId: number,
     ideaCode: string,
     newStatus: string,
-    ideaId: number
+    ideaId: number,
+    _proposalId?: number,
+    ideaTitle?: string,
   ) {
     const statusLabels: Record<string, string> = {
       REVIEWING: 'đang được sơ loại',
@@ -162,12 +169,26 @@ export default class NotificationService {
       REJECTED: 'đã bị từ chối',
     }
     const statusLabel = statusLabels[newStatus] ?? newStatus
+    const laSoLoai = newStatus === 'APPROVED_INTERNAL'
+    const laDeXuatDatHang = newStatus === 'PROPOSED_FOR_ORDER'
+    const laPheDuyet = newStatus === 'APPROVED_FOR_ORDER'
+    const veYTuongCuaToi = laSoLoai || laDeXuatDatHang || laPheDuyet
+    const tenYTuong = (ideaTitle || ideaCode).trim()
 
     await this.push(userId, {
       type: 'IDEA_STATUS_CHANGED',
-      title: `Ý tưởng ${statusLabel}`,
-      message: `Ý tưởng ${ideaCode} của bạn ${statusLabel}.`,
-      link: `/ideas/${ideaId}`,
+      title: laPheDuyet
+        ? 'Ý tưởng đã được phê duyệt để đăng ký đề xuất'
+        : laDeXuatDatHang
+          ? `Ý tưởng ${ideaCode} đã được đề xuất đặt hàng`
+          : `Ý tưởng ${statusLabel}`,
+      message: laPheDuyet
+        ? `Ý tưởng ${tenYTuong} của bạn đã được phê duyệt để đăng ký đề xuất đề tài.`
+        : laDeXuatDatHang
+          ? `Ý tưởng ${ideaCode} của bạn đã được đề xuất đặt hàng, chờ lãnh đạo phê duyệt.`
+          : `Ý tưởng ${ideaCode} của bạn ${statusLabel}.`,
+      // Sơ loại, đề xuất đặt hàng, phê duyệt: tác giả xem trên danh sách ý tưởng của mình.
+      link: veYTuongCuaToi ? '/ideas/my' : `/ideas/${ideaId}`,
     })
   }
 
@@ -285,17 +306,100 @@ export default class NotificationService {
     })
   }
 
+  /**
+   * Sau khi khóa phiên: báo người có quyền phê duyệt đặt hàng.
+   * Chỉ gửi khi có ít nhất một ý tưởng đề xuất đặt hàng.
+   */
+  static async notifyIdeasProposedForOrderApproval(proposedCount: number) {
+    if (proposedCount <= 0) return
+    await this.pushToPermission('idea.approve', {
+      type: 'IDEA_ORDER_APPROVAL_NEEDED',
+      title: 'Đã có danh sách ý tưởng đề xuất đặt hàng',
+      message: 'Đã có danh sách ý tưởng đề xuất đặt hàng. Xin vui lòng phê duyệt.',
+      link: '/ideas/review?tab=proposed',
+    })
+  }
+
   static async notifyCouncilSessionOpened(
     sessionId: number,
     sessionTitle: string,
     userIds: number[]
   ) {
     if (userIds.length === 0) return
+    const tieuDe = `Phiên ${sessionTitle} đã mở`.slice(0, 255)
     await this.pushMany(userIds, {
       type: 'COUNCIL_SESSION_OPENED',
-      title: 'Phiên hội đồng đã mở',
-      message: `${sessionTitle} đã mở. Xin vui lòng chấm điểm các ý tưởng!`,
-      link: `/ideas/council/${sessionId}`,
+      title: tieuDe,
+      message: 'Xin vui lòng chấm điểm.',
+      link: `/ideas/council?phien=${sessionId}`,
+    })
+  }
+
+  /** Cả hội đồng đã nộp phiếu. Báo một lần cho người tạo phiên. */
+  static async notifyCouncilSessionReadyToClose(
+    sessionId: number,
+    sessionTitle: string,
+    creatorId: number
+  ) {
+    const nguoiTao = Number(creatorId)
+    if (!Number.isFinite(nguoiTao) || nguoiTao <= 0) return
+    const duongDan = `/ideas/council?phien=${sessionId}`
+    const daBao = await Notification.query()
+      .where('user_id', nguoiTao)
+      .where('type', 'COUNCIL_SESSION_READY_TO_CLOSE')
+      .where('link', duongDan)
+      .first()
+    if (daBao) return
+    await this.push(nguoiTao, {
+      type: 'COUNCIL_SESSION_READY_TO_CLOSE',
+      title: `Phiên ${sessionTitle} đã hoàn thành chấm điểm`.slice(0, 255),
+      message: 'Xin vui lòng khóa phiên.',
+      link: duongDan,
+    })
+  }
+
+  /** GV gửi hồ sơ đăng ký → trưởng đơn vị cùng department */
+  static async notifyUnitHeadsRegistrationSubmitted(hoSo: {
+    id: number
+    code: string
+    title: string
+    ownerId: number
+    ownerName: string
+  }) {
+    const headIds = await PermissionService.getUserIdsWithPermission('project.assign_reviewer')
+    if (!headIds.length) return
+
+    const owner = await User.find(hoSo.ownerId)
+    if (owner?.departmentId == null) return
+
+    const heads = await User.query()
+      .whereIn('id', headIds)
+      .where('is_active', true)
+      .where('department_id', owner.departmentId)
+
+    const ids = heads.map((h) => h.id).filter((id) => Number(id) !== Number(hoSo.ownerId))
+    if (!ids.length) return
+
+    await this.pushMany(ids, {
+      type: 'PROJECT_UPDATE',
+      title: 'Đơn đăng ký chờ xác nhận',
+      message: `${hoSo.ownerName} đã gửi hồ sơ đăng ký "${hoSo.title}" (${hoSo.code}).`,
+      link: '/projects/dang-ky-cho-xac-nhan',
+    })
+  }
+
+  /** Đơn vị xác nhận → báo PKH&HTQT (chuông) */
+  static async notifyPkhRegistrationReady(hoSo: {
+    id: number
+    code: string
+    title: string
+    ownerName: string
+  }) {
+    await this.pushToPermission('project.review', {
+      type: 'PROJECT_UPDATE',
+      title: 'Hồ sơ đăng ký chờ PKH&HTQT',
+      message: `${hoSo.ownerName} — hồ sơ "${hoSo.title}" (${hoSo.code}) đã được đơn vị xác nhận.`,
+      link: '/projects/dang-ky-cho-xac-nhan',
     })
   }
 

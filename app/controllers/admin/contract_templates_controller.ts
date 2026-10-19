@@ -1,5 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import ContractTemplateService from '#services/contract_template_service'
+import ContractTemplateService, { chuanCauHinhThongBao } from '#services/contract_template_service'
+import type { ThongBaoMergeConfig } from '#models/contract_template'
 import {
   createContractTemplateValidator,
   updateContractTemplateValidator,
@@ -110,6 +111,7 @@ export default class AdminContractTemplatesController {
           formCode: payload.formCode,
           status: payload.status,
           isDefault,
+          mergeConfig: this.cauHinhThongBao(request),
         },
         file
       )
@@ -173,6 +175,7 @@ export default class AdminContractTemplatesController {
           formCode: payload.formCode,
           status: payload.status,
           isDefault,
+          mergeConfig: this.cauHinhThongBao(request),
         },
         file || null
       )
@@ -253,6 +256,28 @@ export default class AdminContractTemplatesController {
     } catch (err) {
       return this.mapError(response, err)
     }
+  }
+
+  /** Chỉ đọc khi form mẫu thông báo gửi các ô cấu hình. */
+  private cauHinhThongBao(request: HttpContext['request']): ThongBaoMergeConfig | undefined {
+    const loai = String(request.input('templateType') || request.input('template_type') || '')
+    if (loai !== 'THONG_BAO') return undefined
+    const khoa = [
+      'ky_hieu',
+      'ky_hieu_thong_bao',
+      'noi_nhan',
+      'tham_quyen_ky',
+      'ho_ten_nguoi_ky',
+      'so_moi_nhat',
+    ] as const
+    if (!khoa.some((k) => request.input(k) !== undefined)) return undefined
+    return chuanCauHinhThongBao({
+      ky_hieu: request.input('ky_hieu') || request.input('ky_hieu_thong_bao'),
+      noi_nhan: request.input('noi_nhan'),
+      tham_quyen_ky: request.input('tham_quyen_ky'),
+      ho_ten_nguoi_ky: request.input('ho_ten_nguoi_ky'),
+      so_moi_nhat: request.input('so_moi_nhat'),
+    })
   }
 
   private mapError(response: HttpContext['response'], err: unknown) {

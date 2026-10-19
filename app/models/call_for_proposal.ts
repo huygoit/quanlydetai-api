@@ -57,7 +57,9 @@ export default class CallForProposal extends BaseModel {
   @column()
   declare status: CfpStatus
 
-  @column()
+  @column({
+    consume: (v: unknown) => (v == null || v === '' ? v : Number(v)),
+  })
   declare createdBy: number
 
   @column.dateTime()

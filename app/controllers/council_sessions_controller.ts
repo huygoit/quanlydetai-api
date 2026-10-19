@@ -155,22 +155,44 @@ export default class CouncilSessionsController {
 
   async close({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    const canManage = await CouncilPermissionService.canManageCouncil(user)
-    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ Phòng KH được đóng phiên.' })
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
-    if (session.status !== 'OPEN') return response.badRequest({ success: false, message: 'Chỉ đóng được khi trạng thái OPEN.' })
+    // Người tạo phiên mới được khóa.
+    if (Number(user.id) !== Number(session.createdById)) {
+      return response.forbidden({ success: false, message: 'Chỉ người tạo phiên mới được khóa phiên.' })
+    }
+    if (session.status !== 'OPEN') return response.badRequest({ success: false, message: 'Chỉ khóa được phiên đang mở.' })
 
+    const members = await SessionMember.query().where('session_id', session.id)
     const sessionIdeas = await SessionIdea.query().where('session_id', session.id)
+    if (members.length === 0 || sessionIdeas.length === 0) {
+      return response.badRequest({ success: false, message: 'Phiên cần có thành viên và ý tưởng trước khi khóa.' })
+    }
+
+    const tatCaPhieu = await IdeaCouncilScore.query()
+      .where('session_id', session.id)
+      .where('submitted', true)
+    const daNop = new Set(tatCaPhieu.map((phieu) => `${phieu.ideaId}:${phieu.councilMemberId}`))
+    const chuaCham = new Set<string>()
+    for (const yTuong of sessionIdeas) {
+      for (const thanhVien of members) {
+        if (!daNop.has(`${yTuong.ideaId}:${thanhVien.memberId}`)) {
+          chuaCham.add(thanhVien.memberName)
+        }
+      }
+    }
+    if (chuaCham.size > 0) {
+      return response.badRequest({
+        success: false,
+        message: `Chưa khóa được. Còn thành viên chưa chấm xong: ${[...chuaCham].join(', ')}.`,
+      })
+    }
+
     let proposedCount = 0
     let rejectedCount = 0
 
     for (const si of sessionIdeas) {
-      const scores = await IdeaCouncilScore.query()
-        .where('session_id', session.id)
-        .where('idea_id', si.ideaId)
-        .where('submitted', true)
-      if (scores.length === 0) continue
+      const scores = tatCaPhieu.filter((phieu) => Number(phieu.ideaId) === Number(si.ideaId))
 
       const n = scores.length
       const avgWeighted = scores.reduce((sum, s) => sum + Number(s.weightedScore), 0) / n
@@ -209,6 +231,12 @@ export default class CouncilSessionsController {
 
     session.status = 'CLOSED'
     await session.save()
+
+    // Báo lãnh đạo (idea.approve) khi có ý tưởng đề xuất đặt hàng.
+    if (proposedCount > 0) {
+      await NotificationService.notifyIdeasProposedForOrderApproval(proposedCount)
+    }
+
     return response.ok({ success: true, data: { proposedCount, rejectedCount }, message: 'Đã đóng phiên.' })
   }
 

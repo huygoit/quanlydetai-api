@@ -85,11 +85,14 @@ export default class ProjectProposalsController {
       researchOutputType: rot ? { id: rot.id, code: rot.code, name: rot.name } : null,
       researchDirection: p.researchDirection,
       attachmentUrl: p.attachmentUrl,
+      maxMembers: p.maxMembers ?? 10,
+      requireRegistrationFile: Boolean(p.requireRegistrationFile),
       callForProposalId: p.callForProposalId,
       projectProcessTypeId: p.projectProcessTypeId,
       projectProcessType: ppt
         ? { id: ppt.id, code: ppt.code, name: ppt.name }
         : null,
+      suitableLevels: p.suitableLevels ?? [],
       supplementDueAt: p.supplementDueAt?.toISO() ?? null,
       supplementOverdue: p.supplementOverdue ?? false,
       pkhComment: p.pkhComment,
@@ -125,6 +128,7 @@ export default class ProjectProposalsController {
       projectProcessType: ppt
         ? { id: ppt.id, code: ppt.code, name: ppt.name }
         : null,
+      suitableLevels: p.suitableLevels ?? [],
       supplementDueAt: p.supplementDueAt?.toISO() ?? null,
       supplementOverdue: p.supplementOverdue ?? false,
       pkhComment: p.pkhComment,
@@ -154,6 +158,32 @@ export default class ProjectProposalsController {
     if (!row) throw new Error('PROCESS_TYPE_NOT_FOUND')
     const level = QT_CODE_TO_LEVEL[row.code] || ('TRUONG' as ProjectProposalLevel)
     return { processType: row, level }
+  }
+
+  /** Chuẩn hóa danh sách cấp QT; luôn gồm mã cấp chính. */
+  private async resolveSuitableLevels(
+    primaryCode: string,
+    raw?: string[] | null
+  ): Promise<string[]> {
+    const out: string[] = []
+    const seen = new Set<string>()
+    const push = (code: string) => {
+      const c = String(code || '').trim()
+      if (!c || seen.has(c)) return
+      seen.add(c)
+      out.push(c)
+    }
+    push(primaryCode)
+    for (const item of Array.isArray(raw) ? raw : []) push(item)
+    if (out.length <= 1) return out
+    // Chỉ giữ mã QT còn ACTIVE trong danh mục
+    const active = await ProjectProcessType.query()
+      .whereIn('code', out)
+      .where('status', 'ACTIVE')
+      .select('code')
+    const ok = new Set(active.map((r) => r.code))
+    const filtered = out.filter((c) => ok.has(c))
+    return filtered.length ? filtered : [primaryCode]
   }
 
   /** Ghi timeline trạng thái đề xuất */
@@ -386,6 +416,11 @@ export default class ProjectProposalsController {
     const code = await ProjectProposal.generateCode(payload.year)
     const summary = (payload.summary || payload.objectives).trim()
     const ownerUnit = await resolveUserUnitLabel(user)
+    const primaryRow = await ProjectProcessType.find(processTypeId)
+    const suitableLevels = await this.resolveSuitableLevels(
+      primaryRow?.code || 'QT-I',
+      payload.suitableLevels
+    )
 
     const proposal = await ProjectProposal.create({
       code,
@@ -410,8 +445,11 @@ export default class ProjectProposalsController {
       researchOutputTypeId: payload.researchOutputTypeId ?? null,
       researchDirection: payload.researchDirection ?? null,
       attachmentUrl: payload.attachmentUrl ?? null,
+      maxMembers: payload.maxMembers ?? 10,
+      requireRegistrationFile: payload.requireRegistrationFile ?? false,
       callForProposalId: active.callForProposal.id,
       projectProcessTypeId: processTypeId,
+      suitableLevels,
       status: 'DRAFT',
     })
 
@@ -449,6 +487,10 @@ export default class ProjectProposalsController {
         const resolved = await this.resolveProcessType(payload.projectProcessTypeId)
         proposal.projectProcessTypeId = resolved.processType.id
         proposal.level = payload.level || resolved.level
+        proposal.suitableLevels = await this.resolveSuitableLevels(
+          resolved.processType.code,
+          payload.suitableLevels ?? proposal.suitableLevels
+        )
       } catch {
         return response.unprocessableEntity({
           success: false,
@@ -466,6 +508,10 @@ export default class ProjectProposalsController {
         })
       }
       proposal.callForProposalId = active.callForProposal.id
+    } else if (payload.suitableLevels) {
+      const primary =
+        (await ProjectProcessType.find(proposal.projectProcessTypeId))?.code || 'QT-I'
+      proposal.suitableLevels = await this.resolveSuitableLevels(primary, payload.suitableLevels)
     } else if (payload.level && payload.level !== proposal.level) {
       const active = await CallForProposalService.findActivePeriodForLevel(
         payload.level,
@@ -481,7 +527,7 @@ export default class ProjectProposalsController {
       proposal.level = payload.level
     }
 
-    const { projectProcessTypeId: _ppt, level: _lv, ...rest } = payload
+    const { projectProcessTypeId: _ppt, level: _lv, suitableLevels: _sl, ...rest } = payload
     proposal.merge({
       ...rest,
       summary: payload.summary ?? proposal.summary,

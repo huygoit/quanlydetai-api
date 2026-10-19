@@ -1,6 +1,11 @@
 import ContractTemplate from '#models/contract_template'
-import type { ContractTemplateStatus, ContractTemplateType } from '#models/contract_template'
+import type {
+  ContractTemplateStatus,
+  ContractTemplateType,
+  ThongBaoMergeConfig,
+} from '#models/contract_template'
 import { BM06_TEMPLATE_VARIABLES, BM14_TEMPLATE_VARIABLES } from '#constants/bm06_template_variables'
+import { THONG_BAO_TEMPLATE_VARIABLES } from '#constants/thong_bao_template_variables'
 import {
   DOC_TEMPLATE_TYPES,
   getDocTemplateType,
@@ -17,6 +22,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { ModelPaginatorContract } from '@adonisjs/lucid/types/model'
+import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 
 export interface ContractTemplateFilters {
   page?: number
@@ -37,11 +43,40 @@ interface MetaPayload {
   formCode?: string | null
   status?: ContractTemplateStatus
   isDefault?: boolean
+  mergeConfig?: ThongBaoMergeConfig
+}
+
+const CAU_HINH_TRONG: ThongBaoMergeConfig = {
+  ky_hieu: '',
+  noi_nhan: '',
+  tham_quyen_ky: '',
+  ho_ten_nguoi_ky: '',
+  so_moi_nhat: 0,
+}
+
+function soDaDung(giaTri: unknown) {
+  const so = Number(String(giaTri ?? '').trim())
+  if (!Number.isFinite(so) || so < 0) return 0
+  return Math.floor(so)
+}
+
+export function chuanCauHinhThongBao(
+  raw: (Partial<ThongBaoMergeConfig> & { ky_hieu_thong_bao?: string }) | null | undefined
+): ThongBaoMergeConfig {
+  const cat = (giaTri: string | undefined, dai: number) => (giaTri || '').trim().slice(0, dai)
+  return {
+    ky_hieu: cat(raw?.ky_hieu || raw?.ky_hieu_thong_bao, 50),
+    tham_quyen_ky: cat(raw?.tham_quyen_ky, 255),
+    ho_ten_nguoi_ky: cat(raw?.ho_ten_nguoi_ky, 255),
+    noi_nhan: (raw?.noi_nhan || '').replace(/\r\n/g, '\n').trim().slice(0, 4000),
+    so_moi_nhat: soDaDung(raw?.so_moi_nhat),
+  }
 }
 
 function knownVariablesForType(templateType: string) {
   if (templateType === 'HOP_DONG') return BM06_TEMPLATE_VARIABLES
   if (templateType === 'THANH_LY') return BM14_TEMPLATE_VARIABLES
+  if (templateType === 'THONG_BAO') return THONG_BAO_TEMPLATE_VARIABLES
   return []
 }
 
@@ -76,6 +111,7 @@ export default class ContractTemplateService {
       file_url: row.fileUrl,
       file_size: row.fileSize,
       detected_variables: detected,
+      merge_config: row.templateType === 'THONG_BAO' ? chuanCauHinhThongBao(row.mergeConfig) : null,
       unknown_variables: known.length
         ? detected.filter((k) => !knownSet.has(k))
         : [],
@@ -128,6 +164,22 @@ export default class ContractTemplateService {
     const row = await ContractTemplate.find(id)
     if (!row) throw new Error('CONTRACT_TEMPLATE_NOT_FOUND')
     return row
+  }
+
+  /** Trong transaction phê duyệt: số đã dùng + 1, rồi lưu lại. */
+  static async capSoThongBaoDaDuyet(trx: TransactionClientContract) {
+    const mau = await ContractTemplate.query({ client: trx })
+      .where('template_type', 'THONG_BAO')
+      .where('status', 'ACTIVE')
+      .where('is_default', true)
+      .forUpdate()
+      .first()
+    if (!mau) throw new Error('NO_DEFAULT_TEMPLATE')
+    const moi = soDaDung(mau.mergeConfig?.so_moi_nhat) + 1
+    mau.mergeConfig = chuanCauHinhThongBao({ ...mau.mergeConfig, so_moi_nhat: moi })
+    mau.useTransaction(trx)
+    await mau.save()
+    return String(moi)
   }
 
   static async getDefaultActive(templateType: ContractTemplateType = 'HOP_DONG') {
@@ -215,6 +267,10 @@ export default class ContractTemplateService {
       fileUrl: saved.fileUrl,
       fileSize: saved.fileSize,
       detectedVariables: saved.detectedVariables,
+      mergeConfig:
+        templateType === 'THONG_BAO'
+          ? chuanCauHinhThongBao(payload.mergeConfig)
+          : { ...CAU_HINH_TRONG },
       isDefault: wantDefault,
       status: payload.status || 'ACTIVE',
       version: 1,
@@ -246,6 +302,9 @@ export default class ContractTemplateService {
       row.formCode = (payload.formCode?.trim() || '').toUpperCase() || row.formCode
     }
     if (payload.status != null) row.status = payload.status
+    if (payload.mergeConfig && row.templateType === 'THONG_BAO') {
+      row.mergeConfig = chuanCauHinhThongBao(payload.mergeConfig)
+    }
 
     if (file) {
       const oldStored = row.storedFileName

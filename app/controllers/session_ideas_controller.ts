@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import CouncilSession from '#models/council_session'
 import SessionIdea from '#models/session_idea'
 import Idea from '#models/idea'
+import IdeaCouncilScore from '#models/idea_council_score'
 import CouncilPermissionService from '#services/council_permission_service'
 import { addSessionIdeasValidator } from '#validators/council_validator'
 
@@ -42,6 +43,15 @@ export default class SessionIdeasController {
     const session = await CouncilSession.find(params.id)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     const list = await SessionIdea.query().where('session_id', params.id).orderBy('id', 'asc')
+    const phieuDaGui = await IdeaCouncilScore.query()
+      .where('session_id', params.id)
+      .where('submitted', true)
+      .select('idea_id')
+    const soPhieuDaGui = new Map<number, number>()
+    for (const phieu of phieuDaGui) {
+      const maYTuong = Number(phieu.ideaId)
+      soPhieuDaGui.set(maYTuong, (soPhieuDaGui.get(maYTuong) ?? 0) + 1)
+    }
     const data = list.map((si) => ({
       id: si.id,
       ideaId: si.ideaId,
@@ -51,6 +61,7 @@ export default class SessionIdeasController {
       ownerUnit: si.ownerUnit,
       field: si.field,
       statusSnapshot: si.statusSnapshot,
+      submittedScoreCount: soPhieuDaGui.get(Number(si.ideaId)) ?? 0,
     }))
     return response.ok({ success: true, data })
   }

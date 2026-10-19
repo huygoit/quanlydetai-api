@@ -38,6 +38,7 @@ import AdminContractTemplatesController from '#controllers/admin/contract_templa
 import ProjectContractsController from '#controllers/project_contracts_controller'
 import ProjectModule56Controller from '#controllers/project_module56_controller'
 import CallForProposalsController from '#controllers/call_for_proposals_controller'
+import ProposalRegistrationsController from '#controllers/proposal_registrations_controller'
 import HomeController from '#controllers/home_controller'
 import KpisController from '#controllers/kpis_controller'
 import AdminResearchOutputTypesController from '#controllers/admin/research_output_types_controller'
@@ -757,7 +758,31 @@ router
       .get('/active-period', [CallForProposalsController, 'activePeriod'])
       .use(middleware.permission('cfp.view,project.create,project.submit,project.view'))
     router.get('/', [CallForProposalsController, 'index']).use(middleware.permission('cfp.view'))
+    router
+      .get('/proposal-candidates', [CallForProposalsController, 'proposalCandidatesByTypes'])
+      .use(middleware.permission('cfp.create,cfp.update'))
     router.get('/:id/audits', [CallForProposalsController, 'audits']).use(middleware.permission('cfp.view'))
+    router
+      .get('/:id/proposals', [CallForProposalsController, 'proposals'])
+      .use(middleware.permission('cfp.view'))
+    router
+      .get('/:id/notice-view', [CallForProposalsController, 'noticeView'])
+      .use(middleware.permission('cfp.view,cfp.update,cfp.create'))
+    router
+      .get('/:id/notice-preview', [CallForProposalsController, 'noticePreview'])
+      .use(middleware.permission('cfp.view,cfp.update,cfp.create'))
+    router
+      .get('/:id/notice-file', [CallForProposalsController, 'noticeFile'])
+      .use(middleware.permission('cfp.view,cfp.update,cfp.create'))
+    router
+      .get('/:id/proposal-candidates', [CallForProposalsController, 'proposalCandidates'])
+      .use(middleware.permission('cfp.update'))
+    router
+      .post('/:id/proposals/detach', [CallForProposalsController, 'detachProposals'])
+      .use(middleware.permission('cfp.update'))
+    router
+      .post('/:id/proposals', [CallForProposalsController, 'attachProposals'])
+      .use(middleware.permission('cfp.update'))
     router.get('/:id', [CallForProposalsController, 'show']).use(middleware.permission('cfp.view'))
     router.post('/', [CallForProposalsController, 'store']).use(middleware.permission('cfp.create'))
     router.put('/:id', [CallForProposalsController, 'update']).use(middleware.permission('cfp.update'))
@@ -802,6 +827,20 @@ router
     router.post('/:id/extend-adjustment', [ProjectProposalsController, 'extendAdjustment'])
   })
   .prefix('/api/project-proposals')
+  .middleware([middleware.auth()])
+
+// Hồ sơ đăng ký thực hiện nhiệm vụ trong thông báo
+router
+  .group(() => {
+    router.get('/context', [ProposalRegistrationsController, 'context'])
+    router.get('/pending-count', [ProposalRegistrationsController, 'pendingCount'])
+    router.get('/pending', [ProposalRegistrationsController, 'pending'])
+    router.get('/:id', [ProposalRegistrationsController, 'show'])
+    router.post('/:id/confirm', [ProposalRegistrationsController, 'confirm'])
+    router.post('/:id/return', [ProposalRegistrationsController, 'returnToDraft'])
+    router.post('/', [ProposalRegistrationsController, 'store'])
+  })
+  .prefix('/api/proposal-registrations')
   .middleware([middleware.auth()])
 
 // --- Phiên xét chọn đề tài (US-03-03 tạo phiên + US-03-04 kết quả/BGH)

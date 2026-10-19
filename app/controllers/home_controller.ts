@@ -267,9 +267,10 @@ export default class HomeController {
    */
   async tasks({ auth, response }: HttpContext) {
     const user = auth.use('api').user!
-    const hasPhongKH = await PermissionService.userHasPermission(user.id, 'idea.review') ||
-      await PermissionService.userHasPermission(user.id, 'project.review') ||
-      await PermissionService.userHasPermission(user.id, 'council.view')
+    const coDuyet = await PermissionService.userHasPermission(user.id, 'idea.review') ||
+      await PermissionService.userHasPermission(user.id, 'project.review')
+    const coChamHoiDong = await PermissionService.userHasPermission(user.id, 'council.view') ||
+      await PermissionService.userHasPermission(user.id, 'council.score')
     const hasLanhDao = await PermissionService.userHasPermission(user.id, 'idea.approve') ||
       await PermissionService.userHasPermission(user.id, 'project.approve')
 
@@ -287,14 +288,37 @@ export default class HomeController {
 
     let data: TaskItem[] = []
 
-    if (hasPhongKH) {
+    const layPhienDangCham = () =>
+      CouncilSession.query()
+        .where('status', 'OPEN')
+        .whereExists((sub) => {
+          sub
+            .from('session_members')
+            .whereColumn('session_members.session_id', 'council_sessions.id')
+            .where('session_members.member_id', user.id)
+        })
+        .orderBy('updated_at', 'desc')
+        .limit(5)
+
+    const viecChamHoiDong = (s: CouncilSession): TaskItem => ({
+      id: `task-council-${s.id}`,
+      type: 'PHAN_HOI_DONG',
+      title: `Phân hội đồng: ${s.title}`,
+      relatedModule: 'IDEA',
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19) + 'Z',
+      status: 'PENDING',
+      priority: 'HIGH',
+      link: `/ideas/council?phien=${s.id}`,
+    })
+
+    if (coDuyet) {
       const ideasPending = await Idea.query().where('status', 'SUBMITTED').limit(5)
       const proposalsPending = await ProjectProposal.query()
         .whereIn('status', ['SUBMITTED', 'CHO_PKH'])
         .limit(3)
-      const sessionsOpen = await CouncilSession.query().where('status', 'OPEN').limit(2)
+      const sessionsOpen = coChamHoiDong ? await layPhienDangCham() : []
       data = [
-        ...ideasPending.slice(0, 1).map((i, idx) => ({
+        ...ideasPending.slice(0, 1).map((i) => ({
           id: `task-idea-${i.id}`,
           type: 'SO_LOAI_Y_TUONG',
           title: `Sơ loại ý tưởng: ${i.title}`,
@@ -305,16 +329,7 @@ export default class HomeController {
           priority: 'HIGH' as const,
           link: '/ideas/review',
         })),
-        ...sessionsOpen.slice(0, 1).map((s) => ({
-          id: `task-council-${s.id}`,
-          type: 'PHAN_HOI_DONG',
-          title: `Phân hội đồng: ${s.title}`,
-          relatedModule: 'PROJECT' as const,
-          dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19) + 'Z',
-          status: 'PENDING' as const,
-          priority: 'HIGH' as const,
-          link: '/projects/council',
-        })),
+        ...sessionsOpen.map((s) => viecChamHoiDong(s)),
         ...proposalsPending.slice(0, 1).map((p) => ({
           id: `task-proposal-${p.id}`,
           type: 'DUYET_DE_XUAT',
@@ -352,6 +367,9 @@ export default class HomeController {
           },
         ]
       }
+    } else if (coChamHoiDong) {
+      const sessionsOpen = await layPhienDangCham()
+      data = sessionsOpen.map((s) => viecChamHoiDong(s))
     } else if (hasLanhDao) {
       data = [
         {

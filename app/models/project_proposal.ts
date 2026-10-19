@@ -145,13 +145,29 @@ export default class ProjectProposal extends BaseModel {
   @column()
   declare attachmentUrl: string | null
 
+  /** Số thành viên tối đa khi đăng ký thực hiện nhiệm vụ này */
+  @column()
+  declare maxMembers: number
+
+  /** Bắt buộc file đăng ký / thuyết minh sơ bộ */
+  @column()
+  declare requireRegistrationFile: boolean
+
   /** Kỳ thông báo tuyển chọn gắn với đề xuất */
   @column()
   declare callForProposalId: number | null
 
-  /** Loại quy trình đề tài (QT-I … QT-V) */
+  /** Loại quy trình đề tài (QT-I … QT-V) — cấp chính khớp kỳ CFP */
   @column()
   declare projectProcessTypeId: number | null
+
+  /** Các cấp phù hợp (mã QT-*), copy từ ý tưởng / chọn trên form */
+  @column({
+    prepare: (v: string[] | null) => (v == null ? '[]' : JSON.stringify(v)),
+    consume: (v: string | unknown) =>
+      typeof v === 'string' ? JSON.parse(v) : Array.isArray(v) ? v : [],
+  })
+  declare suitableLevels: string[]
 
   /** Ý tưởng nguồn (khi tạo tự động sau phê duyệt đặt hàng) */
   @column()

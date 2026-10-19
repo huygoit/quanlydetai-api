@@ -4,7 +4,10 @@ import CouncilSession from '#models/council_session'
 import SessionMember from '#models/session_member'
 import SessionIdea from '#models/session_idea'
 import IdeaCouncilScore from '#models/idea_council_score'
+import Idea from '#models/idea'
+import ProjectProposal from '#models/project_proposal'
 import CouncilPermissionService from '#services/council_permission_service'
+import NotificationService from '#services/notification_service'
 import { saveScoreValidator } from '#validators/council_validator'
 import { calculateWeightedScore, THRESHOLD_SCORE } from '#services/council_score_service'
 
@@ -128,6 +131,7 @@ export default class IdeaCouncilScoresController {
     score.submitted = true
     score.submittedAt = DateTime.now()
     await score.save()
+    await this.baoNguoiTaoKhiChamXong(session)
     return response.ok({ success: true, message: 'Đã nộp phiếu.', data: this.serializeScore(score) })
   }
 
@@ -146,18 +150,51 @@ export default class IdeaCouncilScoresController {
     score.submitted = true
     score.submittedAt = DateTime.now()
     await score.save()
+    await this.baoNguoiTaoKhiChamXong(session)
     return response.ok({ success: true, message: 'Đã nộp phiếu.', data: this.serializeScore(score) })
+  }
+
+  /** Khi mọi thành viên đã nộp phiếu cho mọi ý tưởng thì báo người tạo phiên. */
+  private async baoNguoiTaoKhiChamXong(session: CouncilSession) {
+    const members = await SessionMember.query().where('session_id', session.id).select('member_id')
+    const ideas = await SessionIdea.query().where('session_id', session.id).select('idea_id')
+    if (members.length === 0 || ideas.length === 0) return
+    const phieu = await IdeaCouncilScore.query()
+      .where('session_id', session.id)
+      .where('submitted', true)
+      .select('idea_id', 'council_member_id')
+    const daNop = new Set(phieu.map((muc) => `${muc.ideaId}:${muc.councilMemberId}`))
+    const chamXong = ideas.every((yTuong) =>
+      members.every((thanhVien) => daNop.has(`${yTuong.ideaId}:${thanhVien.memberId}`))
+    )
+    if (!chamXong) return
+    await NotificationService.notifyCouncilSessionReadyToClose(
+      session.id,
+      session.title,
+      session.createdById
+    )
   }
 
   async listScores({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    const canManage = await CouncilPermissionService.canManageCouncil(user)
-    if (!canManage) return response.forbidden({ success: false, message: 'Chỉ người có quyền council.view/council.create xem được danh sách phiếu.' })
     const session = await CouncilSession.find(params.sessionId)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
+    const laNguoiTao = Number(user.id) === Number(session.createdById)
+    const laThanhVien = await SessionMember.query()
+      .where('session_id', session.id)
+      .where('member_id', user.id)
+      .first()
+    const canManage = await CouncilPermissionService.canManageCouncil(user)
+    if (!laNguoiTao && !laThanhVien && !canManage) {
+      return response.forbidden({
+        success: false,
+        message: 'Chỉ thành viên hội đồng hoặc người tạo phiên mới xem được phiếu đã gửi.',
+      })
+    }
     const list = await IdeaCouncilScore.query()
       .where('session_id', params.sessionId)
       .where('idea_id', params.ideaId)
+      .where('submitted', true)
       .orderBy('id', 'asc')
     const data = list.map((s) => this.serializeScore(s))
     return response.ok({ success: true, data })
@@ -225,6 +262,17 @@ export default class IdeaCouncilScoresController {
     const session = await CouncilSession.find(params.sessionId)
     if (!session) return response.notFound({ success: false, message: 'Không tìm thấy phiên.' })
     const sessionIdeas = await SessionIdea.query().where('session_id', params.sessionId)
+    const maYTuong = sessionIdeas.map((si) => si.ideaId)
+    const yTuongGoc = maYTuong.length
+      ? await Idea.query().whereIn('id', maYTuong).select('id', 'status', 'linked_project_id', 'owner_id')
+      : []
+    const deXuat = maYTuong.length
+      ? await ProjectProposal.query().whereIn('source_idea_id', maYTuong).select('id', 'code', 'source_idea_id')
+      : []
+    const trangThaiYTuong = new Map(yTuongGoc.map((yt) => [Number(yt.id), yt.status]))
+    const chuYTuong = new Map(yTuongGoc.map((yt) => [Number(yt.id), Number(yt.ownerId)]))
+    const maDeTai = new Map(yTuongGoc.map((yt) => [Number(yt.id), yt.linkedProjectId]))
+    const deXuatTheoYTuong = new Map(deXuat.map((dx) => [Number(dx.sourceIdeaId), dx]))
     const data: Array<Record<string, unknown>> = []
     for (const si of sessionIdeas) {
       const scores = await IdeaCouncilScore.query()
@@ -247,6 +295,10 @@ export default class IdeaCouncilScoresController {
           memberCount: session.memberCount,
           recommendation: null,
           thresholdScore: THRESHOLD_SCORE,
+          ideaStatus: trangThaiYTuong.get(Number(si.ideaId)) ?? null,
+          ownerId: chuYTuong.get(Number(si.ideaId)) ?? null,
+          linkedProjectCode: maDeTai.get(Number(si.ideaId)) ?? null,
+          linkedProposalId: deXuatTheoYTuong.get(Number(si.ideaId))?.id ?? null,
         })
         continue
       }
@@ -266,6 +318,10 @@ export default class IdeaCouncilScoresController {
         memberCount: session.memberCount,
         recommendation: avgWeighted >= THRESHOLD_SCORE ? 'PROPOSE_ORDER' : 'NOT_PROPOSE',
         thresholdScore: THRESHOLD_SCORE,
+        ideaStatus: trangThaiYTuong.get(Number(si.ideaId)) ?? null,
+        ownerId: chuYTuong.get(Number(si.ideaId)) ?? null,
+        linkedProjectCode: maDeTai.get(Number(si.ideaId)) ?? null,
+        linkedProposalId: deXuatTheoYTuong.get(Number(si.ideaId))?.id ?? null,
       })
     }
     return response.ok({ success: true, data })

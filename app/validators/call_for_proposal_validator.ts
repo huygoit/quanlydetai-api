@@ -54,3 +54,10 @@ export const extendCfpValidator = vine.compile(
     deadlineAt: vine.string().trim(),
   })
 )
+
+/** Danh sách id nhiệm vụ (đề xuất) gắn hoặc gỡ khỏi thông báo */
+export const cfpProposalIdsValidator = vine.compile(
+  vine.object({
+    proposalIds: vine.array(vine.number().positive()).minLength(1).maxLength(200),
+  })
+)

@@ -14,8 +14,10 @@ export const createProjectProposalValidator = vine.compile(
     title: vine.string().trim().minLength(1).maxLength(500),
     // Tên lĩnh vực từ danh mục fields — kiểm tra DB ở controller
     field: vine.string().trim().minLength(1).maxLength(255),
-    /** Phân cấp = loại quy trình đề tài (QT-I…) */
+    /** Phân cấp chính = loại quy trình đề tài (QT-I…) — khớp kỳ CFP */
     projectProcessTypeId: vine.number().positive(),
+    /** Các cấp phù hợp (mã QT-*), copy từ ý tưởng / chọn nhiều trên form */
+    suitableLevels: vine.array(vine.string().trim().maxLength(20)).minLength(1).optional(),
     /** Giữ optional — BE tự suy từ QT nếu thiếu */
     level: vine.enum(LEVEL_OPTIONS).optional(),
     year: vine.number().min(2020).max(2030),
@@ -32,6 +34,10 @@ export const createProjectProposalValidator = vine.compile(
     researchOutputTypeId: vine.number().positive().optional().nullable(),
     researchDirection: vine.string().trim().maxLength(500).optional().nullable(),
     attachmentUrl: attachmentUrlRule.optional().nullable(),
+    /** Khung đăng ký thực hiện: số người tối đa */
+    maxMembers: vine.number().min(1).max(30).optional(),
+    /** Khung đăng ký thực hiện: bắt buộc đính kèm file */
+    requireRegistrationFile: vine.boolean().optional(),
   })
 )
 
@@ -40,6 +46,7 @@ export const updateProjectProposalValidator = vine.compile(
     title: vine.string().trim().minLength(1).maxLength(500).optional(),
     field: vine.string().trim().minLength(1).maxLength(255).optional(),
     projectProcessTypeId: vine.number().positive().optional(),
+    suitableLevels: vine.array(vine.string().trim().maxLength(20)).minLength(1).optional(),
     level: vine.enum(LEVEL_OPTIONS).optional(),
     year: vine.number().min(2020).max(2030).optional(),
     durationMonths: vine.number().min(1).max(60).optional(),
@@ -55,6 +62,8 @@ export const updateProjectProposalValidator = vine.compile(
     researchOutputTypeId: vine.number().positive().optional().nullable(),
     researchDirection: vine.string().trim().maxLength(500).optional().nullable(),
     attachmentUrl: attachmentUrlRule.optional().nullable(),
+    maxMembers: vine.number().min(1).max(30).optional(),
+    requireRegistrationFile: vine.boolean().optional(),
   })
 )
 

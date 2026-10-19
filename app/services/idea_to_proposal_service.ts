@@ -28,20 +28,24 @@ export type IdeaToProposalResult = {
  * Idempotent theo source_idea_id.
  */
 export default class IdeaToProposalService {
-  /** Chọn loại QT từ suitableLevels (ưu tiên mã QT-*), fallback QT-I */
-  private static async resolveProcessType(suitableLevels: string[]): Promise<ProjectProcessType> {
-    const levels = Array.isArray(suitableLevels) ? suitableLevels : []
-    const preferredCodes: string[] = []
-
-    for (const raw of levels) {
+  /** Chuẩn hóa cấp ý tưởng → danh sách mã QT-* (giữ thứ tự, bỏ trùng). */
+  static normalizeSuitableLevels(suitableLevels: string[]): string[] {
+    const out: string[] = []
+    const seen = new Set<string>()
+    for (const raw of Array.isArray(suitableLevels) ? suitableLevels : []) {
       const code = String(raw || '').trim()
       if (!code) continue
-      if (code.startsWith('QT-')) {
-        preferredCodes.push(code)
-      } else if (LEGACY_IDEA_LEVEL_TO_QT[code]) {
-        preferredCodes.push(LEGACY_IDEA_LEVEL_TO_QT[code])
-      }
+      const qt = code.startsWith('QT-') ? code : LEGACY_IDEA_LEVEL_TO_QT[code]
+      if (!qt || seen.has(qt)) continue
+      seen.add(qt)
+      out.push(qt)
     }
+    return out
+  }
+
+  /** Chọn loại QT từ suitableLevels (ưu tiên mã QT-*), fallback QT-I */
+  private static async resolveProcessType(suitableLevels: string[]): Promise<ProjectProcessType> {
+    const preferredCodes = this.normalizeSuitableLevels(suitableLevels)
 
     for (const code of preferredCodes) {
       const row = await ProjectProcessType.query()
@@ -75,13 +79,32 @@ export default class IdeaToProposalService {
         idea.linkedProjectId = existing.code
         await idea.save()
       }
+      // Bổ sung cấp còn thiếu từ ý tưởng (đề xuất cũ chỉ lưu 1 cấp).
+      const tuYTuong = this.normalizeSuitableLevels(idea.suitableLevels ?? [])
+      const dangCo = this.normalizeSuitableLevels(existing.suitableLevels ?? [])
+      if (tuYTuong.length && tuYTuong.some((c) => !dangCo.includes(c))) {
+        const gop = [...dangCo]
+        for (const c of tuYTuong) {
+          if (!gop.includes(c)) gop.push(c)
+        }
+        existing.suitableLevels = gop
+        await existing.save()
+      }
       return { proposal: existing, created: false }
     }
 
-    const processType = await this.resolveProcessType(idea.suitableLevels ?? [])
+    const suitableLevels = this.normalizeSuitableLevels(idea.suitableLevels ?? [])
+    const processType = await this.resolveProcessType(suitableLevels)
     const level = levelFromProcessTypeCode(processType.code)
     const year = new Date().getFullYear()
     const owner = await User.find(idea.ownerId)
+    // Đảm bảo cấp chính nằm trong danh sách đã copy.
+    const levelsLuu =
+      suitableLevels.length > 0
+        ? suitableLevels.includes(processType.code)
+          ? suitableLevels
+          : [processType.code, ...suitableLevels]
+        : [processType.code]
 
     let callForProposalId: number | null = null
     try {
@@ -121,6 +144,7 @@ export default class IdeaToProposalService {
       attachmentUrl: null,
       callForProposalId,
       projectProcessTypeId: processType.id,
+      suitableLevels: levelsLuu,
       sourceIdeaId: idea.id,
       status: 'DRAFT',
     })

@@ -65,6 +65,22 @@ function decodeXmlEntities(s: string): string {
     .replaceAll('&apos;', "'")
 }
 
+/** Văn bản xem trước: mỗi đoạn Word một dòng. */
+export function extractPreviewTextFromDocumentXml(xml: string): string {
+  const paras = xml.split(/<\/w:p>/)
+  const lines = paras.map((p) => {
+    const parts: string[] = []
+    const re = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(p))) parts.push(decodeXmlEntities(m[1] || ''))
+    return parts.join('')
+  })
+  return lines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 /** Quét {{ten_bien}} trong DOCX. */
 export async function detectDocxPlaceholders(filePath: string): Promise<string[]> {
   const xml = await readDocxDocumentXml(filePath)

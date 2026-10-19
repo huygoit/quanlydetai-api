@@ -1,7 +1,7 @@
 /**
  * Loại mẫu DOCX trong Module 5 (hợp đồng, thanh lý, …).
  */
-export type DocTemplateTypeCode = 'HOP_DONG' | 'THANH_LY'
+export type DocTemplateTypeCode = 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO'
 
 export type DocTemplateTypeDef = {
   code: DocTemplateTypeCode
@@ -24,6 +24,12 @@ export const DOC_TEMPLATE_TYPES: DocTemplateTypeDef[] = [
     defaultFormCode: null,
     description: 'Biên bản thanh lý sau khi kết thúc / nghiệm thu nhiệm vụ',
   },
+  {
+    code: 'THONG_BAO',
+    label: 'Thông báo',
+    defaultFormCode: 'TB',
+    description: 'Thông báo tuyển chọn tổ chức, cá nhân chủ trì đề tài',
+  },
 ]
 
 export const DOC_TEMPLATE_TYPE_CODES = DOC_TEMPLATE_TYPES.map((t) => t.code) as [
@@ -44,5 +50,6 @@ export function mapLegacyFormCodeToTemplateType(formCode: string | null | undefi
   const c = (formCode || '').toUpperCase()
   if (c === 'BM06' || c === 'HOP_DONG') return 'HOP_DONG'
   if (c === 'THANH_LY' || c === 'BBTL') return 'THANH_LY'
+  if (c === 'THONG_BAO' || c === 'TB') return 'THONG_BAO'
   return 'HOP_DONG'
 }

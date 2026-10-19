@@ -54,21 +54,50 @@ export default class extends BaseSeeder {
       }
     }
 
-    const existing = await ContractTemplate.query().where('code', 'BM06_DEFAULT').first()
+    await this.seedFile({
+      code: 'BM06_DEFAULT',
+      name: 'Mẫu hợp đồng BM.06 (chuẩn)',
+      description: 'Mẫu DOCX có biến {{...}} — seed từ BM06_Mau_hop_dong_co_bien.docx',
+      templateType: 'HOP_DONG',
+      formCode: 'BM06',
+      fileName: 'BM06_Mau_hop_dong_co_bien.docx',
+      source: app.makePath('resources/bm06/BM06_Mau_hop_dong_co_bien.docx'),
+    })
+
+    await this.seedFile({
+      code: 'TB_TUYEN_CHON_UED',
+      name: 'Thông báo tuyển chọn đề tài (UED)',
+      description: 'Mẫu thông báo tuyển chọn tổ chức, cá nhân chủ trì đề tài — Trường ĐHSP Đà Nẵng.',
+      templateType: 'THONG_BAO',
+      formCode: 'TB',
+      fileName: 'Template_Thong_bao_tuyen_chon_de_tai_UED.docx',
+      source: app.makePath('resources/thong-bao/Template_Thong_bao_tuyen_chon_de_tai_UED.docx'),
+    })
+  }
+
+  private async seedFile(input: {
+    code: string
+    name: string
+    description: string
+    templateType: 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO'
+    formCode: string
+    fileName: string
+    source: string
+  }) {
+    const existing = await ContractTemplate.query().where('code', input.code).first()
     if (existing) return
 
-    const seedSrc = app.makePath('resources/bm06/BM06_Mau_hop_dong_co_bien.docx')
     try {
-      await fs.access(seedSrc)
+      await fs.access(input.source)
     } catch {
-      console.warn('[19_contract_template] Bỏ qua seed file — chưa có resources/bm06/BM06_Mau_hop_dong_co_bien.docx')
+      console.warn(`[19_contract_template] Bỏ qua ${input.code} — chưa có file ${input.source}`)
       return
     }
 
     const dir = await resolveContractTemplateDir()
     const stored = `${Date.now()}-${randomUUID()}.docx`
     const dest = path.join(dir, stored)
-    await fs.copyFile(seedSrc, dest)
+    await fs.copyFile(input.source, dest)
     const stat = await fs.stat(dest)
     let detected: string[] = []
     try {
@@ -78,12 +107,12 @@ export default class extends BaseSeeder {
     }
 
     await ContractTemplate.create({
-      code: 'BM06_DEFAULT',
-      name: 'Mẫu hợp đồng BM.06 (chuẩn)',
-      description: 'Mẫu DOCX có biến {{...}} — seed từ BM06_Mau_hop_dong_co_bien.docx',
-      templateType: 'HOP_DONG',
-      formCode: 'BM06',
-      fileName: 'BM06_Mau_hop_dong_co_bien.docx',
+      code: input.code,
+      name: input.name,
+      description: input.description,
+      templateType: input.templateType,
+      formCode: input.formCode,
+      fileName: input.fileName,
       storedFileName: stored,
       fileUrl: buildPublicContractTemplateUrl(stored),
       fileSize: stat.size,
