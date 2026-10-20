@@ -6,8 +6,13 @@ import ProjectProposal from '#models/project_proposal'
 import CallForProposal from '#models/call_for_proposal'
 import ProposalRegistrationMember from '#models/proposal_registration_member'
 
-/** Nháp, chờ đơn vị, hoặc đã chuyển Phòng Khoa học */
-export type ProposalRegistrationStatus = 'DRAFT' | 'CHO_DON_VI' | 'CHO_PKH'
+/** Nháp, chờ đơn vị, chờ phòng, được chấp thuận, hoặc bị từ chối */
+export type ProposalRegistrationStatus =
+  | 'DRAFT'
+  | 'CHO_DON_VI'
+  | 'CHO_PKH'
+  | 'DKDT_DUOC_CHAP_THUAN'
+  | 'DKDT_TU_CHOI'
 
 export default class ProposalRegistration extends BaseModel {
   static table = 'proposal_registrations'
@@ -51,6 +56,10 @@ export default class ProposalRegistration extends BaseModel {
   /** Ghi chú khi đơn vị xác nhận, hoặc lý do trả lại */
   @column()
   declare unitComment: string | null
+
+  /** Lý do phòng từ chối đơn này */
+  @column()
+  declare pkhReason: string | null
 
   @column()
   declare status: ProposalRegistrationStatus

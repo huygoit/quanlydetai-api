@@ -185,9 +185,17 @@ export default class ProjectProposal extends BaseModel {
   @column()
   declare pkhComment: string | null
 
-  /** Được phép soạn thuyết minh (sau BGH: chỉ DUOC_CHON) */
+  /** Được phép soạn thuyết minh (sau BGH: chỉ DUOC_CHON, hoặc sau khi phòng phân công) */
   @column()
   declare canWriteOutline: boolean
+
+  /** Cổng đăng ký thực hiện: DA_GIAO khi đã phân công, DM_DONG_DANG_KY khi không tuyển được */
+  @column()
+  declare catalogRegistrationStatus: 'DA_GIAO' | 'DM_DONG_DANG_KY' | null
+
+  /** Lý do đóng đăng ký khi không tuyển được ai */
+  @column()
+  declare catalogRegistrationNote: string | null
 
   /** Nội dung điều chỉnh từ HĐ (khi DIEU_CHINH) */
   @column()

@@ -13,6 +13,7 @@ import ProjectOutlineBudgetLine from '#models/project_outline_budget_line'
 import type { OutlineBudgetGroup } from '#models/project_outline_budget_line'
 import ProjectOutlineAudit from '#models/project_outline_audit'
 import ProjectProposal from '#models/project_proposal'
+import OfficialAssignment from '#models/official_assignment'
 import ProjectProposalMember from '#models/project_proposal_member'
 import ScientificProfile from '#models/scientific_profile'
 import { resolveProposalMemberRole } from '#constants/proposal_member_role'
@@ -46,6 +47,7 @@ export default class ProjectOutlineService {
 
   /** Kiểm tra đề xuất đủ điều kiện soạn thuyết minh */
   static assertEligibleProposal(p: ProjectProposal) {
+    if (p.catalogRegistrationStatus === 'DA_GIAO' && p.canWriteOutline) return null
     if (p.status !== 'DUOC_CHON' || !p.canWriteOutline) {
       return 'Đề xuất chưa đủ điều kiện soạn thuyết minh.'
     }
@@ -167,6 +169,8 @@ export default class ProjectOutlineService {
    * Thành viên khác (Thư ký / Thành viên) không được.
    */
   static async userCanWriteOutline(proposal: ProjectProposal, userId: number): Promise<boolean> {
+    const giao = await OfficialAssignment.query().where('danh_muc_id', proposal.id).first()
+    if (giao) return Number(giao.principalUserId) === Number(userId)
     if (Number(proposal.ownerId) === Number(userId)) return true
 
     const profile = await ScientificProfile.query().where('user_id', userId).first()
@@ -205,7 +209,13 @@ export default class ProjectOutlineService {
       }
     }
 
-    return [...new Set([...owned, ...asPrincipal].map((p) => p.id))]
+    const base = [...new Set([...owned, ...asPrincipal].map((p) => p.id))]
+    const giao = await OfficialAssignment.query().select('danh_muc_id', 'principal_user_id')
+    const daGiao = new Set(giao.map((g) => Number(g.danhMucId)))
+    const cuaToi = giao
+      .filter((g) => Number(g.principalUserId) === Number(userId))
+      .map((g) => Number(g.danhMucId))
+    return [...new Set([...base.filter((id) => !daGiao.has(id)), ...cuaToi])]
   }
 
   /** Thuyết minh user được theo dõi: là thành viên hoặc nằm trong hội đồng bảo vệ. */

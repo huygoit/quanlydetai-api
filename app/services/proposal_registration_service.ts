@@ -307,6 +307,19 @@ export default class ProposalRegistrationService {
     throw new LoiHoSoDangKy('Chỉ người có quyền xác nhận đăng ký của đơn vị được xem danh sách này.')
   }
 
+  /** PKH: mọi đơn đơn vị đã xác nhận, đang chờ phòng */
+  static async danhSachChoPkh(user: User) {
+    const laPkh = await PermissionService.userHasPermission(user.id, 'project.review')
+    if (!laPkh) {
+      throw new LoiHoSoDangKy('Chỉ Phòng Khoa học và Hợp tác quốc tế được xét duyệt hồ sơ đăng ký.')
+    }
+    const rows = await ProposalRegistration.query()
+      .where('status', 'CHO_PKH')
+      .preload('projectProposal', (q) => q.select('id', 'code', 'title'))
+      .orderBy('submitted_at', 'desc')
+    return rows.map((row) => this.serializeChoDuyet(row))
+  }
+
   static async demChoDonVi(user: User) {
     const duoc = await PermissionService.userHasPermission(user.id, 'project.assign_reviewer')
     if (!duoc || user.departmentId == null) return 0
@@ -459,6 +472,7 @@ export default class ProposalRegistrationService {
       attachmentUrl: row.attachmentUrl,
       note: row.note,
       unitComment: row.unitComment,
+      pkhReason: row.pkhReason,
       status: row.status,
       submittedAt: row.submittedAt?.toISO() ?? null,
     }

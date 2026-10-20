@@ -399,7 +399,7 @@ export default class NotificationService {
       type: 'PROJECT_UPDATE',
       title: 'Hồ sơ đăng ký chờ PKH&HTQT',
       message: `${hoSo.ownerName} — hồ sơ "${hoSo.title}" (${hoSo.code}) đã được đơn vị xác nhận.`,
-      link: '/projects/dang-ky-cho-xac-nhan',
+      link: '/projects/xet-duyet-dang-ky',
     })
   }
 
