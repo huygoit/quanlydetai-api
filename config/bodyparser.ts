@@ -49,10 +49,9 @@ const bodyParserConfig = defineConfig({
     processManually: [],
 
     /**
-     * Maximum limit of data to parse including all files
-     * and fields
+     * Gồm cả file zip sao lưu (có thể lớn hơn file đính kèm thường).
      */
-    limit: '20mb',
+    limit: '1024mb',
     types: ['multipart/form-data'],
   },
 })

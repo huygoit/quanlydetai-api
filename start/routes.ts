@@ -50,6 +50,7 @@ import FieldsController from '#controllers/fields_controller'
 import AdminSpecializationsController from '#controllers/admin/specializations_controller'
 import SpecializationsController from '#controllers/specializations_controller'
 import AdminCountriesController from '#controllers/admin/countries_controller'
+import AdminBackupsController from '#controllers/admin/backups_controller'
 import CountriesController from '#controllers/countries_controller'
 import AdminUniversitiesController from '#controllers/admin/universities_controller'
 import UniversitiesController from '#controllers/universities_controller'
@@ -249,6 +250,19 @@ router
   })
   .prefix('/api/admin/countries')
   .use([middleware.auth()])
+
+// Sao lưu / khôi phục — chỉ tài khoản có quyền *
+router
+  .group(() => {
+    router.get('/', [AdminBackupsController, 'index'])
+    router.post('/', [AdminBackupsController, 'store'])
+    router.get('/file', [AdminBackupsController, 'download'])
+    router.delete('/file', [AdminBackupsController, 'destroy'])
+    router.post('/upload', [AdminBackupsController, 'upload'])
+    router.post('/restore', [AdminBackupsController, 'restore'])
+  })
+  .prefix('/api/admin/backups')
+  .use([middleware.auth(), middleware.permission('*')])
 
 // --- Catalog quốc gia (đọc)
 router

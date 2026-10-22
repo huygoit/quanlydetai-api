@@ -28,6 +28,9 @@ export default await Env.create(new URL('../', import.meta.url), {
   DB_USER: Env.schema.string(),
   DB_PASSWORD: Env.schema.string.optional(),
   DB_DATABASE: Env.schema.string(),
+  /** Đường dẫn pg_dump / pg_restore nếu không có trong PATH */
+  PG_DUMP_BIN: Env.schema.string.optional(),
+  PG_RESTORE_BIN: Env.schema.string.optional(),
 
   /*
   |----------------------------------------------------------
