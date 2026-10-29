@@ -2,6 +2,10 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ContractTemplateService, { chuanCauHinhThongBao } from '#services/contract_template_service'
 import type { ThongBaoMergeConfig } from '#models/contract_template'
 import {
+  chuanCauHinhQuyetDinh,
+  type QuyetDinhMergeConfig,
+} from '#constants/quyet_dinh_template_variables'
+import {
   createContractTemplateValidator,
   updateContractTemplateValidator,
   updateContractTemplateStatusValidator,
@@ -111,7 +115,7 @@ export default class AdminContractTemplatesController {
           formCode: payload.formCode,
           status: payload.status,
           isDefault,
-          mergeConfig: this.cauHinhThongBao(request),
+          mergeConfig: this.cauHinhMau(request),
         },
         file
       )
@@ -175,7 +179,7 @@ export default class AdminContractTemplatesController {
           formCode: payload.formCode,
           status: payload.status,
           isDefault,
-          mergeConfig: this.cauHinhThongBao(request),
+          mergeConfig: this.cauHinhMau(request),
         },
         file || null
       )
@@ -258,26 +262,57 @@ export default class AdminContractTemplatesController {
     }
   }
 
-  /** Chỉ đọc khi form mẫu thông báo gửi các ô cấu hình. */
-  private cauHinhThongBao(request: HttpContext['request']): ThongBaoMergeConfig | undefined {
+  /** Đọc cấu hình merge theo loại mẫu (Thông báo / Quyết định). */
+  private cauHinhMau(
+    request: HttpContext['request']
+  ): ThongBaoMergeConfig | QuyetDinhMergeConfig | undefined {
     const loai = String(request.input('templateType') || request.input('template_type') || '')
-    if (loai !== 'THONG_BAO') return undefined
-    const khoa = [
-      'ky_hieu',
-      'ky_hieu_thong_bao',
-      'noi_nhan',
-      'tham_quyen_ky',
-      'ho_ten_nguoi_ky',
-      'so_moi_nhat',
-    ] as const
-    if (!khoa.some((k) => request.input(k) !== undefined)) return undefined
-    return chuanCauHinhThongBao({
-      ky_hieu: request.input('ky_hieu') || request.input('ky_hieu_thong_bao'),
-      noi_nhan: request.input('noi_nhan'),
-      tham_quyen_ky: request.input('tham_quyen_ky'),
-      ho_ten_nguoi_ky: request.input('ho_ten_nguoi_ky'),
-      so_moi_nhat: request.input('so_moi_nhat'),
-    })
+    if (loai === 'THONG_BAO') {
+      const khoa = [
+        'ky_hieu',
+        'ky_hieu_thong_bao',
+        'noi_nhan',
+        'tham_quyen_ky',
+        'ho_ten_nguoi_ky',
+        'so_moi_nhat',
+      ] as const
+      if (!khoa.some((k) => request.input(k) !== undefined)) return undefined
+      return chuanCauHinhThongBao({
+        ky_hieu: request.input('ky_hieu') || request.input('ky_hieu_thong_bao'),
+        noi_nhan: request.input('noi_nhan'),
+        tham_quyen_ky: request.input('tham_quyen_ky'),
+        ho_ten_nguoi_ky: request.input('ho_ten_nguoi_ky'),
+        so_moi_nhat: request.input('so_moi_nhat'),
+      })
+    }
+    if (loai === 'QUYET_DINH') {
+      const khoa = [
+        'van_ban_quy_dinh_chuc_nang_nhiem_vu_tham_quyen',
+        'quy_dinh_quan_ly_nhiem_vu_khcn_dmst',
+        'van_ban_phe_duyet_danh_muc_hoac_ke_hoach_tham_dinh',
+        'chuc_danh_nguoi_de_nghi',
+        'don_vi_dau_moi',
+        'don_vi_luu_ho_so',
+        'ho_ten_nguoi_ky',
+        'so_moi_nhat',
+      ] as const
+      if (!khoa.some((k) => request.input(k) !== undefined)) return undefined
+      return chuanCauHinhQuyetDinh({
+        van_ban_quy_dinh_chuc_nang_nhiem_vu_tham_quyen: request.input(
+          'van_ban_quy_dinh_chuc_nang_nhiem_vu_tham_quyen'
+        ),
+        quy_dinh_quan_ly_nhiem_vu_khcn_dmst: request.input('quy_dinh_quan_ly_nhiem_vu_khcn_dmst'),
+        van_ban_phe_duyet_danh_muc_hoac_ke_hoach_tham_dinh: request.input(
+          'van_ban_phe_duyet_danh_muc_hoac_ke_hoach_tham_dinh'
+        ),
+        chuc_danh_nguoi_de_nghi: request.input('chuc_danh_nguoi_de_nghi'),
+        don_vi_dau_moi: request.input('don_vi_dau_moi'),
+        don_vi_luu_ho_so: request.input('don_vi_luu_ho_so'),
+        ho_ten_nguoi_ky: request.input('ho_ten_nguoi_ky'),
+        so_moi_nhat: request.input('so_moi_nhat'),
+      })
+    }
+    return undefined
   }
 
   private mapError(response: HttpContext['response'], err: unknown) {

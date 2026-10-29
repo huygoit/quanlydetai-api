@@ -39,9 +39,10 @@ export default class ProjectOutlinesController {
   private coNguCanhChinhSua(status: string) {
     return (
       status === 'CHINH_SUA_TM' ||
-      status === 'CHO_HD_XAC_NHAN_TM' ||
       status === 'CHO_PKH_DUYET_TM' ||
-      status === 'CHO_XAC_NHAN_KP'
+      status === 'CHO_HD_XAC_NHAN_TM' ||
+      status === 'CHO_BGH_DUYET_TM' ||
+      status === 'CHO_HC_PHAT_HANH_QD'
     )
   }
 
@@ -272,11 +273,14 @@ export default class ProjectOutlinesController {
       outline.defenseConclusion === 'THONG_QUA_DIEU_CHINH'
         ? await ProjectOutlineRevisionService.getRevisionContext(outline)
         : null
+    const canWrite = await this.assertCanWriteOutline(outline, user.id)
     return response.ok({
       success: true,
       data: {
         ...ProjectOutlineService.serialize(outline),
         revisionContext,
+        /** Quyền lưu/nộp của user hiện tại (CNĐT / người đề xuất / được giao). */
+        canWrite,
       },
     })
   }
@@ -545,7 +549,7 @@ export default class ProjectOutlinesController {
       .orderBy('version_no', 'asc')
     return response.ok({
       success: true,
-      data: rows.map((v) => ProjectOutlineRevisionService.serializeVersion(v)),
+      data: await Promise.all(rows.map((v) => ProjectOutlineRevisionService.serializeVersion(v))),
     })
   }
 
@@ -597,11 +601,11 @@ export default class ProjectOutlinesController {
         success: true,
         message: result.idempotent
           ? 'Bản hoàn thiện đã được nộp trước đó.'
-          : 'Đã nộp bản hoàn thiện — chờ thư ký và chủ tịch hội đồng xác nhận.',
+          : 'Đã nộp bản hoàn thiện cho phòng khoa học — chờ PKH duyệt.',
         data: {
           ...ProjectOutlineService.serialize(full!),
           revisionContext,
-          submittedVersion: ProjectOutlineRevisionService.serializeVersion(result.version),
+          submittedVersion: await ProjectOutlineRevisionService.serializeVersion(result.version),
         },
       })
     } catch (e: any) {
@@ -652,7 +656,7 @@ export default class ProjectOutlinesController {
     }
   }
 
-  /** POST /api/project-outlines/:id/revision-pkh — phòng KH sau hội đồng */
+  /** POST /api/project-outlines/:id/revision-pkh — phòng KH duyệt trước hội đồng */
   async revisionPkh({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
     const outline = await this.loadFull(Number(params.id))
@@ -678,7 +682,7 @@ export default class ProjectOutlinesController {
       return response.ok({
         success: true,
         message: accept
-          ? 'Đã chuyển bản hoàn thiện sang xác nhận kinh phí.'
+          ? 'PKH đã duyệt — chuyển hội đồng xác nhận.'
           : 'Đã trả bản hoàn thiện cho chủ nhiệm.',
         data: {
           ...ProjectOutlineService.serialize(full!),
@@ -692,6 +696,17 @@ export default class ProjectOutlinesController {
         message: e?.message || 'Duyệt thất bại.',
       })
     }
+  }
+
+  /**
+   * @deprecated Dùng /api/project-outline-approvals/:id/bgh-approve|bgh-reject
+   */
+  async revisionBgh({ response }: HttpContext) {
+    return response.status(410).send({
+      success: false,
+      message:
+        'Đã chuyển sang màn Chờ phê duyệt BGH (/projects/outline-approvals). Dùng API project-outline-approvals.',
+    })
   }
 
   /** POST /api/project-outlines/:id/extend-revision-deadline — PKH gia hạn */

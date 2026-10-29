@@ -8,6 +8,7 @@ import User from '#models/user'
 import NotificationService from '#services/notification_service'
 import EmailLogService from '#services/email_log_service'
 import ProjectOutlineService from '#services/project_outline_service'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
 /** Cảnh báo khi phản biện đã nhận > N nhiệm vụ trong tháng */
 export const WORKLOAD_WARN_THRESHOLD = 3
@@ -227,7 +228,7 @@ export default class ProjectOutlineReviewService {
             'Phòng Khoa học trân trọng mời Quý thầy/cô tham gia phản biện kín thuyết minh đề tài:',
             `- Mã: ${outline.code}`,
             `- Tên: ${outline.title}`,
-            `- Hạn hoàn thành: ${deadline.toFormat('dd/MM/yyyy HH:mm')}`,
+            `- Hạn hoàn thành: ${deadline.toFormat(DATETIME_FORMAT)}`,
             '',
             'Danh tính phản biện được bảo mật đối với chủ nhiệm và thành viên đề tài trong suốt quá trình đánh giá.',
             'Vui lòng đăng nhập hệ thống để thực hiện nhiệm vụ.',

@@ -16,6 +16,7 @@ import EmailLogService from '#services/email_log_service'
 import ProjectOutlineService from '#services/project_outline_service'
 import { hasAtLeastBusinessDays } from '#utils/business_days'
 import { generateDefenseMinutesHtml } from '#utils/defense_minutes'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
 /** TBD nghiệp vụ — mặc định tối thiểu 1 người ngoài trường */
 const MIN_EXTERNAL_MEMBERS = 1
@@ -64,6 +65,8 @@ export default class ProjectOutlineDefenseService {
       meetingUrl: s.meetingUrl,
       shortNoticeOverride: s.shortNoticeOverride,
       shortNoticeReason: s.shortNoticeReason,
+      earlyMeetingOpened: !!s.earlyMeetingOpened,
+      earlyMeetingOpenedAt: s.earlyMeetingOpenedAt?.toISO() ?? null,
       cancelledAt: s.cancelledAt?.toISO() ?? null,
       cancelReason: s.cancelReason,
       discussionNotes: s.discussionNotes,
@@ -98,21 +101,28 @@ export default class ProjectOutlineDefenseService {
     }
   }
 
-  /** Hồ sơ đủ điều kiện lên lịch bảo vệ */
+  /**
+   * TM chờ PKH tổ chức thẩm định (TM_CHO_PKH&HTQT ≈ PHANBIEN_KIN).
+   * Vẫn liệt kê cả hồ sơ chưa đủ phiếu PB — FE hiện trạng thái, chỉ cho lên lịch khi đã đủ điểm.
+   */
   static async listEligible() {
     const rows = await ProjectOutline.query()
       .where('status', 'PHANBIEN_KIN')
-      .whereNotNull('review_scores_completed_at')
-      .orderBy('review_scores_completed_at', 'asc')
+      .orderBy('id', 'asc')
 
     const result = []
     for (const o of rows) {
       const active = await ProjectOutlineDefenseSession.query()
         .where('project_outline_id', o.id)
-        .whereIn('status', ['DRAFT', 'CONFIRMED'])
+        .whereIn('status', ['DRAFT', 'CONFIRMED', 'PENDING_BGH', 'BGH_SIGNED', 'PUBLISHED'])
         .first()
       if (active) continue
-      result.push(ProjectOutlineService.serialize(o))
+      const serialized = ProjectOutlineService.serialize(o) as Record<string, unknown>
+      serialized.defenseReady = !!o.reviewScoresCompletedAt
+      serialized.defenseBlockReason = o.reviewScoresCompletedAt
+        ? null
+        : 'Chưa đủ phiếu phản biện kín — hoàn tất chấm điểm trước khi lên lịch thẩm định.'
+      result.push(serialized)
     }
     return result
   }
@@ -219,7 +229,7 @@ export default class ProjectOutlineDefenseService {
       if (existing.length) {
         throw new Error(
           `"${existing[0].memberName}" trùng lịch bảo vệ khác (${s.meetingAt.toFormat(
-            'dd/MM/yyyy HH:mm'
+            DATETIME_FORMAT
           )}).`
         )
       }
@@ -412,7 +422,7 @@ export default class ProjectOutlineDefenseService {
     outline: ProjectOutline,
     members: ProjectOutlineDefenseMember[]
   ) {
-    const when = session.meetingAt.toFormat('dd/MM/yyyy HH:mm')
+    const when = session.meetingAt.toFormat(DATETIME_FORMAT)
     const subject = `[KH&CN] Thư mời bảo vệ thuyết minh ${outline.code}`
     const body = [
       `Kính mời tham dự buổi bảo vệ thuyết minh đề tài:`,
@@ -474,38 +484,49 @@ export default class ProjectOutlineDefenseService {
     if (session.status === 'FINALIZED') throw new Error('Buổi đã chốt biên bản — không hủy.')
     if (session.status === 'CANCELLED') return session
 
-    const outline = await ProjectOutline.findOrFail(session.projectOutlineId)
-    const from = outline.status
     session.status = 'CANCELLED'
     session.cancelledAt = DateTime.now()
     session.cancelReason = reason.trim()
     await session.save()
 
-    if (outline.activeDefenseSessionId === session.id) {
-      outline.activeDefenseSessionId = null
-      outline.defenseScheduledAt = null
-      if (outline.status === 'BAOVE_PENDING') {
-        outline.status = 'PHANBIEN_KIN'
-      }
-      await outline.save()
-    }
+    // Gỡ mọi TM gắn phiên (flow nhiều TM)
+    const ProjectOutlineDefenseSessionOutline = (
+      await import('#models/project_outline_defense_session_outline')
+    ).default
+    const links = await ProjectOutlineDefenseSessionOutline.query().where('session_id', session.id)
+    const outlineIds = [
+      ...new Set([session.projectOutlineId, ...links.map((l) => l.projectOutlineId)]),
+    ]
 
-    await ProjectOutlineService.writeAudit(
-      outline.id,
-      actorId,
-      'CANCEL_DEFENSE_SESSION',
-      from,
-      outline.status,
-      { sessionId: session.id, reason }
-    )
+    for (const oid of outlineIds) {
+      const outline = await ProjectOutline.find(oid)
+      if (!outline) continue
+      const from = outline.status
+      if (outline.activeDefenseSessionId === session.id) {
+        outline.activeDefenseSessionId = null
+        outline.defenseScheduledAt = null
+        if (outline.status === 'BAOVE_PENDING') {
+          outline.status = 'PHANBIEN_KIN'
+        }
+        await outline.save()
+      }
+      await ProjectOutlineService.writeAudit(
+        outline.id,
+        actorId,
+        'CANCEL_DEFENSE_SESSION',
+        from,
+        outline.status,
+        { sessionId: session.id, reason }
+      )
+    }
 
     const members = await ProjectOutlineDefenseMember.query().where('session_id', session.id)
     for (const m of members) {
       if (m.userId) {
         await NotificationService.push(m.userId, {
           type: 'PROJECT_UPDATE',
-          title: 'Hủy buổi bảo vệ thuyết minh',
-          message: `${outline.code}: ${reason}`,
+          title: 'Hủy phiên thẩm định thuyết minh',
+          message: reason,
           link: `/projects/defenses`,
         })
       }
@@ -525,8 +546,8 @@ export default class ProjectOutlineDefenseService {
     },
     actorId: number
   ) {
-    if (session.status !== 'CONFIRMED') {
-      throw new Error('Chỉ ghi biên bản khi buổi đã xác nhận lịch.')
+    if (session.status !== 'CONFIRMED' && session.status !== 'PUBLISHED') {
+      throw new Error('Chỉ ghi biên bản khi phiên đã phát hành.')
     }
     if (payload.attendances?.length) {
       for (const a of payload.attendances) {
@@ -578,8 +599,8 @@ export default class ProjectOutlineDefenseService {
       const members = await ProjectOutlineDefenseMember.query().where('session_id', session.id)
       return { session, outline, members }
     }
-    if (session.status !== 'CONFIRMED') {
-      throw new Error('Chỉ chốt biên bản khi buổi đã xác nhận.')
+    if (session.status !== 'CONFIRMED' && session.status !== 'PUBLISHED') {
+      throw new Error('Chỉ chốt biên bản khi phiên đã phát hành.')
     }
 
     // Cập nhật điểm danh
@@ -654,18 +675,33 @@ export default class ProjectOutlineDefenseService {
     await session.save()
 
     let nextStatus: ProjectOutline['status'] = 'BAOVE_KHONG_DAT'
-    if (payload.conclusion === 'THONG_QUA') nextStatus = 'CHO_XAC_NHAN_KP'
-    else if (payload.conclusion === 'THONG_QUA_DIEU_CHINH') nextStatus = 'CHINH_SUA_TM'
+    if (payload.conclusion === 'THONG_QUA') {
+      nextStatus = 'CHO_BGH_DUYET_TM'
+    } else if (payload.conclusion === 'THONG_QUA_DIEU_CHINH') {
+      nextStatus = 'CHINH_SUA_TM'
+    }
 
     outline.status = nextStatus
     outline.defenseConclusion = payload.conclusion
     outline.defenseFinalizedAt = session.finalizedAt
     await outline.save()
 
+    if (payload.conclusion === 'THONG_QUA') {
+      const FinalApproval = (await import('#services/project_outline_final_approval_service')).default
+      await FinalApproval.enqueueForBgh(outline, actorId, {
+        sessionId: session.id,
+        via: 'LEGACY_DEFENSE',
+      })
+    }
+
     if (payload.conclusion === 'THONG_QUA_DIEU_CHINH') {
-      const ProjectOutlineRevisionService = (await import('#services/project_outline_revision_service'))
-        .default
-      await ProjectOutlineRevisionService.openRevisionPeriod(outline, session, actorId)
+      const ProjectOutlineRevisionService = (
+        await import('#services/project_outline_revision_service')
+      ).default
+      await ProjectOutlineRevisionService.openRevisionPeriod(outline, session, actorId, {
+        minutesUrl: relativeUrl,
+        adjustmentRequirements: payload.adjustmentRequirements,
+      })
     }
 
     await ProjectOutlineService.writeAudit(

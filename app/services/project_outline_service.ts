@@ -265,17 +265,20 @@ export default class ProjectOutlineService {
       .where('project_outline_id', outlineId)
       .whereNotNull('profile_id')
       .select('profile_id')
-    const profileIds = members.map((m) => m.profileId).filter((id): id is number => !!id)
+    const profileIds = members
+      .map((m) => Number(m.profileId))
+      .filter((id) => Number.isFinite(id) && id > 0)
     if (!profileIds.length) return []
     const profiles = await ScientificProfile.query()
       .whereIn('id', profileIds)
       .whereNotNull('user_id')
       .select('user_id')
+    const except = exceptUserId != null ? Number(exceptUserId) : null
     return [
       ...new Set(
         profiles
-          .map((p) => p.userId)
-          .filter((id): id is number => !!id && id !== exceptUserId)
+          .map((p) => Number(p.userId))
+          .filter((id) => Number.isFinite(id) && id > 0 && id !== except)
       ),
     ]
   }

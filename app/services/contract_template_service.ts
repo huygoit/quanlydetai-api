@@ -2,10 +2,16 @@ import ContractTemplate from '#models/contract_template'
 import type {
   ContractTemplateStatus,
   ContractTemplateType,
+  DocMergeConfig,
   ThongBaoMergeConfig,
 } from '#models/contract_template'
 import { BM06_TEMPLATE_VARIABLES, BM14_TEMPLATE_VARIABLES } from '#constants/bm06_template_variables'
 import { THONG_BAO_TEMPLATE_VARIABLES } from '#constants/thong_bao_template_variables'
+import {
+  QUYET_DINH_TEMPLATE_VARIABLES,
+  chuanCauHinhQuyetDinh,
+  type QuyetDinhMergeConfig,
+} from '#constants/quyet_dinh_template_variables'
 import {
   DOC_TEMPLATE_TYPES,
   getDocTemplateType,
@@ -43,7 +49,7 @@ interface MetaPayload {
   formCode?: string | null
   status?: ContractTemplateStatus
   isDefault?: boolean
-  mergeConfig?: ThongBaoMergeConfig
+  mergeConfig?: ThongBaoMergeConfig | QuyetDinhMergeConfig | DocMergeConfig
 }
 
 const CAU_HINH_TRONG: ThongBaoMergeConfig = {
@@ -77,6 +83,7 @@ function knownVariablesForType(templateType: string) {
   if (templateType === 'HOP_DONG') return BM06_TEMPLATE_VARIABLES
   if (templateType === 'THANH_LY') return BM14_TEMPLATE_VARIABLES
   if (templateType === 'THONG_BAO') return THONG_BAO_TEMPLATE_VARIABLES
+  if (templateType === 'QUYET_DINH') return QUYET_DINH_TEMPLATE_VARIABLES
   return []
 }
 
@@ -111,7 +118,12 @@ export default class ContractTemplateService {
       file_url: row.fileUrl,
       file_size: row.fileSize,
       detected_variables: detected,
-      merge_config: row.templateType === 'THONG_BAO' ? chuanCauHinhThongBao(row.mergeConfig) : null,
+      merge_config:
+        row.templateType === 'THONG_BAO'
+          ? chuanCauHinhThongBao(row.mergeConfig)
+          : row.templateType === 'QUYET_DINH'
+            ? chuanCauHinhQuyetDinh(row.mergeConfig)
+            : null,
       unknown_variables: known.length
         ? detected.filter((k) => !knownSet.has(k))
         : [],
@@ -269,8 +281,10 @@ export default class ContractTemplateService {
       detectedVariables: saved.detectedVariables,
       mergeConfig:
         templateType === 'THONG_BAO'
-          ? chuanCauHinhThongBao(payload.mergeConfig)
-          : { ...CAU_HINH_TRONG },
+          ? chuanCauHinhThongBao(payload.mergeConfig as ThongBaoMergeConfig)
+          : templateType === 'QUYET_DINH'
+            ? chuanCauHinhQuyetDinh(payload.mergeConfig as QuyetDinhMergeConfig)
+            : { ...CAU_HINH_TRONG },
       isDefault: wantDefault,
       status: payload.status || 'ACTIVE',
       version: 1,
@@ -303,7 +317,10 @@ export default class ContractTemplateService {
     }
     if (payload.status != null) row.status = payload.status
     if (payload.mergeConfig && row.templateType === 'THONG_BAO') {
-      row.mergeConfig = chuanCauHinhThongBao(payload.mergeConfig)
+      row.mergeConfig = chuanCauHinhThongBao(payload.mergeConfig as ThongBaoMergeConfig)
+    }
+    if (payload.mergeConfig && row.templateType === 'QUYET_DINH') {
+      row.mergeConfig = chuanCauHinhQuyetDinh(payload.mergeConfig as QuyetDinhMergeConfig)
     }
 
     if (file) {
@@ -335,6 +352,23 @@ export default class ContractTemplateService {
 
     await row.save()
     return row
+  }
+
+  /** Tăng số quyết định trên mẫu mặc định (dự thảo / phát hành). */
+  static async capSoQuyetDinh(template?: ContractTemplate | null) {
+    const mau =
+      template ||
+      (await ContractTemplate.query()
+        .where('template_type', 'QUYET_DINH')
+        .where('status', 'ACTIVE')
+        .where('is_default', true)
+        .first())
+    if (!mau) return { so: '1', mau: null as ContractTemplate | null }
+    const cfg = chuanCauHinhQuyetDinh(mau.mergeConfig)
+    const moi = (cfg.so_moi_nhat || 0) + 1
+    mau.mergeConfig = chuanCauHinhQuyetDinh({ ...cfg, so_moi_nhat: moi })
+    await mau.save()
+    return { so: String(moi), mau }
   }
 
   static async setDefault(id: number) {

@@ -1,19 +1,26 @@
 import { DateTime } from 'luxon'
+import path from 'node:path'
+import fs from 'node:fs/promises'
 import ProjectOutline from '#models/project_outline'
 import ProjectOutlineMember from '#models/project_outline_member'
 import ProjectOutlineBudgetLine from '#models/project_outline_budget_line'
 import ProjectOutlineVersion from '#models/project_outline_version'
 import ProjectOutlineDefenseSession from '#models/project_outline_defense_session'
 import ProjectOutlineDefenseMember from '#models/project_outline_defense_member'
+import ProjectOutlineDefenseMinutesItem from '#models/project_outline_defense_minutes_item'
 import PermissionService from '#services/permission_service'
 import NotificationService from '#services/notification_service'
 import EmailLogService from '#services/email_log_service'
 import ProjectOutlineService from '#services/project_outline_service'
+import { listUploadRootCandidates, normalizePublicBasePath, getUploadEnvConfig } from '#utils/upload_storage_helper'
 
-/** Số ngày nhắc trước deadline (tham khảo US-04-05) */
+/** Số ngày nhắc trước hạn chỉnh sửa */
 export const REVISION_REMINDER_DAYS = 2
 /** Giải trình bắt buộc tối thiểu */
 export const MIN_REVISION_EXPLANATION = 100
+
+/** Trạng thái sau khi CNNV nộp bản hoàn thiện (TM_CHO_PKH) */
+export const STATUS_CHO_PKH = 'CHO_PKH_DUYET_TM' as const
 
 export type OutlineSnapshot = {
   title: string
@@ -187,7 +194,57 @@ export default class ProjectOutlineRevisionService {
     return (last?.versionNo || 0) + 1
   }
 
-  static serializeVersion(v: ProjectOutlineVersion) {
+  static tenFileTuUrl(url?: string | null) {
+    if (!url?.trim()) return null
+    try {
+      const raw = decodeURIComponent(url.split('?')[0] || '')
+      return path.basename(raw) || null
+    } catch {
+      return null
+    }
+  }
+
+  /** Đọc dung lượng file trên đĩa (nếu tìm được); không có thì null */
+  static async doLuongFileTuUrl(url?: string | null): Promise<number | null> {
+    if (!url?.trim()) return null
+    const { publicBasePath } = getUploadEnvConfig()
+    const base = normalizePublicBasePath(publicBasePath)
+    let relative = url.split('?')[0] || ''
+    try {
+      relative = decodeURIComponent(relative)
+    } catch {
+      /* giữ nguyên */
+    }
+    if (relative.startsWith(base)) relative = relative.slice(base.length)
+    relative = relative.replace(/^\/+/, '')
+    if (!relative) return null
+    for (const root of listUploadRootCandidates()) {
+      const full = path.join(root, relative)
+      try {
+        const st = await fs.stat(full)
+        if (st.isFile()) return st.size
+      } catch {
+        /* thử root khác */
+      }
+    }
+    return null
+  }
+
+  static async serializeVersion(v: ProjectOutlineVersion) {
+    const snap = (v.snapshotJson || {}) as OutlineSnapshot & {
+      outlineFileName?: string | null
+      outlineFileSize?: number | null
+    }
+    const fileName =
+      snap.outlineFileName || this.tenFileTuUrl(v.outlineFileUrl) || this.tenFileTuUrl(snap.outlineFileUrl)
+    let fileSize =
+      snap.outlineFileSize != null && Number.isFinite(Number(snap.outlineFileSize))
+        ? Number(snap.outlineFileSize)
+        : null
+    if (fileSize == null) {
+      fileSize = await this.doLuongFileTuUrl(v.outlineFileUrl || snap.outlineFileUrl)
+    }
+    const uploadedAt = v.lockedAt?.toISO() ?? v.createdAt?.toISO() ?? null
     return {
       id: v.id,
       projectOutlineId: v.projectOutlineId,
@@ -197,6 +254,9 @@ export default class ProjectOutlineRevisionService {
       status: v.status,
       outlineFileUrl: v.outlineFileUrl,
       appendixFileUrl: v.appendixFileUrl,
+      fileName,
+      fileSize,
+      uploadedAt,
       explanation: v.explanation,
       defenseSessionId: v.defenseSessionId,
       createdBy: v.createdBy,
@@ -212,7 +272,8 @@ export default class ProjectOutlineRevisionService {
   static async openRevisionPeriod(
     outline: ProjectOutline,
     session: ProjectOutlineDefenseSession,
-    actorId: number | null
+    actorId: number | null,
+    opts?: { minutesUrl?: string | null; adjustmentRequirements?: string | null }
   ) {
     const existingBaseline = await ProjectOutlineVersion.query()
       .where('project_outline_id', outline.id)
@@ -222,13 +283,18 @@ export default class ProjectOutlineRevisionService {
     let baseline = existingBaseline
     if (!baseline) {
       const snapshot = await this.buildSnapshot(outline.id)
+      const fileSize = await this.doLuongFileTuUrl(outline.outlineFileUrl)
       baseline = await ProjectOutlineVersion.create({
         projectOutlineId: outline.id,
         versionNo: await this.nextVersionNo(outline.id),
         parentVersionId: null,
         versionType: 'BASELINE_AFTER_DEFENSE',
         status: 'LOCKED',
-        snapshotJson: snapshot,
+        snapshotJson: {
+          ...snapshot,
+          outlineFileName: this.tenFileTuUrl(outline.outlineFileUrl),
+          outlineFileSize: fileSize,
+        },
         outlineFileUrl: outline.outlineFileUrl,
         appendixFileUrl: outline.appendixFileUrl,
         explanation: null,
@@ -246,20 +312,79 @@ export default class ProjectOutlineRevisionService {
     outline.revisionReminderSentAt = null
     await outline.save()
 
-    if (outline.ownerId) {
-      await NotificationService.push(outline.ownerId, {
+    // Thông báo + mail biên bản cho CNĐT và mọi thành viên đề tài
+    await this.notifyTeamNeedRevision(outline, session, opts)
+
+    return baseline
+  }
+
+  /** Gửi thông báo in-app + email biên bản cho CNĐT và mọi thành viên có hồ sơ. */
+  static async notifyTeamNeedRevision(
+    outline: ProjectOutline,
+    session: ProjectOutlineDefenseSession,
+    opts?: { minutesUrl?: string | null; adjustmentRequirements?: string | null }
+  ) {
+    const han = outline.revisionDeadline
+      ? outline.revisionDeadline.toFormat('dd/MM/yyyy')
+      : session.adjustmentDeadline
+        ? session.adjustmentDeadline.toFormat('dd/MM/yyyy')
+        : 'hạn đã chọn'
+    const yeuCau =
+      (opts?.adjustmentRequirements || session.adjustmentRequirements || '').trim() ||
+      'Xem chi tiết trên hệ thống / biên bản đính kèm.'
+    const minutesUrl = (opts?.minutesUrl || session.minutesFileUrl || '').trim()
+    const formLink = `/projects/outlines/form/${outline.id}`
+
+    // Dùng memberUserIds (query trực tiếp user_id) — preload('profile') từng sót userId (bigint/Lucid).
+    const userIds = [
+      ...new Set(
+        [outline.ownerId, ...(await ProjectOutlineService.memberUserIds(outline.id))]
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    ]
+
+    const title = 'Thuyết minh cần hoàn thiện sau thẩm định'
+    const message = `${outline.code}: HĐ đề nghị hoàn thiện hồ sơ. Hạn ${han}. ${yeuCau}`
+
+    if (userIds.length) {
+      await NotificationService.pushMany(userIds, {
         type: 'PROJECT_UPDATE',
-        title: 'Yêu cầu chỉnh sửa thuyết minh',
-        message: `${outline.code}: hãy chỉnh sửa và nộp bản hoàn thiện trước ${
-          outline.revisionDeadline
-            ? outline.revisionDeadline.toFormat('dd/MM/yyyy')
-            : 'hạn PKH đã chọn'
-        }.`,
-        link: `/projects/outlines/form/${outline.id}`,
+        title,
+        message,
+        link: formLink,
       })
     }
 
-    return baseline
+    const body = [
+      `Kính gửi thành viên đề tài ${outline.code},`,
+      '',
+      `Hội đồng thẩm định đã kết luận: Đề nghị hoàn thiện hồ sơ.`,
+      `Tên nhiệm vụ: ${outline.title}`,
+      `Hạn hoàn thiện: ${han}`,
+      '',
+      'Nội dung cần hoàn thiện:',
+      yeuCau,
+      '',
+      minutesUrl ? `Biên bản BM.05b: ${minutesUrl}` : 'Biên bản: xem trên hệ thống.',
+      `Nộp thuyết minh hoàn thiện tại: ${formLink}`,
+      '',
+      'Trân trọng.',
+    ].join('\n')
+
+    for (const uid of userIds) {
+      try {
+        await EmailLogService.logStubToUser(
+          uid,
+          `[KH&CN] Biên bản thẩm định — cần hoàn thiện ${outline.code}`,
+          body,
+          'project_outline_defense_session',
+          session.id
+        )
+      } catch (e) {
+        console.warn('[notifyTeamNeedRevision] Gửi mail thất bại user', uid, e)
+      }
+    }
   }
 
   static async getRevisionContext(outline: ProjectOutline) {
@@ -268,9 +393,15 @@ export default class ProjectOutlineRevisionService {
       : await ProjectOutlineDefenseSession.query()
           .where('project_outline_id', outline.id)
           .where('status', 'FINALIZED')
-          .where('conclusion', 'THONG_QUA_DIEU_CHINH')
           .orderBy('id', 'desc')
           .first()
+
+    const minutesItem = session
+      ? await ProjectOutlineDefenseMinutesItem.query()
+          .where('session_id', session.id)
+          .where('project_outline_id', outline.id)
+          .first()
+      : null
 
     const baseline = outline.revisionBaselineVersionId
       ? await ProjectOutlineVersion.find(outline.revisionBaselineVersionId)
@@ -286,6 +417,25 @@ export default class ProjectOutlineRevisionService {
 
     const pastDeadline = this.isPastDeadline(outline.revisionDeadline)
     const remind = this.needsReminder(outline.revisionDeadline)
+    const yeuCau =
+      minutesItem?.adjustmentRequirements || session?.adjustmentRequirements || null
+    const ketLuanItem = minutesItem?.councilConclusion || null
+
+    // Chỉ trả userId Thư ký / Chủ tịch — tránh FE gọi API phiên HĐ (CNĐT bị 403).
+    let thuKyUserId: number | null = null
+    let chuTichUserId: number | null = null
+    if (session) {
+      const hdMembers = await ProjectOutlineDefenseMember.query()
+        .where('session_id', session.id)
+        .whereIn('role_in_council', ['THU_KY', 'CHU_TICH'])
+        .select('user_id', 'role_in_council')
+      for (const m of hdMembers) {
+        const uid = Number(m.userId)
+        if (!Number.isFinite(uid) || uid <= 0) continue
+        if (m.roleInCouncil === 'THU_KY') thuKyUserId = uid
+        if (m.roleInCouncil === 'CHU_TICH') chuTichUserId = uid
+      }
+    }
 
     return {
       status: outline.status,
@@ -296,20 +446,32 @@ export default class ProjectOutlineRevisionService {
       needsReminder: remind && outline.status === 'CHINH_SUA_TM',
       reminderDays: REVISION_REMINDER_DAYS,
       revisionExplanation: outline.revisionExplanation,
-      adjustmentRequirements: session?.adjustmentRequirements ?? null,
+      adjustmentRequirements: yeuCau,
       discussionNotes: session?.discussionNotes ?? null,
-      conclusion: session?.conclusion ?? outline.defenseConclusion,
+      minutesNote: minutesItem?.note ?? null,
+      councilConclusion: ketLuanItem,
+      conclusion:
+        ketLuanItem === 'HOAN_THIEN'
+          ? 'THONG_QUA_DIEU_CHINH'
+          : session?.conclusion ?? outline.defenseConclusion,
       minutesFileUrl: session?.minutesFileUrl ?? null,
-      finalScore: session?.finalScore == null ? null : Number(session.finalScore),
-      baselineVersion: baseline ? this.serializeVersion(baseline) : null,
-      submittedVersion: submitted ? this.serializeVersion(submitted) : null,
+      finalScore:
+        minutesItem?.averageScore != null
+          ? Number(minutesItem.averageScore)
+          : session?.finalScore == null
+            ? null
+            : Number(session.finalScore),
+      baselineVersion: baseline ? await this.serializeVersion(baseline) : null,
+      submittedVersion: submitted ? await this.serializeVersion(submitted) : null,
       diffLimitNote:
-        'Hệ thống so sánh các trường form và metadata file (tên/URL). Chưa hỗ trợ diff nội dung DOCX/PDF.',
+        'So sánh trường form + metadata file (tên, dung lượng, ngày upload). Chưa diff nội dung DOCX/PDF.',
       minExplanationLength: MIN_REVISION_EXPLANATION,
-      editable:
-        outline.status === 'CHINH_SUA_TM' && !pastDeadline,
-      canSubmit:
-        outline.status === 'CHINH_SUA_TM' && !pastDeadline,
+      editable: outline.status === 'CHINH_SUA_TM' && !pastDeadline,
+      canSubmit: outline.status === 'CHINH_SUA_TM' && !pastDeadline,
+      thuKyUserId,
+      chuTichUserId,
+      /** Luồng mới: CNNV → PKH → HĐ → BGH */
+      flowSteps: ['CHINH_SUA', 'PKH', 'HOI_DONG', 'BGH'] as const,
     }
   }
 
@@ -339,7 +501,7 @@ export default class ProjectOutlineRevisionService {
   }
 
   static async submitRevision(outline: ProjectOutline, actorId: number, explanation: string) {
-    const daNop = ['CHO_HD_XAC_NHAN_TM', 'CHO_PKH_DUYET_TM', 'CHO_XAC_NHAN_KP']
+    const daNop = ['CHO_PKH_DUYET_TM', 'CHO_HD_XAC_NHAN_TM', 'CHO_BGH_DUYET_TM']
     if (daNop.includes(outline.status) && outline.revisionSubmittedVersionId) {
       const ver = await ProjectOutlineVersion.find(outline.revisionSubmittedVersionId)
       return { outline, version: ver!, idempotent: true }
@@ -353,7 +515,7 @@ export default class ProjectOutlineRevisionService {
     const expErr = this.validateExplanation(explanation)
     if (expErr) throw new Error(expErr)
     if (!outline.outlineFileUrl?.trim()) {
-      throw new Error('Cần upload file thuyết minh phiên bản mới trước khi nộp.')
+      throw new Error('Cần upload file thuyết minh BM.04 mới trước khi nộp.')
     }
 
     const members = await ProjectOutlineService.loadMembers(outline.id)
@@ -372,17 +534,25 @@ export default class ProjectOutlineRevisionService {
 
     const hoiDong = await this.hoiDongBaoVe(outline)
     if (!hoiDong.thuKy?.userId || !hoiDong.chuTich?.userId) {
-      throw new Error('Buổi bảo vệ chưa có thư ký và chủ tịch có tài khoản để xác nhận bản hoàn thiện.')
+      throw new Error(
+        'Phiên thẩm định chưa có thư ký và chủ tịch có tài khoản — không thể chuyển duyệt sau PKH.'
+      )
     }
 
     const snapshot = await this.buildSnapshot(outline.id)
+    const fileSize = await this.doLuongFileTuUrl(outline.outlineFileUrl)
+    const snapshotWithMeta = {
+      ...snapshot,
+      outlineFileName: this.tenFileTuUrl(outline.outlineFileUrl),
+      outlineFileSize: fileSize,
+    }
     const version = await ProjectOutlineVersion.create({
       projectOutlineId: outline.id,
       versionNo: await this.nextVersionNo(outline.id),
       parentVersionId: baselineId,
       versionType: 'REVISION_SUBMITTED',
       status: 'LOCKED',
-      snapshotJson: snapshot,
+      snapshotJson: snapshotWithMeta,
       outlineFileUrl: outline.outlineFileUrl,
       appendixFileUrl: outline.appendixFileUrl,
       explanation: explanation.trim(),
@@ -396,9 +566,9 @@ export default class ProjectOutlineRevisionService {
     outline.revisionSubmittedVersionId = version.id
     outline.revisionSubmittedAt = DateTime.now()
     outline.revisionBaselineVersionId = baselineId
-    outline.revisionGateStatus = 'CHO_THU_KY'
+    outline.revisionGateStatus = 'CHO_PKH'
     outline.revisionReturnReason = null
-    outline.status = 'CHO_HD_XAC_NHAN_TM'
+    outline.status = STATUS_CHO_PKH
     outline.completionPercent = 100
     await outline.save()
 
@@ -407,14 +577,14 @@ export default class ProjectOutlineRevisionService {
       actorId,
       'SUBMIT_REVISION',
       from,
-      'CHO_HD_XAC_NHAN_TM',
+      STATUS_CHO_PKH,
       { versionId: version.id, parentVersionId: baselineId }
     )
 
-    await NotificationService.push(hoiDong.thuKy.userId, {
+    await NotificationService.pushToPermission('project.review', {
       type: 'PROJECT_UPDATE',
-      title: 'Bản hoàn thiện chờ thư ký xác nhận',
-      message: outline.code,
+      title: 'Bản hoàn thiện chờ phòng KH',
+      message: `${outline.code} — CNNV đã nộp theo BM.05b.`,
       link: `/projects/outlines/form/${outline.id}`,
     })
 
@@ -422,7 +592,7 @@ export default class ProjectOutlineRevisionService {
       await EmailLogService.logStubToUser(
         outline.ownerId,
         `[KH&CN] Đã nộp bản hoàn thiện ${outline.code}`,
-        `Thuyết minh ${outline.code} đã nộp và chờ thư ký, chủ tịch hội đồng rồi phòng KH xác nhận.`,
+        `Thuyết minh ${outline.code} đã nộp cho phòng KH. Tiếp theo: PKH → Hội đồng → BGH phê duyệt.`,
         'project_outline',
         outline.id
       )
@@ -431,16 +601,83 @@ export default class ProjectOutlineRevisionService {
     return { outline, version, idempotent: false }
   }
 
-  /** Thư ký rồi chủ tịch xác nhận bản hoàn thiện trước khi sang phòng KH. */
-  static async confirmCouncil(outline: ProjectOutline, actorId: number, accept: boolean, reason: string) {
+  /** Phòng KH duyệt trước, rồi chuyển hội đồng (Thư ký → Chủ tịch). */
+  static async pkhReviewRevision(
+    outline: ProjectOutline,
+    actorId: number,
+    accept: boolean,
+    reason: string
+  ) {
+    const duoc =
+      (await PermissionService.userHasPermission(actorId, 'project.review')) ||
+      (await PermissionService.userHasPermission(actorId, 'project.selection_manage'))
+    if (!duoc) throw new Error('Không có quyền duyệt bản hoàn thiện.')
+    if (outline.status !== 'CHO_PKH_DUYET_TM' || outline.revisionGateStatus !== 'CHO_PKH') {
+      throw new Error('Hồ sơ không chờ phòng KH duyệt bản hoàn thiện.')
+    }
+    if (!accept) return this.traLaiBanHoanThien(outline, actorId, reason.trim(), 'REVISION_PKH_RETURN')
+
+    const hoiDong = await this.hoiDongBaoVe(outline)
+    if (!hoiDong.thuKy?.userId) {
+      throw new Error('Phiên thẩm định thiếu thư ký — không chuyển hội đồng được.')
+    }
+
+    const from = outline.status
+    outline.revisionGateStatus = 'CHO_THU_KY'
+    outline.status = 'CHO_HD_XAC_NHAN_TM'
+    await outline.save()
+    await ProjectOutlineService.writeAudit(
+      outline.id,
+      actorId,
+      'REVISION_PKH_OK',
+      from,
+      'CHO_HD_XAC_NHAN_TM'
+    )
+    await NotificationService.push(hoiDong.thuKy.userId, {
+      type: 'PROJECT_UPDATE',
+      title: 'Bản hoàn thiện chờ thư ký xác nhận',
+      message: `${outline.code} — PKH đã duyệt, cần hội đồng xác nhận.`,
+      link: `/projects/outlines/form/${outline.id}`,
+    })
+    return outline
+  }
+
+  /** Thư ký rồi chủ tịch — chủ tịch được duyệt cả khi đang chờ thư ký (nhảy thẳng BGH). */
+  static async confirmCouncil(
+    outline: ProjectOutline,
+    actorId: number,
+    accept: boolean,
+    reason: string
+  ) {
     if (outline.status !== 'CHO_HD_XAC_NHAN_TM') {
       throw new Error('Hồ sơ không chờ hội đồng xác nhận bản hoàn thiện.')
     }
     const hoiDong = await this.hoiDongBaoVe(outline)
     const note = reason.trim()
+    const uid = Number(actorId)
+    const thuKyUid = hoiDong.thuKy?.userId != null ? Number(hoiDong.thuKy.userId) : null
+    const chuTichUid = hoiDong.chuTich?.userId != null ? Number(hoiDong.chuTich.userId) : null
+    const laThuKy = thuKyUid != null && thuKyUid === uid
+    const laChuTich = chuTichUid != null && chuTichUid === uid
+
     if (outline.revisionGateStatus === 'CHO_THU_KY') {
-      if (!hoiDong.thuKy?.userId || hoiDong.thuKy.userId !== actorId) {
-        throw new Error('Chỉ thư ký hội đồng của phiên này được xác nhận.')
+      // Chủ tịch được duyệt luôn (bỏ qua bước thư ký) → BGH
+      if (laChuTich) {
+        if (!accept) return this.traLaiBanHoanThien(outline, actorId, note, 'REVISION_CHAIR_RETURN')
+        await ProjectOutlineService.writeAudit(
+          outline.id,
+          actorId,
+          'REVISION_CHAIR_OK',
+          outline.status,
+          'CHO_BGH_DUYET_TM',
+          { skippedSecretary: true }
+        )
+        const FinalApproval = (await import('#services/project_outline_final_approval_service')).default
+        await FinalApproval.enqueueForBgh(outline, actorId, { via: 'REVISION_COUNCIL' })
+        return outline
+      }
+      if (!laThuKy) {
+        throw new Error('Chỉ thư ký hoặc chủ tịch hội đồng của phiên này được xác nhận.')
       }
       if (!accept) return this.traLaiBanHoanThien(outline, actorId, note, 'REVISION_SECRETARY_RETURN')
       outline.revisionGateStatus = 'CHO_CHU_TICH'
@@ -452,8 +689,8 @@ export default class ProjectOutlineRevisionService {
         'CHO_HD_XAC_NHAN_TM',
         'CHO_HD_XAC_NHAN_TM'
       )
-      if (hoiDong.chuTich?.userId) {
-        await NotificationService.push(hoiDong.chuTich.userId, {
+      if (chuTichUid) {
+        await NotificationService.push(chuTichUid, {
           type: 'PROJECT_UPDATE',
           title: 'Bản hoàn thiện chờ chủ tịch xác nhận',
           message: outline.code,
@@ -463,54 +700,22 @@ export default class ProjectOutlineRevisionService {
       return outline
     }
     if (outline.revisionGateStatus === 'CHO_CHU_TICH') {
-      if (!hoiDong.chuTich?.userId || hoiDong.chuTich.userId !== actorId) {
+      if (!laChuTich) {
         throw new Error('Chỉ chủ tịch hội đồng của phiên này được xác nhận.')
       }
       if (!accept) return this.traLaiBanHoanThien(outline, actorId, note, 'REVISION_CHAIR_RETURN')
-      const from = outline.status
-      outline.revisionGateStatus = 'CHO_PKH'
-      outline.status = 'CHO_PKH_DUYET_TM'
-      await outline.save()
       await ProjectOutlineService.writeAudit(
         outline.id,
         actorId,
         'REVISION_CHAIR_OK',
-        from,
-        'CHO_PKH_DUYET_TM'
+        outline.status,
+        'CHO_BGH_DUYET_TM'
       )
-      await NotificationService.pushToPermission('project.review', {
-        type: 'PROJECT_UPDATE',
-        title: 'Bản hoàn thiện chờ phòng KH',
-        message: `${outline.code} — hội đồng đã xác nhận.`,
-        link: `/projects/outlines/form/${outline.id}`,
-      })
+      const FinalApproval = (await import('#services/project_outline_final_approval_service')).default
+      await FinalApproval.enqueueForBgh(outline, actorId, { via: 'REVISION_COUNCIL' })
       return outline
     }
     throw new Error('Hồ sơ đã đổi trạng thái — vui lòng tải lại dữ liệu.')
-  }
-
-  /** Phòng KH nhận bản hoàn thiện rồi mới chuyển xác nhận kinh phí. */
-  static async pkhReviewRevision(outline: ProjectOutline, actorId: number, accept: boolean, reason: string) {
-    const duoc =
-      (await PermissionService.userHasPermission(actorId, 'project.review')) ||
-      (await PermissionService.userHasPermission(actorId, 'project.budget_propose'))
-    if (!duoc) throw new Error('Không có quyền duyệt bản hoàn thiện.')
-    if (outline.status !== 'CHO_PKH_DUYET_TM') {
-      throw new Error('Hồ sơ không chờ phòng KH duyệt bản hoàn thiện.')
-    }
-    if (!accept) return this.traLaiBanHoanThien(outline, actorId, reason.trim(), 'REVISION_PKH_RETURN')
-    const from = outline.status
-    outline.revisionGateStatus = null
-    outline.status = 'CHO_XAC_NHAN_KP'
-    await outline.save()
-    await ProjectOutlineService.writeAudit(outline.id, actorId, 'REVISION_PKH_OK', from, 'CHO_XAC_NHAN_KP')
-    await NotificationService.pushToPermission('project.budget_propose', {
-      type: 'PROJECT_UPDATE',
-      title: 'Bản hoàn thiện đã sang xác nhận kinh phí',
-      message: outline.code,
-      link: `/projects/budget-approvals/${outline.id}`,
-    })
-    return outline
   }
 
   private static async hoiDongBaoVe(outline: ProjectOutline) {
@@ -536,8 +741,15 @@ export default class ProjectOutlineRevisionService {
     outline.revisionReturnReason = reason
     await outline.save()
     await ProjectOutlineService.writeAudit(outline.id, actorId, action, from, 'CHINH_SUA_TM', { reason })
-    if (outline.ownerId) {
-      await NotificationService.push(outline.ownerId, {
+    const userIds = [
+      ...new Set(
+        [outline.ownerId, ...(await ProjectOutlineService.memberUserIds(outline.id))]
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    ]
+    if (userIds.length) {
+      await NotificationService.pushMany(userIds, {
         type: 'PROJECT_UPDATE',
         title: 'Bản hoàn thiện bị trả lại',
         message: `${outline.code}: ${reason}`,
@@ -583,8 +795,15 @@ export default class ProjectOutlineRevisionService {
       { oldDeadline: old, newDeadline: due.toISO(), reason }
     )
 
-    if (outline.ownerId) {
-      await NotificationService.push(outline.ownerId, {
+    const userIds = [
+      ...new Set(
+        [outline.ownerId, ...(await ProjectOutlineService.memberUserIds(outline.id))]
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    ]
+    if (userIds.length) {
+      await NotificationService.pushMany(userIds, {
         type: 'PROJECT_UPDATE',
         title: 'Gia hạn chỉnh sửa thuyết minh',
         message: `${outline.code}: hạn mới ${due.toFormat('dd/MM/yyyy')}. Lý do: ${reason}`,
@@ -596,9 +815,7 @@ export default class ProjectOutlineRevisionService {
 
   static async compareVersions(outlineId: number, fromVersionId?: number, toVersionId?: number) {
     const baseline =
-      (fromVersionId
-        ? await ProjectOutlineVersion.find(fromVersionId)
-        : null) ||
+      (fromVersionId ? await ProjectOutlineVersion.find(fromVersionId) : null) ||
       (await ProjectOutlineVersion.query()
         .where('project_outline_id', outlineId)
         .where('version_type', 'BASELINE_AFTER_DEFENSE')
@@ -606,14 +823,34 @@ export default class ProjectOutlineRevisionService {
         .first())
 
     let afterSnap: OutlineSnapshot
-    let afterMeta: ReturnType<typeof this.serializeVersion> | null = null
+    let afterMeta: Record<string, unknown> | null = null
 
     if (toVersionId) {
       const ver = await ProjectOutlineVersion.findOrFail(toVersionId)
       afterSnap = ver.snapshotJson as OutlineSnapshot
-      afterMeta = this.serializeVersion(ver)
+      afterMeta = await this.serializeVersion(ver)
     } else {
       afterSnap = await this.buildSnapshot(outlineId)
+      const currentUrl = afterSnap.outlineFileUrl
+      afterMeta = {
+        id: 0,
+        projectOutlineId: outlineId,
+        versionNo: 0,
+        parentVersionId: baseline?.id ?? null,
+        versionType: 'CURRENT',
+        status: 'WORKING',
+        outlineFileUrl: currentUrl,
+        appendixFileUrl: afterSnap.appendixFileUrl,
+        fileName: this.tenFileTuUrl(currentUrl),
+        fileSize: await this.doLuongFileTuUrl(currentUrl),
+        uploadedAt: null,
+        explanation: null,
+        defenseSessionId: null,
+        createdBy: null,
+        lockedAt: null,
+        createdAt: null,
+        snapshot: afterSnap,
+      }
     }
 
     if (!baseline) {
@@ -621,18 +858,40 @@ export default class ProjectOutlineRevisionService {
         diffs: [],
         baseline: null,
         after: afterMeta,
+        fileDiff: null,
         diffLimitNote:
-          'Chưa có bản đóng băng sau bảo vệ. Chỉ hiển thị bản hiện tại. Không diff DOCX/PDF.',
+          'Chưa có bản gốc sau thẩm định. Chỉ hiển thị bản hiện tại. Không diff DOCX/PDF.',
       }
     }
 
     const before = baseline.snapshotJson as OutlineSnapshot
+    const baselineMeta = await this.serializeVersion(baseline)
+    const fileDiff = {
+      before: {
+        fileName: baselineMeta.fileName,
+        fileSize: baselineMeta.fileSize,
+        uploadedAt: baselineMeta.uploadedAt,
+        url: baselineMeta.outlineFileUrl,
+      },
+      after: {
+        fileName:
+          (afterMeta?.fileName as string | null | undefined) ??
+          this.tenFileTuUrl(afterSnap.outlineFileUrl),
+        fileSize:
+          (afterMeta?.fileSize as number | null | undefined) ??
+          (await this.doLuongFileTuUrl(afterSnap.outlineFileUrl)),
+        uploadedAt: (afterMeta?.uploadedAt as string | null | undefined) ?? null,
+        url: afterSnap.outlineFileUrl,
+      },
+    }
+
     return {
       diffs: this.diffSnapshots(before, afterSnap),
-      baseline: this.serializeVersion(baseline),
+      baseline: baselineMeta,
       after: afterMeta,
+      fileDiff,
       diffLimitNote:
-        'So sánh trường form + metadata file (URL). Chưa hỗ trợ diff nội dung DOCX/PDF.',
+        'So sánh trường form + metadata file (tên, dung lượng, ngày). Chưa hỗ trợ diff nội dung DOCX/PDF.',
     }
   }
 
@@ -641,9 +900,17 @@ export default class ProjectOutlineRevisionService {
     if (outline.status !== 'CHINH_SUA_TM') return false
     if (outline.revisionReminderSentAt) return false
     if (!this.needsReminder(outline.revisionDeadline)) return false
-    if (!outline.ownerId) return false
 
-    await NotificationService.push(outline.ownerId, {
+    const userIds = [
+      ...new Set(
+        [outline.ownerId, ...(await ProjectOutlineService.memberUserIds(outline.id))]
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    ]
+    if (!userIds.length) return false
+
+    await NotificationService.pushMany(userIds, {
       type: 'PROJECT_UPDATE',
       title: 'Sắp hết hạn chỉnh sửa thuyết minh',
       message: `${outline.code}: hạn ${

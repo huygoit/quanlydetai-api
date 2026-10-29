@@ -34,6 +34,7 @@ import ProjectOutlineReviewsController from '#controllers/project_outline_review
 import ProjectOutlineScoresController from '#controllers/project_outline_scores_controller'
 import ProjectOutlineDefensesController from '#controllers/project_outline_defenses_controller'
 import ProjectOutlineBudgetsController from '#controllers/project_outline_budgets_controller'
+import ProjectOutlineApprovalsController from '#controllers/project_outline_approvals_controller'
 import AdminContractTemplatesController from '#controllers/admin/contract_templates_controller'
 import ProjectContractsController from '#controllers/project_contracts_controller'
 import ProjectModule56Controller from '#controllers/project_module56_controller'
@@ -70,6 +71,7 @@ import path from 'node:path'
 import { access } from 'node:fs/promises'
 import app from '@adonisjs/core/services/app'
 import { findAttachmentFilePath } from '#utils/upload_storage_helper'
+import { findGeneratedContractFilePath } from '#utils/docx_merge_helper'
 
 // --- Auth (login, register không cần token)
 router.post('/api/auth/login', [AuthController, 'login'])
@@ -95,6 +97,31 @@ router.get('/storage/profile-attachments/:filename', async ({ params, response }
   }
 })
 
+// --- Public: file DOCX sinh từ mẫu (QĐ thành lập HĐ, hợp đồng, …)
+router.get('/storage/project-contracts/:filename', async ({ params, response }) => {
+  const filename = String(params.filename || '')
+  if (!filename || filename !== path.basename(filename)) {
+    return response.badRequest({ success: false, message: 'Tên file không hợp lệ.' })
+  }
+  try {
+    const foundPath = await findGeneratedContractFilePath(filename)
+    if (!foundPath) {
+      return response.notFound({ success: false, message: 'Không tìm thấy file.' })
+    }
+    const lower = filename.toLowerCase()
+    if (lower.endsWith('.docx')) {
+      response.header(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      )
+    }
+    response.header('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`)
+    return response.download(foundPath)
+  } catch {
+    return response.notFound({ success: false, message: 'Không tìm thấy file.' })
+  }
+})
+
 // --- Public: biên bản phiên xét chọn (HTML UTF-8)
 router.get('/uploads/selection-minutes/:filename', async ({ params, response }) => {
   const filename = String(params.filename || '')
@@ -109,6 +136,23 @@ router.get('/uploads/selection-minutes/:filename', async ({ params, response }) 
     return response.download(filePath)
   } catch {
     return response.notFound({ success: false, message: 'Không tìm thấy biên bản.' })
+  }
+})
+
+// --- Public: biên bản thẩm định thuyết minh BM.05b (HTML UTF-8)
+router.get('/uploads/defense-minutes/:filename', async ({ params, response }) => {
+  const filename = String(params.filename || '')
+  if (!filename || filename !== path.basename(filename) || !filename.endsWith('.html')) {
+    return response.badRequest({ success: false, message: 'Tên file không hợp lệ.' })
+  }
+  const filePath = path.join(app.makePath('public'), 'uploads', 'defense-minutes', filename)
+  try {
+    await access(filePath)
+    response.header('Content-Type', 'text/html; charset=utf-8')
+    response.header('Content-Disposition', `inline; filename="${filename}"`)
+    return response.download(filePath)
+  } catch {
+    return response.notFound({ success: false, message: 'Không tìm thấy biên bản thẩm định.' })
   }
 })
 
@@ -909,6 +953,7 @@ router
     router.post('/:id/submit-revision', [ProjectOutlinesController, 'submitRevision'])
     router.post('/:id/revision-council', [ProjectOutlinesController, 'revisionCouncil'])
     router.post('/:id/revision-pkh', [ProjectOutlinesController, 'revisionPkh'])
+    router.post('/:id/revision-bgh', [ProjectOutlinesController, 'revisionBgh'])
     router.post('/:id/extend-revision-deadline', [ProjectOutlinesController, 'extendRevisionDeadline'])
     router.get('/:id', [ProjectOutlinesController, 'show'])
     router.put('/:id', [ProjectOutlinesController, 'update'])
@@ -937,18 +982,28 @@ router
     router.get('/eligible', [ProjectOutlineDefensesController, 'eligible'])
     router.get('/', [ProjectOutlineDefensesController, 'index'])
     router.post('/', [ProjectOutlineDefensesController, 'store'])
+    router.get('/my-tasks', [ProjectOutlineDefensesController, 'myTasks'])
+    router.get('/score-sheets/:sheetId', [ProjectOutlineDefensesController, 'showScoreSheet'])
+    router.put('/score-sheets/:sheetId', [ProjectOutlineDefensesController, 'saveScoreSheet'])
     router.get('/:id/available-members', [ProjectOutlineDefensesController, 'availableMembers'])
+    router.get('/:id/score-progress', [ProjectOutlineDefensesController, 'scoreProgress'])
     router.get('/:id', [ProjectOutlineDefensesController, 'show'])
     router.put('/:id', [ProjectOutlineDefensesController, 'update'])
-    router.post('/:id/confirm', [ProjectOutlineDefensesController, 'confirm'])
+    router.post('/:id/submit-bgh', [ProjectOutlineDefensesController, 'submitBgh'])
+    router.post('/:id/bgh-sign', [ProjectOutlineDefensesController, 'bghSign'])
+    router.post('/:id/publish', [ProjectOutlineDefensesController, 'publish'])
+    router.post('/:id/remind/:memberId', [ProjectOutlineDefensesController, 'remind'])
     router.post('/:id/cancel', [ProjectOutlineDefensesController, 'cancel'])
+    router.post('/:id/open-early-meeting', [ProjectOutlineDefensesController, 'openEarlyMeeting'])
+    router.get('/:id/minutes', [ProjectOutlineDefensesController, 'minutesContext'])
     router.put('/:id/minutes', [ProjectOutlineDefensesController, 'saveMinutes'])
+    router.post('/:id/reopen-minutes', [ProjectOutlineDefensesController, 'reopenMinutes'])
     router.post('/:id/finalize', [ProjectOutlineDefensesController, 'finalize'])
   })
   .prefix('/api/project-outline-defenses')
   .middleware([middleware.auth()])
 
-// --- Xác nhận kinh phí & phê duyệt (US-04-06)
+// --- Xác nhận kinh phí (US-04-06 đã ngừng)
 router
   .group(() => {
     router.get('/', [ProjectOutlineBudgetsController, 'index'])
@@ -958,6 +1013,18 @@ router
     router.post('/:outlineId/ld-decide', [ProjectOutlineBudgetsController, 'ldDecide'])
   })
   .prefix('/api/project-outline-budgets')
+  .middleware([middleware.auth()])
+
+// --- Phê duyệt cuối TM (BGH → TC-HC phát hành QĐ)
+router
+  .group(() => {
+    router.get('/', [ProjectOutlineApprovalsController, 'index'])
+    router.get('/:id', [ProjectOutlineApprovalsController, 'show'])
+    router.post('/:id/bgh-approve', [ProjectOutlineApprovalsController, 'bghApprove'])
+    router.post('/:id/bgh-reject', [ProjectOutlineApprovalsController, 'bghReject'])
+    router.post('/:id/hc-publish', [ProjectOutlineApprovalsController, 'hcPublish'])
+  })
+  .prefix('/api/project-outline-approvals')
   .middleware([middleware.auth()])
 
 // --- Hợp đồng BM.06 (US-05-01 bước 1: sinh dự thảo)

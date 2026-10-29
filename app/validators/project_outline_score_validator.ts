@@ -6,10 +6,16 @@ const scoreLineSchema = vine.object({
   comment: vine.string().trim().optional().nullable(),
 })
 
+/** Kết luận BM-02.09 (+ giữ DAT/KHONG_DAT cho phiếu cũ) */
+const CONCLUSIONS = ['DE_XUAT', 'HOAN_THIEN', 'KHONG_DE_XUAT', 'DAT', 'KHONG_DAT'] as const
+
 export const saveReviewScoreDraftValidator = vine.compile(
   vine.object({
     generalComment: vine.string().trim().optional().nullable(),
-    conclusion: vine.enum(['DAT', 'KHONG_DAT']).optional().nullable(),
+    conclusion: vine.enum(CONCLUSIONS).optional().nullable(),
+    precheckEligible: vine.boolean().optional().nullable(),
+    precheckConflictCleared: vine.boolean().optional().nullable(),
+    precheckEthicsOk: vine.boolean().optional().nullable(),
     lines: vine.array(scoreLineSchema).optional(),
   })
 )
@@ -17,7 +23,10 @@ export const saveReviewScoreDraftValidator = vine.compile(
 export const submitReviewScoreValidator = vine.compile(
   vine.object({
     generalComment: vine.string().trim().optional().nullable(),
-    conclusion: vine.enum(['DAT', 'KHONG_DAT']).optional().nullable(),
+    conclusion: vine.enum(CONCLUSIONS).optional().nullable(),
+    precheckEligible: vine.boolean().optional().nullable(),
+    precheckConflictCleared: vine.boolean().optional().nullable(),
+    precheckEthicsOk: vine.boolean().optional().nullable(),
     lines: vine.array(scoreLineSchema).minLength(1),
   })
 )

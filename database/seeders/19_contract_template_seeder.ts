@@ -9,6 +9,7 @@ import {
   buildPublicContractTemplateUrl,
   resolveContractTemplateDir,
 } from '#utils/contract_template_storage'
+import { QUYET_DINH_MERGE_TRONG } from '#constants/quyet_dinh_template_variables'
 import app from '@adonisjs/core/services/app'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -73,13 +74,24 @@ export default class extends BaseSeeder {
       fileName: 'Template_Thong_bao_tuyen_chon_de_tai_UED.docx',
       source: app.makePath('resources/thong-bao/Template_Thong_bao_tuyen_chon_de_tai_UED.docx'),
     })
+
+    await this.seedFile({
+      code: 'QD_THANH_LAP_HD_TM',
+      name: 'Quyết định thành lập Hội đồng thẩm định thuyết minh',
+      description:
+        'Mẫu DOCX quyết định thành lập HĐ thẩm định thuyết minh — biến {{...}} theo phụ lục phiên họp.',
+      templateType: 'QUYET_DINH',
+      formCode: 'QD',
+      fileName: 'Quyet_dinh_thanh_lap_Hoi_dong_TEMPLATE.docx',
+      source: app.makePath('resources/quyet-dinh/Quyet_dinh_thanh_lap_Hoi_dong_TEMPLATE.docx'),
+    })
   }
 
   private async seedFile(input: {
     code: string
     name: string
     description: string
-    templateType: 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO'
+    templateType: 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO' | 'QUYET_DINH'
     formCode: string
     fileName: string
     source: string
@@ -117,6 +129,15 @@ export default class extends BaseSeeder {
       fileUrl: buildPublicContractTemplateUrl(stored),
       fileSize: stat.size,
       detectedVariables: detected,
+      mergeConfig:
+        input.templateType === 'QUYET_DINH'
+          ? ({
+              ky_hieu: '',
+              noi_nhan: '',
+              tham_quyen_ky: '',
+              ...QUYET_DINH_MERGE_TRONG,
+            } as any)
+          : undefined,
       isDefault: true,
       status: 'ACTIVE',
       version: 1,

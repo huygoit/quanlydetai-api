@@ -4,7 +4,12 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import ProjectOutlineDefenseSession from '#models/project_outline_defense_session'
 import User from '#models/user'
 
-export type DefenseCouncilRole = 'CHU_TICH' | 'THU_KY' | 'UY_VIEN'
+export type DefenseCouncilRole =
+  | 'CHU_TICH'
+  | 'THU_KY'
+  | 'PHAN_BIEN_1'
+  | 'PHAN_BIEN_2'
+  | 'UY_VIEN'
 export type DefenseAttendance = 'PENDING' | 'PRESENT' | 'ABSENT'
 
 export default class ProjectOutlineDefenseMember extends BaseModel {

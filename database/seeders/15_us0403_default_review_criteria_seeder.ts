@@ -3,93 +3,128 @@ import ProjectReviewCriteriaSet from '#models/project_review_criteria_set'
 import ProjectReviewCriteriaItem from '#models/project_review_criteria_item'
 
 /**
- * Bộ tiêu chí mặc định phản biện kín (US-04-03) — có thể sửa bởi ADMIN.
- * Không hard-code “năm tiêu chí × 20” cứng trong logic chấm.
+ * Bộ tiêu chí BM-02.09 — Phiếu đánh giá hồ sơ xét tài trợ/đặt hàng/tuyển chọn/giao trực tiếp.
+ * Phiếu cũ đã snapshot vẫn giữ tiêu chí lúc tạo; phiếu mới lấy bộ mặc định này.
  */
 export default class extends BaseSeeder {
   async run() {
-    let set = await ProjectReviewCriteriaSet.findBy('code', 'DEFAULT_BLIND_REVIEW')
+    // Bỏ mặc định bộ cũ (nếu còn)
+    const old = await ProjectReviewCriteriaSet.findBy('code', 'DEFAULT_BLIND_REVIEW')
+    if (old) {
+      old.isDefault = false
+      old.isActive = false
+      old.name = 'Bộ tiêu chí phản biện kín (cũ)'
+      await old.save()
+    }
+
+    let set = await ProjectReviewCriteriaSet.findBy('code', 'BM_02_09')
     if (!set) {
       set = await ProjectReviewCriteriaSet.create({
-        code: 'DEFAULT_BLIND_REVIEW',
-        name: 'Bộ tiêu chí phản biện kín mặc định',
-        description: 'Tiềm lực, cấp thiết, mục tiêu, phương pháp, khả thi/sản phẩm, kinh phí.',
+        code: 'BM_02_09',
+        name: 'BM-02.09 — Phiếu đánh giá hồ sơ xét tài trợ/đặt hàng/tuyển chọn/giao trực tiếp',
+        description:
+          '8 tiêu chí / 100 điểm theo mẫu BM-02.09. Nhận xét chung ở cuối phiếu, không bắt buộc nhận xét từng tiêu chí.',
         isActive: true,
         isDefault: true,
         failThreshold: 50,
         blindAggregation: true,
-        minCommentLength: 50,
+        minCommentLength: 20,
       })
     } else {
-      set.isActive = true
-      set.isDefault = true
+      set.merge({
+        name: 'BM-02.09 — Phiếu đánh giá hồ sơ xét tài trợ/đặt hàng/tuyển chọn/giao trực tiếp',
+        isActive: true,
+        isDefault: true,
+        failThreshold: 50,
+        blindAggregation: true,
+        minCommentLength: 20,
+      })
       await set.save()
     }
 
     const items = [
       {
-        code: 'TIEM_LUC',
-        name: 'Tiềm lực thực hiện',
-        description: 'Năng lực CNĐT, thành viên, điều kiện thực hiện',
-        maxScore: 20,
-        weight: 1,
+        code: 'PHU_HOP_MUC_TIEU',
+        name: 'Sự phù hợp với mục tiêu, yêu cầu nhiệm vụ',
+        maxScore: 15,
         sortOrder: 1,
       },
       {
-        code: 'CAP_THIET',
-        name: 'Tính cấp thiết',
-        description: 'Lý do chọn đề tài, ý nghĩa khoa học/thực tiễn',
-        maxScore: 20,
-        weight: 1,
+        code: 'KHOA_HOC_MOI',
+        name: 'Tính khoa học, tính mới và sáng tạo',
+        maxScore: 15,
         sortOrder: 2,
       },
       {
-        code: 'MUC_TIEU',
-        name: 'Mục tiêu',
-        description: 'Mục tiêu rõ, phù hợp, đo được',
+        code: 'NOI_DUNG_PP',
+        name: 'Nội dung và phương pháp thực hiện',
         maxScore: 15,
-        weight: 1,
         sortOrder: 3,
       },
       {
-        code: 'PHUONG_PHAP',
-        name: 'Phương pháp nghiên cứu',
-        description: 'Phương pháp phù hợp, khả thi',
+        code: 'SAN_PHAM_CL',
+        name: 'Sản phẩm và chỉ tiêu chất lượng',
         maxScore: 15,
-        weight: 1,
         sortOrder: 4,
       },
       {
-        code: 'KHA_THI_SP',
-        name: 'Tính khả thi / sản phẩm',
-        description: 'Tiến độ, sản phẩm dự kiến, khả năng hoàn thành',
-        maxScore: 15,
-        weight: 1,
+        code: 'KHA_THI_TIEN_DO',
+        name: 'Tính khả thi và tiến độ',
+        maxScore: 10,
         sortOrder: 5,
       },
       {
-        code: 'KINH_PHI',
-        name: 'Kinh phí',
-        description: 'Hợp lý, khớp nội dung nghiên cứu',
-        maxScore: 15,
-        weight: 1,
+        code: 'NANG_LUC_NHOM',
+        name: 'Năng lực của chủ nhiệm và nhóm thực hiện',
+        maxScore: 10,
         sortOrder: 6,
+      },
+      {
+        code: 'CSVC_NGUON_LUC',
+        name: 'Cơ sở vật chất và nguồn lực',
+        maxScore: 10,
+        sortOrder: 7,
+      },
+      {
+        code: 'HIEU_QUA_CG',
+        name: 'Hiệu quả, khả năng ứng dụng/chuyển giao',
+        maxScore: 10,
+        sortOrder: 8,
       },
     ]
 
+    const keepCodes = new Set(items.map((i) => i.code))
+    const existing = await ProjectReviewCriteriaItem.query().where('criteria_set_id', set.id)
+    for (const row of existing) {
+      if (!keepCodes.has(row.code)) await row.delete()
+    }
+
     for (const it of items) {
-      const exist = await ProjectReviewCriteriaItem.query()
+      const row = await ProjectReviewCriteriaItem.query()
         .where('criteria_set_id', set.id)
         .where('code', it.code)
         .first()
-      if (exist) {
-        exist.merge({ ...it, commentRequired: true })
-        await exist.save()
+      if (row) {
+        row.merge({
+          name: it.name,
+          description: null,
+          maxScore: it.maxScore,
+          weight: 1,
+          sortOrder: it.sortOrder,
+          // BM-02.09: nhận xét ở cuối phiếu, không bắt buộc từng tiêu chí
+          commentRequired: false,
+        })
+        await row.save()
       } else {
         await ProjectReviewCriteriaItem.create({
           criteriaSetId: set.id,
-          ...it,
-          commentRequired: true,
+          code: it.code,
+          name: it.name,
+          description: null,
+          maxScore: it.maxScore,
+          weight: 1,
+          sortOrder: it.sortOrder,
+          commentRequired: false,
         })
       }
     }

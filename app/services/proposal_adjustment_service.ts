@@ -4,6 +4,7 @@ import ProjectProposalAdjustmentVersion from '#models/project_proposal_adjustmen
 import { addBusinessDays, countBusinessDays } from '#utils/business_days'
 import NotificationService from '#services/notification_service'
 import EmailLogService from '#services/email_log_service'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
 /**
  * US-03-05 — mở kỳ điều chỉnh khi đề xuất chuyển DIEU_CHINH.
@@ -69,7 +70,7 @@ export default class ProposalAdjustmentService {
       const days = countBusinessDays(p.adjustmentNotifiedAt, DateTime.now())
       if (days < 4) continue
 
-      const dueLabel = p.adjustmentDueAt?.toFormat('dd/MM/yyyy HH:mm') || '—'
+      const dueLabel = p.adjustmentDueAt?.toFormat(DATETIME_FORMAT) || '—'
       await NotificationService.push(p.ownerId, {
         type: 'PROJECT_UPDATE',
         title: 'Nhắc hạn điều chỉnh đề xuất',

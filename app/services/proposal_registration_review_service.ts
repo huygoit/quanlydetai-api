@@ -213,15 +213,17 @@ export default class ProposalRegistrationReviewService {
     }
   }
 
-  /** Chấp thuận một đơn. Các đơn đã tới phòng bị từ chối với cùng một lý do. */
+  /** Chấp thuận một đơn đã qua đơn vị. Các đơn còn lại (kể cả đang chờ đơn vị) bị từ chối cùng lý do. */
   static async chapThuan(user: User, nhiemVuId: number, dangKyId: number, lyDo: string) {
     await this.kiemTraPkh(user)
     const nhiemVu = await this.taiNhiemVuMo(nhiemVuId)
     const ds = await this.donDaGui(nhiemVuId)
-    if (ds.some((d) => d.status === 'CHO_DON_VI')) {
-      throw new LoiHoSoDangKy('Còn đơn đang chờ đơn vị xác nhận. Hãy đợi đủ đơn rồi mới chấp thuận.')
+    // Đã có đơn được chấp thuận thì không chấp thuận thêm đơn khác
+    if (ds.some((d) => d.status === 'DKDT_DUOC_CHAP_THUAN' && Number(d.id) !== Number(dangKyId))) {
+      throw new LoiHoSoDangKy('Đã chấp thuận một đơn. Không thể chấp thuận thêm đơn khác.')
     }
     const chon = ds.find((d) => Number(d.id) === Number(dangKyId))
+    // Chỉ khóa đúng đơn chưa được trưởng đơn vị xác nhận — không khóa cả nhiệm vụ
     if (!chon || chon.status === 'CHO_DON_VI') {
       throw new LoiHoSoDangKy('Chỉ chấp thuận đơn đã được đơn vị xác nhận.')
     }

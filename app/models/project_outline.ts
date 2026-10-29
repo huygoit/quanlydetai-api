@@ -18,6 +18,9 @@ export type ProjectOutlineStatus =
   | 'CHINH_SUA_TM'
   | 'CHO_HD_XAC_NHAN_TM'
   | 'CHO_PKH_DUYET_TM'
+  | 'CHO_BGH_DUYET_TM'
+  | 'CHO_HC_PHAT_HANH_QD'
+  /** @deprecated US-04-06 đã bỏ — giữ để đọc dữ liệu cũ */
   | 'CHO_XAC_NHAN_KP'
   | 'CHO_TC_THAM_TRA'
   | 'LDPD_PENDING'
@@ -229,9 +232,9 @@ export default class ProjectOutline extends BaseModel {
   @column.dateTime()
   declare revisionSubmittedAt: DateTime | null
 
-  /** CHO_THU_KY | CHO_CHU_TICH | CHO_PKH — cổng sau khi nộp bản hoàn thiện */
+  /** CHO_PKH | CHO_THU_KY | CHO_CHU_TICH | CHO_BGH — cổng sau nộp bản hoàn thiện */
   @column()
-  declare revisionGateStatus: 'CHO_THU_KY' | 'CHO_CHU_TICH' | 'CHO_PKH' | null
+  declare revisionGateStatus: 'CHO_PKH' | 'CHO_THU_KY' | 'CHO_CHU_TICH' | 'CHO_BGH' | null
 
   @column()
   declare revisionReturnReason: string | null
@@ -247,6 +250,27 @@ export default class ProjectOutline extends BaseModel {
 
   @column()
   declare approvedBudget: number | null
+
+  @column()
+  declare bghDecisionNote: string | null
+
+  @column.dateTime()
+  declare bghSignedAt: DateTime | null
+
+  @column()
+  declare bghSignedBy: number | null
+
+  @column()
+  declare bghRejectReason: string | null
+
+  @column()
+  declare assignmentDecisionUrl: string | null
+
+  @column.dateTime()
+  declare hcPublishedAt: DateTime | null
+
+  @column()
+  declare hcPublishedBy: number | null
 
   // snakeCase mặc định tách thành module_5_opened_at, lệch cột thật module5_opened_at
   @column.dateTime({ columnName: 'module5_opened_at' })

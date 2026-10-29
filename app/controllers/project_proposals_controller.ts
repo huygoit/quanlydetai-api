@@ -31,6 +31,7 @@ import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
 import { resolveUserUnitLabel, sameDepartmentId } from '#utils/user_unit'
 import { isActiveFieldName } from '#utils/catalog_assert'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
 /**
  * Ánh xạ mã QT → cấp dùng kiểm tra kỳ CFP.
@@ -883,7 +884,7 @@ export default class ProjectProposalsController {
     await EmailLogService.logStubToUser(
       proposal.ownerId,
       `[KH&CN] Yêu cầu bổ sung đề xuất ${proposal.code}`,
-      `Đề xuất "${proposal.title}" (${proposal.code}) cần bổ sung:\n\n${payload.note}\n\nHạn bổ sung: ${proposal.supplementDueAt.toFormat('dd/MM/yyyy HH:mm')}.`,
+      `Đề xuất "${proposal.title}" (${proposal.code}) cần bổ sung:\n\n${payload.note}\n\nHạn bổ sung: ${proposal.supplementDueAt.toFormat(DATETIME_FORMAT)}.`,
       'project_proposal',
       proposal.id
     )
@@ -969,7 +970,7 @@ export default class ProjectProposalsController {
     await EmailLogService.logStubToUser(
       proposal.ownerId,
       `[KH&CN] Gia hạn bổ sung đề xuất ${proposal.code}`,
-      `Hạn bổ sung mới: ${due.toFormat('dd/MM/yyyy HH:mm')}.${payload.reason ? `\n\nLý do: ${payload.reason}` : ''}`,
+      `Hạn bổ sung mới: ${due.toFormat(DATETIME_FORMAT)}.${payload.reason ? `\n\nLý do: ${payload.reason}` : ''}`,
       'project_proposal',
       proposal.id
     )
@@ -1164,14 +1165,14 @@ export default class ProjectProposalsController {
       await EmailLogService.logStub({
         toEmail: cu.email,
         subject: `[KH&CN] Thư mời phiên xét chọn đề tài #${session.id}`,
-        body: `Kính mời tham dự phiên xét chọn đề tài.\nNgày họp: ${meetingAt.toFormat('dd/MM/yyyy HH:mm')}\nĐịa điểm: ${payload.location}\nSố hồ sơ: ${hopLe.length}`,
+        body: `Kính mời tham dự phiên xét chọn đề tài.\nNgày họp: ${meetingAt.toFormat(DATETIME_FORMAT)}\nĐịa điểm: ${payload.location}\nSố hồ sơ: ${hopLe.length}`,
         relatedType: 'proposal_selection_session',
         relatedId: session.id,
       })
     }
     await NotificationService.notifySelectionSessionCreated(
       session.id,
-      `Họp ${meetingAt.toFormat('dd/MM/yyyy HH:mm')} tại ${payload.location} (${hopLe.length} hồ sơ).`
+      `Họp ${meetingAt.toFormat(DATETIME_FORMAT)} tại ${payload.location} (${hopLe.length} hồ sơ).`
     )
 
     return response.created({
@@ -1465,12 +1466,12 @@ export default class ProjectProposalsController {
       'EXTEND_ADJUSTMENT',
       'DIEU_CHINH',
       'DIEU_CHINH',
-      payload.reason || `Gia hạn đến ${due.toFormat('dd/MM/yyyy HH:mm')}`
+      payload.reason || `Gia hạn đến ${due.toFormat(DATETIME_FORMAT)}`
     )
     await NotificationService.push(proposal.ownerId, {
       type: 'PROJECT_UPDATE',
       title: 'Đã gia hạn điều chỉnh đề xuất',
-      message: `${proposal.code}: hạn mới ${due.toFormat('dd/MM/yyyy HH:mm')}.`,
+      message: `${proposal.code}: hạn mới ${due.toFormat(DATETIME_FORMAT)}.`,
       link: `/projects/register/form/${proposal.id}`,
     })
     return response.ok({ success: true, data: this.serialize(proposal) })

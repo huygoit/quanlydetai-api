@@ -5,6 +5,7 @@ import app from '@adonisjs/core/services/app'
 import type ProjectOutline from '#models/project_outline'
 import type ProjectOutlineDefenseSession from '#models/project_outline_defense_session'
 import type ProjectOutlineDefenseMember from '#models/project_outline_defense_member'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
 const MODE_LABEL: Record<string, string> = {
   IN_PERSON: 'Trực tiếp',
@@ -78,7 +79,7 @@ export async function generateDefenseMinutesHtml(
   <p><strong>Tên đề tài:</strong> ${escapeHtml(outline.title)}</p>
   <p><strong>Chủ nhiệm:</strong> ${escapeHtml(outline.ownerName || '')}
     ${outline.ownerUnit ? ` — ${escapeHtml(outline.ownerUnit)}` : ''}</p>
-  <p><strong>Thời gian:</strong> ${session.meetingAt.toFormat('dd/MM/yyyy HH:mm')}</p>
+  <p><strong>Thời gian:</strong> ${session.meetingAt.toFormat(DATETIME_FORMAT)}</p>
   <p><strong>Hình thức:</strong> ${MODE_LABEL[session.meetingMode] || session.meetingMode}</p>
   <p><strong>Địa điểm:</strong> ${escapeHtml(session.location || '—')}</p>
   ${session.meetingUrl ? `<p><strong>Link họp:</strong> ${escapeHtml(session.meetingUrl)}</p>` : ''}
@@ -112,7 +113,7 @@ export async function generateDefenseMinutesHtml(
       : ''
   }
   <p style="margin-top:24px"><em>Sinh lúc ${DateTime.now().toFormat(
-    'dd/MM/yyyy HH:mm'
+    DATETIME_FORMAT
   )} — hệ thống KH&CN.</em></p>
 </body>
 </html>`

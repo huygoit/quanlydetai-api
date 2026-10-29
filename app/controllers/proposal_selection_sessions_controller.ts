@@ -18,6 +18,7 @@ import {
 import { createSelectionSessionValidator } from '#validators/project_proposal_validator'
 import { hasAtLeastBusinessDays } from '#utils/business_days'
 import User from '#models/user'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
 /** Kết quả HĐ → trạng thái đề xuất (bỏ DIEU_CHINH / Đồng ý có điều chỉnh) */
 const RESULT_TO_STATUS: Record<string, 'DUOC_CHON' | 'KHONG_CHON'> = {
@@ -227,7 +228,7 @@ export default class ProposalSelectionSessionsController {
 
     await NotificationService.notifySelectionSessionCreated(
       session.id,
-      `Họp ${meetingAt.toFormat('dd/MM/yyyy HH:mm')} tại ${payload.location} (${hopLe.length} hồ sơ).`
+      `Họp ${meetingAt.toFormat(DATETIME_FORMAT)} tại ${payload.location} (${hopLe.length} hồ sơ).`
     )
 
     return response.created({

@@ -68,6 +68,18 @@ export default class ProjectOutlineReviewScoreSheet extends BaseModel {
   @column()
   declare conclusion: string | null
 
+  /** BM-02.09 mục A — đủ điều kiện tham gia */
+  @column()
+  declare precheckEligible: boolean | null
+
+  /** BM-02.09 mục A — đã hoàn thành BM-06.08, không xung đột lợi ích */
+  @column()
+  declare precheckConflictCleared: boolean | null
+
+  /** BM-02.09 mục A — đạo đức / dữ liệu / SHTT / an toàn / AI */
+  @column()
+  declare precheckEthicsOk: boolean | null
+
   @column.dateTime()
   declare submittedAt: DateTime | null
 

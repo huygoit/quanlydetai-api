@@ -32,6 +32,7 @@ import {
   type CouncilRole,
   type FinalClassification,
 } from '#constants/module56'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 import {
   assertCnnv,
   assertExecution,
@@ -188,7 +189,7 @@ export default class ProjectFinalService {
       await NotificationService.push(m.userId, {
         type: 'PROJECT_UPDATE',
         title: 'Mời hội đồng đánh giá cuối kỳ',
-        message: `${outline.code} họp ${meetingAt.toFormat('dd/MM/yyyy HH:mm')}`,
+        message: `${outline.code} họp ${meetingAt.toFormat(DATETIME_FORMAT)}`,
         link: `/projects/final/${outline.id}`,
       })
     }
@@ -947,7 +948,7 @@ export default class ProjectFinalService {
       {
         heading: '3. Thời gian và địa điểm',
         lines: [
-          `Thời gian họp: ${row.meetingAt?.toFormat('dd/MM/yyyy HH:mm') || ''}`,
+          `Thời gian họp: ${row.meetingAt?.toFormat(DATETIME_FORMAT) || ''}`,
           `Địa điểm: ${row.meetingLocation || ''}`,
         ],
       },

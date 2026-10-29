@@ -70,6 +70,10 @@ export default class ProjectOutlineScoreService {
       totalScore: opts?.hideScores ? null : sheet.totalScore,
       generalComment: opts?.hideScores ? null : sheet.generalComment,
       conclusion: opts?.hideScores ? null : sheet.conclusion,
+      // Ba điều kiện mục A BM-02.09
+      precheckEligible: sheet.precheckEligible,
+      precheckConflictCleared: sheet.precheckConflictCleared,
+      precheckEthicsOk: sheet.precheckEthicsOk,
       submittedAt: sheet.submittedAt?.toISO() ?? null,
       reopenedAt: sheet.reopenedAt?.toISO() ?? null,
       reopenReason: sheet.reopenReason,
@@ -189,7 +193,7 @@ export default class ProjectOutlineScoreService {
     lines: ProjectOutlineReviewScoreLine[]
   ): string[] {
     const snap = sheet.criteriaSnapshot
-    const minLen = Number(snap?.minCommentLength ?? 50)
+    const minLen = Number(snap?.minCommentLength ?? 20)
     const errors: string[] = []
     for (const l of lines) {
       if (l.score == null) errors.push(`Thiếu điểm: ${l.criterionName}`)
@@ -205,7 +209,49 @@ export default class ProjectOutlineScoreService {
         }
       }
     }
+
+    // BM-02.09: phải tick 3 điều kiện (true/false), kết luận + nhận xét chung
+    if (sheet.precheckEligible == null) errors.push('Chưa xác nhận: đủ điều kiện tham gia.')
+    if (sheet.precheckConflictCleared == null) {
+      errors.push('Chưa xác nhận: BM-06.08 / xung đột lợi ích.')
+    }
+    if (sheet.precheckEthicsOk == null) {
+      errors.push('Chưa xác nhận: đạo đức / dữ liệu / SHTT / an toàn / AI.')
+    }
+
+    const ketLuan = (sheet.conclusion || '').trim()
+    if (!ketLuan) errors.push('Chưa chọn kết luận.')
+
+    const nhanXet = (sheet.generalComment || '').trim()
+    const thieuDieuKien =
+      sheet.precheckEligible === false ||
+      sheet.precheckConflictCleared === false ||
+      sheet.precheckEthicsOk === false
+    if (thieuDieuKien && ketLuan === 'DE_XUAT') {
+      errors.push(
+        'Còn điều kiện mục A chưa đạt — không được chọn “Đề nghị xét tài trợ/đặt hàng…”. Hãy nêu rõ ở nhận xét.'
+      )
+    }
+    if (nhanXet.length < minLen) {
+      errors.push(`Nhận xét cần ≥ ${minLen} ký tự (hiện ${nhanXet.length}).`)
+    }
+
     return errors
+  }
+
+  private static applyPrechecks(
+    sheet: ProjectOutlineReviewScoreSheet,
+    payload: {
+      precheckEligible?: boolean | null
+      precheckConflictCleared?: boolean | null
+      precheckEthicsOk?: boolean | null
+    }
+  ) {
+    if (payload.precheckEligible !== undefined) sheet.precheckEligible = payload.precheckEligible
+    if (payload.precheckConflictCleared !== undefined) {
+      sheet.precheckConflictCleared = payload.precheckConflictCleared
+    }
+    if (payload.precheckEthicsOk !== undefined) sheet.precheckEthicsOk = payload.precheckEthicsOk
   }
 
   static async saveDraft(
@@ -214,6 +260,9 @@ export default class ProjectOutlineScoreService {
     payload: {
       generalComment?: string | null
       conclusion?: string | null
+      precheckEligible?: boolean | null
+      precheckConflictCleared?: boolean | null
+      precheckEthicsOk?: boolean | null
       lines?: LineInput[]
     }
   ) {
@@ -226,6 +275,7 @@ export default class ProjectOutlineScoreService {
       sheet.generalComment = payload.generalComment?.trim() || null
     }
     if (payload.conclusion !== undefined) sheet.conclusion = payload.conclusion
+    this.applyPrechecks(sheet, payload)
     await sheet.save()
     await sheet.load('lines')
     return sheet
@@ -238,6 +288,9 @@ export default class ProjectOutlineScoreService {
     payload: {
       generalComment?: string | null
       conclusion?: string | null
+      precheckEligible?: boolean | null
+      precheckConflictCleared?: boolean | null
+      precheckEthicsOk?: boolean | null
       lines: LineInput[]
     }
   ) {
@@ -253,6 +306,7 @@ export default class ProjectOutlineScoreService {
       sheet.generalComment = payload.generalComment?.trim() || null
     }
     if (payload.conclusion !== undefined) sheet.conclusion = payload.conclusion
+    this.applyPrechecks(sheet, payload)
 
     const errors = this.validateForSubmit(sheet, lines)
     if (errors.length) throw new Error(errors[0])

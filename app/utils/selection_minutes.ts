@@ -4,6 +4,7 @@ import path from 'node:path'
 import app from '@adonisjs/core/services/app'
 import type ProposalSelectionSession from '#models/proposal_selection_session'
 import type ProposalSelectionSessionItem from '#models/proposal_selection_session_item'
+import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
 const RESULT_LABEL: Record<string, string> = {
   DONG_Y: 'Đồng ý',
@@ -64,7 +65,7 @@ export async function generateSelectionMinutesHtml(
 <body>
   <h1>BIÊN BẢN HỌP HỘI ĐỒNG TƯ VẤN XÉT CHỌN ĐỀ TÀI</h1>
   <p><strong>Phiên:</strong> ${escapeHtml(session.title || `Phiên #${session.id}`)}</p>
-  <p><strong>Ngày họp:</strong> ${session.meetingAt.toFormat('dd/MM/yyyy HH:mm')}</p>
+  <p><strong>Ngày họp:</strong> ${session.meetingAt.toFormat(DATETIME_FORMAT)}</p>
   <p><strong>Địa điểm:</strong> ${escapeHtml(session.location)}</p>
   <h2>Thành phần Hội đồng</h2>
   ${membersHtml}
@@ -78,7 +79,7 @@ export async function generateSelectionMinutesHtml(
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  <p style="margin-top:24px"><em>Sinh lúc ${DateTime.now().toFormat('dd/MM/yyyy HH:mm')} — hệ thống KH&CN.</em></p>
+  <p style="margin-top:24px"><em>Sinh lúc ${DateTime.now().toFormat(DATETIME_FORMAT)} — hệ thống KH&CN.</em></p>
 </body>
 </html>`
 

@@ -1,0 +1,60 @@
+ĐẠI HỌC ĐÀ NẴNGCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+TRƯỜNG ĐẠI HỌC SƯ PHẠMĐộc lập - Tự do - Hạnh phúc
+Số: {{so_quyet_dinh}}/QĐ-ĐHSP
+Đà Nẵng, {{ngay_ban_hanh}}
+QUYẾT ĐỊNH
+Về việc thành lập Hội đồng thẩm định thuyết minhnhiệm vụ khoa học, công nghệ và đổi mới sáng tạo
+HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC SƯ PHẠMĐẠI HỌC ĐÀ NẴNG
+Căn cứ {{van_ban_quy_dinh_chuc_nang_nhiem_vu_tham_quyen}};
+Căn cứ {{quy_dinh_quan_ly_nhiem_vu_khcn_dmst}};
+Căn cứ {{van_ban_phe_duyet_danh_muc_hoac_ke_hoach_tham_dinh}};
+Theo đề nghị của {{chuc_danh_nguoi_de_nghi}}.
+QUYẾT ĐỊNH:
+Điều 1. Thành lập Hội đồng
+Thành lập Hội đồng thẩm định thuyết minh nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo gồm {{so_thanh_vien}} thành viên theo danh sách tại Phụ lục kèm theo Quyết định này.
+Hội đồng thực hiện thẩm định thuyết minh {{ma_thuyet_minh}}, tên nhiệm vụ: “{{ten_nhiem_vu}}”.
+Điều 2. Nhiệm vụ và tổ chức hoạt động của Hội đồng
+Hội đồng xem xét, đánh giá nội dung thuyết minh, mục tiêu, phương pháp, sản phẩm, tiến độ, tính khả thi và dự toán kinh phí; lập biên bản, kết luận và kiến nghị để trình cấp có thẩm quyền xem xét.
+Thành viên Hội đồng thực hiện nhiệm vụ theo phân công; bảo đảm khách quan, bảo mật thông tin và kê khai xung đột lợi ích theo quy định áp dụng. Hội đồng tự giải thể sau khi hoàn thành nhiệm vụ.
+Thời gian họp: {{thoi_gian_hop}}. Địa điểm: {{dia_diem}}.
+Điều 3. Hiệu lực và trách nhiệm thi hành
+Quyết định có hiệu lực kể từ ngày ký. {{don_vi_dau_moi}}, các đơn vị, cá nhân có liên quan và các thành viên có tên tại Điều 1 chịu trách nhiệm thi hành Quyết định này./.
+Nơi nhận:HIỆU TRƯỞNG
+- Như Điều 3;- Lưu: VT, {{don_vi_luu_ho_so}}.
+{{ho_ten_nguoi_ky}}
+
+PHỤ LỤC
+DANH SÁCH HỘI ĐỒNG THẨM ĐỊNH THUYẾT MINH
+(Kèm theo Quyết định số {{so_quyet_dinh}}/QĐ-ĐHSP{{ngay_ban_hanh}} của Hiệu trưởng Trường Đại học Sư phạm - Đại học Đà Nẵng)
+1. Thành phần Hội đồng
+{{danh_sach_hoi_dong}}
+STT
+Họ và tên
+Đơn vị công tác
+Vai trò
+1
+Đinh Thị Mỹ Hạnh
+Ban Giám hiệu - Trường ĐHSP
+Chủ tịch
+2
+Nguyễn Trần Quốc Vinh
+Khoa Toán - Tin, Trường ĐHSP
+Thư ký
+3
+Đinh Thanh Khẩn
+Khoa Lý - Hóa, Trường ĐHSP
+Phản biện 1
+4
+Phan Thị Hà Linh
+Khoa Lý - Hóa, Trường ĐHSP
+Phản biện 2
+5
+Nguyễn Ngọc Thạch
+Khoa Toán - Tin, Trường ĐHSP
+Ủy viên
+
+2. Thuyết minh được thẩm định
+Mã thuyết minh: {{ma_thuyet_minh}}.Tên nhiệm vụ: {{ten_nhiem_vu}}.
+3. Thông tin phiên họp
+Thời gian: {{thoi_gian_hop}}. Địa điểm: {{dia_diem}}.
+Mã dự thảo: {{ma_du_thao}}
