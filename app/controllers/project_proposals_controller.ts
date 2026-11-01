@@ -240,6 +240,11 @@ export default class ProjectProposalsController {
     )
   }
 
+  /** PKH duyệt được cả hồ sơ đang chờ Khoa, không bắt buộc trưởng đơn vị xác nhận trước. */
+  private pkhCoTheDuyet(status: string) {
+    return status === 'SUBMITTED' || status === 'CHO_PKH' || status === 'UNIT_REVIEWED'
+  }
+
   private async assertAdjustmentExtend(userId: number) {
     return (
       (await this.assertPkh(userId)) ||
@@ -631,6 +636,12 @@ export default class ProjectProposalsController {
       })
     } else {
       await NotificationService.notifyUnitHeadsProposalSubmitted(proposal)
+      await NotificationService.pushToPermissions(['project.review', 'project.selection_manage'], {
+        type: 'PROJECT_UPDATE',
+        title: 'Đề xuất chờ PKH kiểm tra',
+        message: `${proposal.ownerName} đã nộp "${proposal.title}" (${proposal.code}). PKH có thể kiểm tra ngay, không cần chờ trưởng đơn vị.`,
+        link: `/projects/pkh-review?id=${proposal.id}`,
+      })
     }
 
     return response.ok({ success: true, data: this.serialize(proposal) })
@@ -824,10 +835,10 @@ export default class ProjectProposalsController {
     if (!proposal) {
       return response.notFound({ success: false, message: 'Không tìm thấy đề xuất.' })
     }
-    if (proposal.status !== 'CHO_PKH') {
+    if (!this.pkhCoTheDuyet(proposal.status)) {
       return response.badRequest({
         success: false,
-        message: 'Chỉ xác nhận hợp lệ hồ sơ đang chờ PKH.',
+        message: 'Chỉ xác nhận hợp lệ hồ sơ đang chờ Khoa hoặc chờ PKH.',
       })
     }
     const from = proposal.status
@@ -854,10 +865,10 @@ export default class ProjectProposalsController {
     if (!proposal) {
       return response.notFound({ success: false, message: 'Không tìm thấy đề xuất.' })
     }
-    if (proposal.status !== 'CHO_PKH') {
+    if (!this.pkhCoTheDuyet(proposal.status)) {
       return response.badRequest({
         success: false,
-        message: 'Chỉ yêu cầu bổ sung hồ sơ đang chờ PKH.',
+        message: 'Chỉ yêu cầu bổ sung hồ sơ đang chờ Khoa hoặc chờ PKH.',
       })
     }
     const payload = await request.validateUsing(requestSupplementValidator)
@@ -987,10 +998,10 @@ export default class ProjectProposalsController {
     if (!proposal) {
       return response.notFound({ success: false, message: 'Không tìm thấy đề xuất.' })
     }
-    if (proposal.status !== 'CHO_PKH' && proposal.status !== 'YEU_CAU_BS') {
+    if (!this.pkhCoTheDuyet(proposal.status) && proposal.status !== 'YEU_CAU_BS') {
       return response.badRequest({
         success: false,
-        message: 'Chỉ loại hồ sơ đang chờ PKH hoặc yêu cầu bổ sung.',
+        message: 'Chỉ loại hồ sơ đang chờ Khoa, chờ PKH hoặc yêu cầu bổ sung.',
       })
     }
     const payload = await request.validateUsing(rejectByPkhValidator)
@@ -1031,8 +1042,8 @@ export default class ProjectProposalsController {
       const r = await base.clone().where('status', st).count('* as total')
       return Number(r[0].$extras.total || 0)
     }
-    // Tổng đã nhận = đã qua Khoa (không tính DRAFT/SUBMITTED/RETURNED/WITHDRAWN thuần GV)
-    const pkhStatuses = ['CHO_PKH', 'HOP_LE', 'YEU_CAU_BS', 'DA_LOAI']
+    // Đã nhận gồm cả hồ sơ đang chờ Khoa — PKH duyệt được ngay, không cần trưởng đơn vị
+    const pkhStatuses = ['SUBMITTED', 'CHO_PKH', 'UNIT_REVIEWED', 'HOP_LE', 'YEU_CAU_BS', 'DA_LOAI']
     const totalReceived = await (async () => {
       const r = await ProjectProposal.query()
         .where('call_for_proposal_id', cfpId)
@@ -1054,7 +1065,13 @@ export default class ProjectProposalsController {
         hopLe: await countStatus('HOP_LE'),
         choBoSung: await countStatus('YEU_CAU_BS'),
         daLoai: await countStatus('DA_LOAI'),
-        choPkh: await countStatus('CHO_PKH'),
+        choPkh: await (async () => {
+          const r = await ProjectProposal.query()
+            .where('call_for_proposal_id', cfpId)
+            .whereIn('status', ['SUBMITTED', 'CHO_PKH', 'UNIT_REVIEWED'])
+            .count('* as total')
+          return Number(r[0].$extras.total || 0)
+        })(),
       },
     })
   }

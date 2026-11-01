@@ -96,9 +96,6 @@ export default class extends BaseSeeder {
     fileName: string
     source: string
   }) {
-    const existing = await ContractTemplate.query().where('code', input.code).first()
-    if (existing) return
-
     try {
       await fs.access(input.source)
     } catch {
@@ -118,6 +115,40 @@ export default class extends BaseSeeder {
       console.warn('[19_contract_template] Không quét được biến:', (e as Error).message)
     }
 
+    const mergeConfig =
+      input.templateType === 'QUYET_DINH'
+        ? ({
+            ky_hieu: '',
+            noi_nhan: '',
+            tham_quyen_ky: '',
+            ...QUYET_DINH_MERGE_TRONG,
+          } as any)
+        : undefined
+
+    const existing = await ContractTemplate.query().where('code', input.code).first()
+    // QĐ thành lập HĐ: luôn cập nhật lại file + kích hoạt mặc định (tránh seed cũ bỏ qua).
+    if (existing && input.templateType === 'QUYET_DINH') {
+      existing.name = input.name
+      existing.description = input.description
+      existing.templateType = input.templateType
+      existing.formCode = input.formCode
+      existing.fileName = input.fileName
+      existing.storedFileName = stored
+      existing.fileUrl = buildPublicContractTemplateUrl(stored)
+      existing.fileSize = stat.size
+      existing.detectedVariables = detected
+      existing.mergeConfig = mergeConfig
+      existing.isDefault = true
+      existing.status = 'ACTIVE'
+      await existing.save()
+      console.info(`[19_contract_template] Đã cập nhật ${input.code}`)
+      return
+    }
+    if (existing) {
+      console.info(`[19_contract_template] Đã có ${input.code} — bỏ qua`)
+      return
+    }
+
     await ContractTemplate.create({
       code: input.code,
       name: input.name,
@@ -129,19 +160,12 @@ export default class extends BaseSeeder {
       fileUrl: buildPublicContractTemplateUrl(stored),
       fileSize: stat.size,
       detectedVariables: detected,
-      mergeConfig:
-        input.templateType === 'QUYET_DINH'
-          ? ({
-              ky_hieu: '',
-              noi_nhan: '',
-              tham_quyen_ky: '',
-              ...QUYET_DINH_MERGE_TRONG,
-            } as any)
-          : undefined,
+      mergeConfig,
       isDefault: true,
       status: 'ACTIVE',
       version: 1,
       uploadedBy: null,
     })
+    console.info(`[19_contract_template] Đã tạo ${input.code}`)
   }
 }

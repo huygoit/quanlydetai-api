@@ -44,7 +44,16 @@ export default class ProjectOutlineDefensesController {
     )
   }
 
-  private async loadSession(id: number) {
+  /** Chặn NaN / chuỗi như "my-tasks" khi route cũ nuốt nhầm vào :id */
+  private parseSessionId(raw: unknown): number | null {
+    const id = Number(raw)
+    if (!Number.isInteger(id) || id <= 0) return null
+    return id
+  }
+
+  private async loadSession(raw: unknown) {
+    const id = this.parseSessionId(raw)
+    if (id == null) return null
     return ProjectOutlineDefenseSession.query().where('id', id).preload('members').first()
   }
 
@@ -101,7 +110,7 @@ export default class ProjectOutlineDefensesController {
   /** GET /api/project-outline-defenses/:id */
   async show({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy phiên thẩm định.' })
     }
@@ -124,7 +133,11 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ PKH.' })
     }
-    const session = await ProjectOutlineDefenseSession.find(Number(params.id))
+    const sid = this.parseSessionId(params.id)
+    if (sid == null) {
+      return response.badRequest({ success: false, message: 'Mã phiên không hợp lệ.' })
+    }
+    const session = await ProjectOutlineDefenseSession.find(sid)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -178,7 +191,11 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ PKH.' })
     }
-    const session = await ProjectOutlineDefenseSession.find(Number(params.id))
+    const sid = this.parseSessionId(params.id)
+    if (sid == null) {
+      return response.badRequest({ success: false, message: 'Mã phiên không hợp lệ.' })
+    }
+    const session = await ProjectOutlineDefenseSession.find(sid)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -221,7 +238,7 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ PKH.' })
     }
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -247,7 +264,7 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ PKH.' })
     }
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -272,7 +289,7 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertBgh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ BGH ký QĐ.' })
     }
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -298,7 +315,7 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertTchc(user.id)) && !(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ TC-HC phát hành (hoặc PKH hỗ trợ).' })
     }
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -323,7 +340,7 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ PKH.' })
     }
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -398,7 +415,7 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ PKH.' })
     }
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -428,7 +445,7 @@ export default class ProjectOutlineDefensesController {
     if (!(await this.assertPkh(user.id))) {
       return response.forbidden({ success: false, message: 'Chỉ PKH xác nhận họp trước.' })
     }
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -451,7 +468,7 @@ export default class ProjectOutlineDefensesController {
   /** GET /api/project-outline-defenses/:id/minutes — ngữ cảnh biên bản BM-02.10 */
   async minutesContext({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -481,7 +498,7 @@ export default class ProjectOutlineDefensesController {
   /** PUT /api/project-outline-defenses/:id/minutes — Thư ký lưu nháp */
   async saveMinutes({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -504,7 +521,7 @@ export default class ProjectOutlineDefensesController {
   /** POST /api/project-outline-defenses/:id/reopen-minutes — PKH hoặc Thư ký mở khóa (BGH chưa ký) */
   async reopenMinutes({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }
@@ -541,7 +558,7 @@ export default class ProjectOutlineDefensesController {
   /** POST /api/project-outline-defenses/:id/finalize — Thư ký chốt biên bản */
   async finalize({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
-    const session = await this.loadSession(Number(params.id))
+    const session = await this.loadSession(params.id)
     if (!session) {
       return response.notFound({ success: false, message: 'Không tìm thấy.' })
     }

@@ -56,7 +56,13 @@ async function duongDanBanSao(ten: string): Promise<string> {
   return dayDu
 }
 
-function chayLenh(bin: string, args: string[], themEnv: Record<string, string>): Promise<void> {
+/** pg_restore thường thoát mã 1 khi chỉ có cảnh báo (object đã tồn tại / drop…). */
+function chayLenh(
+  bin: string,
+  args: string[],
+  themEnv: Record<string, string>,
+  chapNhanMa: number[] = [0]
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, {
       env: { ...process.env, ...themEnv },
@@ -72,7 +78,7 @@ function chayLenh(bin: string, args: string[], themEnv: Record<string, string>):
       else reject(err)
     })
     child.on('close', (code) => {
-      if (code === 0) resolve()
+      if (code != null && chapNhanMa.includes(code)) resolve()
       else reject(new LoiSaoLuu(loi.trim() || `Lệnh ${bin} thoát mã ${code}.`))
     })
   })
@@ -261,7 +267,8 @@ export default class BackupService {
           db.database,
           dump,
         ],
-        { PGPASSWORD: db.password }
+        { PGPASSWORD: db.password },
+        [0, 1]
       )
       const storageGoc = await resolveWritableUploadRoot()
       await thayThuMuc(path.join(tam, 'files', 'storage'), storageGoc, ['backups'])

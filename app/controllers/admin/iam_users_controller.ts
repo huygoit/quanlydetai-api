@@ -9,6 +9,30 @@ import { resetIamUserPasswordValidator } from '#validators/reset_iam_user_passwo
 import { assignUserRolesIamValidator } from '#validators/assign_user_roles_iam_validator'
 import { assignUserRoleValidator } from '#validators/assign_user_role_validator'
 import { updateUserRoleAssignmentStatusValidator } from '#validators/update_user_role_assignment_status_validator'
+import BasicRoleService from '#services/basic_role_service'
+
+/** Form gửi department_id hoặc departmentId. Không có thì bỏ qua khi sửa. */
+function layDepartmentId(payload: {
+  departmentId?: number | null
+  department_id?: number | null
+}): number | null | undefined {
+  if (payload.departmentId != null) return Number(payload.departmentId)
+  if (payload.department_id != null) return Number(payload.department_id)
+  if (payload.departmentId === null || payload.department_id === null) return null
+  return undefined
+}
+
+function layRoleIds(payload: { roleIds?: number[]; role_ids?: number[] }): number[] | undefined {
+  return payload.roleIds ?? payload.role_ids
+}
+
+/** Form gửi status ACTIVE/INACTIVE; API lưu isActive. */
+function layIsActive(payload: { isActive?: boolean; status?: string }): boolean | undefined {
+  if (typeof payload.isActive === 'boolean') return payload.isActive
+  if (payload.status === 'ACTIVE') return true
+  if (payload.status === 'INACTIVE' || payload.status === 'LOCKED') return false
+  return undefined
+}
 
 /**
  * Admin: Quản lý user IAM (danh sách, chi tiết, tạo, cập nhật, reset password, gán role).
@@ -127,10 +151,10 @@ export default class AdminIamUsersController {
         fullName: payload.fullName,
         email: payload.email,
         phone: payload.phone ?? null,
-        departmentId: payload.departmentId ?? null,
+        departmentId: layDepartmentId(payload) ?? null,
         password: payload.password,
-        roleIds: payload.roleIds ?? [],
-        isActive: payload.isActive ?? true,
+        roleIds: layRoleIds(payload) ?? [],
+        isActive: layIsActive(payload) ?? true,
         note: payload.note ?? null,
       })
       return response.created({
@@ -165,13 +189,22 @@ export default class AdminIamUsersController {
         fullName: payload.fullName,
         email: payload.email,
         phone: payload.phone,
-        departmentId: payload.departmentId,
-        isActive: payload.isActive,
+        departmentId: layDepartmentId(payload),
+        isActive: layIsActive(payload),
         note: payload.note,
       })
+      const roleIds = layRoleIds(payload)
+      if (roleIds) {
+        if (roleIds.length > 0) {
+          await IamUserService.assignRoles(id, roleIds)
+        } else {
+          await BasicRoleService.assignBasicRoleToUser(id)
+        }
+      }
+      const fresh = await IamUserService.findById(user.id)
       return response.ok({
         message: 'User updated successfully',
-        data: this.serializeUserDetail(user),
+        data: this.serializeUserDetail(fresh),
       })
     } catch (err) {
       if ((err as Error).message === 'USER_NOT_FOUND') {
@@ -187,6 +220,12 @@ export default class AdminIamUsersController {
         return response.unprocessableEntity({
           success: false,
           message: 'Không tìm thấy đơn vị.',
+        })
+      }
+      if ((err as Error).message === 'ROLE_NOT_FOUND') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Một hoặc nhiều vai trò không tồn tại.',
         })
       }
       throw err
