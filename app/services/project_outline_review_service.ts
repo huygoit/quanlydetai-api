@@ -217,7 +217,7 @@ export default class ProjectOutlineReviewService {
           type: 'PROJECT_UPDATE',
           title: 'Mời phản biện kín thuyết minh',
           message: `Bạn được phân công phản biện kín cho thuyết minh "${outline.title}" (${outline.code}). Hạn: ${deadline.toFormat('dd/MM/yyyy')}.`,
-          link: `/projects/blind-reviews/tasks/${row.id}`,
+          link: `/projects/outlines`,
         })
         await EmailLogService.logStubToUser(
           userId,
@@ -357,7 +357,7 @@ export default class ProjectOutlineReviewService {
         type: 'PROJECT_UPDATE',
         title: 'Mời phản biện kín thuyết minh (thay thế)',
         message: `Bạn được phân công phản biện kín cho "${outline.title}" (${outline.code}).`,
-        link: `/projects/blind-reviews/tasks/${neu.id}`,
+        link: `/projects/outlines`,
       })
     }
 

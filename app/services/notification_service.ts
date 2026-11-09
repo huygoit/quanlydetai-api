@@ -267,7 +267,7 @@ export default class NotificationService {
       type: 'PROJECT_UPDATE',
       title: 'Đề xuất chờ PKH kiểm tra',
       message: `${proposal.ownerName} — đề xuất "${proposal.title}" (${proposal.code}) đã được Khoa xác nhận.`,
-      link: `/projects/pkh-review?id=${proposal.id}`,
+      link: `/projects/register?id=${proposal.id}`,
     })
   }
 
@@ -277,7 +277,7 @@ export default class NotificationService {
       type: 'PROJECT_UPDATE',
       title: 'Danh mục xét chọn chờ BGH phê duyệt',
       message: `${sessionTitle} đã được trình BGH.`,
-      link: `/projects/selection-sessions/${sessionId}`,
+      link: `/home`,
     })
   }
 
@@ -302,7 +302,7 @@ export default class NotificationService {
       type: 'PROJECT_UPDATE',
       title: 'Phiên xét chọn đề tài mới',
       message,
-      link: `/projects/selection-sessions/${sessionId}`,
+      link: `/home`,
     })
   }
 

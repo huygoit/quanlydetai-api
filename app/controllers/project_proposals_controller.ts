@@ -632,7 +632,7 @@ export default class ProjectProposalsController {
         type: 'PROJECT_UPDATE',
         title: 'Đề xuất chờ PKH kiểm tra',
         message: `${proposal.ownerName} nộp "${proposal.title}" (${proposal.code}). Kỳ này không yêu cầu khoa xác nhận.`,
-        link: `/projects/pkh-review?id=${proposal.id}`,
+        link: `/projects/register?id=${proposal.id}`,
       })
     } else {
       await NotificationService.notifyUnitHeadsProposalSubmitted(proposal)
@@ -640,7 +640,7 @@ export default class ProjectProposalsController {
         type: 'PROJECT_UPDATE',
         title: 'Đề xuất chờ PKH kiểm tra',
         message: `${proposal.ownerName} đã nộp "${proposal.title}" (${proposal.code}). PKH có thể kiểm tra ngay, không cần chờ trưởng đơn vị.`,
-        link: `/projects/pkh-review?id=${proposal.id}`,
+        link: `/projects/register?id=${proposal.id}`,
       })
     }
 

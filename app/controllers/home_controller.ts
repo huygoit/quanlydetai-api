@@ -572,7 +572,7 @@ export default class HomeController {
         description: 'Phân công hội đồng xét duyệt',
         count: council2aCount,
         status: council2aCount > 0 ? 'process' : 'wait',
-        link: '/projects/council',
+        link: '/projects/register',
       },
       {
         key: 'scoring_2b',

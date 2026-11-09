@@ -372,7 +372,7 @@ export default class ProjectOutlineScoreService {
       message: `Thuyết minh ${outline.code} đã đủ phiếu. Điểm TB: ${avg}${
         avg < threshold ? ' (dưới ngưỡng — đánh dấu không đạt theo điểm)' : ''
       }.`,
-      link: `/projects/blind-reviews`,
+      link: `/projects/outlines`,
     })
 
     await ProjectOutlineService.writeAudit(
@@ -426,7 +426,7 @@ export default class ProjectOutlineScoreService {
         type: 'PROJECT_UPDATE',
         title: 'PKH mở lại phiếu phản biện',
         message: `Phiếu chấm thuyết minh đã được mở lại để chỉnh sửa. Lý do: ${reason}`,
-        link: `/projects/blind-reviews/tasks/${assignment.id}`,
+        link: `/projects/outlines`,
       })
     }
     return sheet

@@ -27,11 +27,8 @@ import SessionIdeasController from '#controllers/session_ideas_controller'
 import IdeaCouncilScoresController from '#controllers/idea_council_scores_controller'
 import ProjectProposalsController from '#controllers/project_proposals_controller'
 import ProjectProposalMembersController from '#controllers/project_proposal_members_controller'
-import ProposalSelectionSessionsController from '#controllers/proposal_selection_sessions_controller'
-import ProposalSelectionSessionMembersController from '#controllers/proposal_selection_session_members_controller'
 import ProjectOutlinesController from '#controllers/project_outlines_controller'
 import ProjectOutlineReviewsController from '#controllers/project_outline_reviews_controller'
-import ProjectOutlineScoresController from '#controllers/project_outline_scores_controller'
 import ProjectOutlineDefensesController from '#controllers/project_outline_defenses_controller'
 import ProjectOutlineBudgetsController from '#controllers/project_outline_budgets_controller'
 import ProjectOutlineApprovalsController from '#controllers/project_outline_approvals_controller'
@@ -861,8 +858,6 @@ router
 router
   .group(() => {
     router.get('/pending-unit-count', [ProjectProposalsController, 'pendingUnitCount'])
-    router.get('/pkh/stats', [ProjectProposalsController, 'pkhStats'])
-    router.get('/pkh/export-excel', [ProjectProposalsController, 'exportPkhExcel'])
     router.get('/', [ProjectProposalsController, 'index'])
     router.get('/:id/audits', [ProjectProposalsController, 'audits'])
     router.get('/:id/members', [ProjectProposalMembersController, 'index'])
@@ -875,11 +870,7 @@ router
     router.post('/:id/withdraw', [ProjectProposalsController, 'withdraw'])
     router.post('/:id/unit-review', [ProjectProposalsController, 'unitReview'])
     router.post('/:id/unit-return', [ProjectProposalsController, 'unitReturn'])
-    router.post('/:id/mark-valid', [ProjectProposalsController, 'markValid'])
-    router.post('/:id/request-supplement', [ProjectProposalsController, 'requestSupplement'])
     router.post('/:id/resubmit-to-pkh', [ProjectProposalsController, 'resubmitToPkh'])
-    router.post('/:id/extend-supplement', [ProjectProposalsController, 'extendSupplement'])
-    router.post('/:id/reject-by-pkh', [ProjectProposalsController, 'rejectByPkh'])
     router.post('/:id/submit-council-adjustment', [
       ProjectProposalsController,
       'submitCouncilAdjustment',
@@ -911,42 +902,14 @@ router
   .prefix('/api/proposal-registrations')
   .middleware([middleware.auth()])
 
-// --- Phiên xét chọn đề tài (US-03-03 tạo phiên + US-03-04 kết quả/BGH)
-router
-  .group(() => {
-    router.get('/', [ProposalSelectionSessionsController, 'index'])
-    router.post('/', [ProposalSelectionSessionsController, 'store'])
-    router.get('/:id', [ProposalSelectionSessionsController, 'show'])
-    router.put('/:id', [ProposalSelectionSessionsController, 'updateMeta'])
-    router.put('/:id/results', [ProposalSelectionSessionsController, 'upsertResults'])
-    router.post('/:id/save-minutes', [ProposalSelectionSessionsController, 'saveMinutes'])
-    router.post('/:id/submit-bgh', [ProposalSelectionSessionsController, 'submitBgh'])
-    router.post('/:id/bgh-approve', [ProposalSelectionSessionsController, 'bghApprove'])
-    router.post('/:id/bgh-reject', [ProposalSelectionSessionsController, 'bghReject'])
-    router.get('/:id/summary', [ProposalSelectionSessionsController, 'summary'])
-    router.put('/:id/admin-edit', [ProposalSelectionSessionsController, 'adminEditLocked'])
-    // Thành viên hội đồng (giống council-sessions)
-    router.get('/:id/available-members', [ProposalSelectionSessionMembersController, 'availableMembers'])
-    router.get('/:id/members', [ProposalSelectionSessionMembersController, 'index'])
-    router.post('/:id/members', [ProposalSelectionSessionMembersController, 'store'])
-    router.delete('/:id/members/:memberId', [ProposalSelectionSessionMembersController, 'destroy'])
-  })
-  .prefix('/api/proposal-selection-sessions')
-  .middleware([middleware.auth()])
-
-// --- Thuyết minh chi tiết (US-04-01) + phân công phản biện kín (US-04-02)
+// --- Thuyết minh chi tiết (US-04-01). API phản biện kín / phiên xét chọn đã gỡ tạm cùng menu rác.
 router
   .group(() => {
     router.get('/eligible', [ProjectOutlinesController, 'eligible'])
-    router.get('/pending-review', [ProjectOutlineReviewsController, 'pendingReview'])
-    router.get('/under-review', [ProjectOutlineReviewsController, 'underReview'])
     router.get('/', [ProjectOutlinesController, 'index'])
     router.post('/from-proposal/:proposalId', [ProjectOutlinesController, 'fromProposal'])
+    // Còn dùng ở thẩm định / triển khai để chọn người
     router.get('/:id/available-reviewers', [ProjectOutlineReviewsController, 'availableReviewers'])
-    router.get('/:id/review-assignments', [ProjectOutlineReviewsController, 'listAssignments'])
-    router.post('/:id/assign-reviewers', [ProjectOutlineReviewsController, 'assign'])
-    router.post('/:id/replace-reviewer', [ProjectOutlineReviewsController, 'replace'])
-    router.get('/:id/review-score-summary', [ProjectOutlineScoresController, 'summary'])
     router.get('/:id/revision-context', [ProjectOutlinesController, 'revisionContext'])
     router.get('/:id/versions', [ProjectOutlinesController, 'versions'])
     router.get('/:id/revision-diff', [ProjectOutlinesController, 'revisionDiff'])
@@ -961,19 +924,6 @@ router
     router.post('/:id/withdraw', [ProjectOutlinesController, 'withdraw'])
   })
   .prefix('/api/project-outlines')
-  .middleware([middleware.auth()])
-
-// --- Phiếu chấm phản biện kín (US-04-03)
-router
-  .group(() => {
-    router.get('/', [ProjectOutlineScoresController, 'myTasks'])
-    router.get('/:assignmentId', [ProjectOutlineScoresController, 'showTask'])
-    router.put('/:assignmentId/score-draft', [ProjectOutlineScoresController, 'saveDraft'])
-    router.post('/:assignmentId/score-submit', [ProjectOutlineScoresController, 'submit'])
-    router.post('/:assignmentId/score-reopen', [ProjectOutlineScoresController, 'reopen'])
-    router.post('/:assignmentId/extend-deadline', [ProjectOutlineScoresController, 'extendDeadline'])
-  })
-  .prefix('/api/project-outline-review-tasks')
   .middleware([middleware.auth()])
 
 // --- Tổ chức bảo vệ thuyết minh (US-04-04)
