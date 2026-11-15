@@ -74,7 +74,8 @@ export default class EmailLogService {
     subject: string,
     body: string,
     relatedType?: string,
-    relatedId?: number
+    relatedId?: number,
+    html?: string
   ) {
     const user = await User.find(userId)
     if (!user?.email) return null
@@ -84,6 +85,7 @@ export default class EmailLogService {
       body,
       relatedType,
       relatedId,
+      html,
     })
   }
 
@@ -102,8 +104,9 @@ export default class EmailLogService {
     subject: string,
     body: string,
     relatedType?: string,
-    relatedId?: number
+    relatedId?: number,
+    html?: string
   ) {
-    return this.sendToUser(userId, subject, body, relatedType, relatedId)
+    return this.sendToUser(userId, subject, body, relatedType, relatedId, html)
   }
 }

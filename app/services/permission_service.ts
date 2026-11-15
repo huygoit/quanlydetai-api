@@ -311,6 +311,18 @@ export default class PermissionService {
       module: 'project',
       action: 'procurement_handle',
     },
+    {
+      code: 'org_profile.view',
+      name: 'Xem cấu hình profile trường',
+      module: 'org_profile',
+      action: 'view',
+    },
+    {
+      code: 'org_profile.update',
+      name: 'Cập nhật cấu hình profile trường',
+      module: 'org_profile',
+      action: 'update',
+    },
   ]
 
   static async syncMissingStandardPermissions(): Promise<{ added: number; permissions: Permission[] }> {

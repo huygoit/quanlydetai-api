@@ -3,11 +3,13 @@ import ProjectProgressService from '#services/project_progress_service'
 import ProjectFinalService from '#services/project_final_service'
 
 const SAU_KHI_KHOI_DONG = 15_000
-const MOI_SAU_GIO = 6 * 60 * 60 * 1000
+/** Mỗi ngày chạy 1 lần — duyệt toàn bộ nhiệm vụ đang thực hiện + kỳ báo cáo */
+const MOI_NGAY = 24 * 60 * 60 * 1000
 
 /**
- * Nhắc hạn khi process web đang chạy.
- * Cờ remindedDays / remindedDay10 / remindedDay13 giữ lần gửi, chạy lại không gửi trùng.
+ * Nhắc hạn khi process web đang chạy (1 lần/ngày).
+ * Production nên gắn thêm cron: node ace remind:module56
+ * Cờ remindedDays / remindedDay10 / remindedDay13 tránh gửi trùng.
  */
 app.ready(() => {
   const gui = async () => {
@@ -22,6 +24,6 @@ app.ready(() => {
     void gui()
     setInterval(() => {
       void gui()
-    }, MOI_SAU_GIO)
+    }, MOI_NGAY)
   }, SAU_KHI_KHOI_DONG)
 })

@@ -3,7 +3,7 @@ import ProjectOutline from '#models/project_outline'
 import ProjectOutlineFinalApprovalService from '#services/project_outline_final_approval_service'
 
 /**
- * Phê duyệt cuối US-04: BGH → TC-HC phát hành QĐ giao thực hiện.
+ * Phê duyệt cuối US-04: BGH duyệt/ký → mở Module 5 (bỏ bước TC-HC phát hành QĐ).
  */
 export default class ProjectOutlineApprovalsController {
   async index({ auth, request, response }: HttpContext) {
@@ -57,8 +57,8 @@ export default class ProjectOutlineApprovalsController {
       return response.ok({
         success: true,
         message: result.idempotent
-          ? 'Hồ sơ đã được BGH ký trước đó.'
-          : 'BGH đã ký phê duyệt — chờ TC-HC phát hành QĐ giao thực hiện.',
+          ? 'Hồ sơ đã được BGH phê duyệt trước đó.'
+          : 'BGH đã phê duyệt — đã mở Module 5 và sinh dự thảo hợp đồng.',
         data: dossier,
       })
     } catch (e: any) {

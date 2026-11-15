@@ -1,29 +1,31 @@
 /**
- * Mã Module 5–6 đã chốt trong prompts/module-5-6.md.
- * Không dùng NT_* / ĐGCK_* / YCKT_CSVC.
+ * Mã Module 5–6 — khoản chi thống nhất 14 mục (khoan_chi.ts).
  */
 
-export const BUDGET_LINE_DEFS = [
-  { code: 'MUC_01', label: 'Công lao động trực tiếp' },
-  { code: 'MUC_02', label: 'Vật tư' },
-  { code: 'MUC_03', label: 'TSCĐ' },
-  { code: 'MUC_04', label: 'Hội thảo / công tác phí' },
-  { code: 'MUC_05', label: 'Thuê ngoài' },
-  { code: 'MUC_06', label: 'Điều tra, khảo sát' },
-  { code: 'MUC_07', label: 'Văn phòng phẩm' },
-  { code: 'MUC_08', label: 'Họp hội đồng' },
-  { code: 'MUC_09', label: 'Quản lý chung' },
-  { code: 'MUC_10', label: 'Chi khác' },
-] as const
+import {
+  KHOAN_CHI,
+  KHOAN_CHI_CODES,
+  KHOAN_CHI_MUA_SAM,
+  KHOAN_CHI_QUAN_LY,
+  nhanKhoanChi,
+} from '#constants/khoan_chi'
 
-export type BudgetLineCode = (typeof BUDGET_LINE_DEFS)[number]['code']
+export const BUDGET_LINE_DEFS = KHOAN_CHI.map((k) => ({
+  code: k.code,
+  label: k.label,
+}))
 
-export const BUDGET_LINE_CODES: BudgetLineCode[] = BUDGET_LINE_DEFS.map((d) => d.code)
+export type BudgetLineCode = (typeof KHOAN_CHI_CODES)[number]
 
-export const PROCUREMENT_LINE_CODES: BudgetLineCode[] = ['MUC_02', 'MUC_03', 'MUC_05']
+export const BUDGET_LINE_CODES: BudgetLineCode[] = [...KHOAN_CHI_CODES]
+
+export const PROCUREMENT_LINE_CODES: BudgetLineCode[] = [...KHOAN_CHI_MUA_SAM]
+
+/** Mã quản lý chung (≤ 5% tổng). */
+export const BUDGET_LINE_QUAN_LY = KHOAN_CHI_QUAN_LY
 
 export function budgetLineLabel(code: string) {
-  return BUDGET_LINE_DEFS.find((d) => d.code === code)?.label || code
+  return nhanKhoanChi(code)
 }
 
 export const CONTRACT_FLOW = [
@@ -58,6 +60,7 @@ export const YCKT_FLOW = [
   'YCKT_BS',
   'YCKT_TC',
   'YCKT_DONE',
+  'YCKT_TU_CHOI',
 ] as const
 
 export type YcktStatus = (typeof YCKT_FLOW)[number]

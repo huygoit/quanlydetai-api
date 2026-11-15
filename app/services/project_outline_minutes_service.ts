@@ -208,8 +208,11 @@ export default class ProjectOutlineMinutesService {
 
     if (payload.attendances?.length) {
       for (const a of payload.attendances) {
-        const m = await ProjectOutlineDefenseMember.find(a.memberId)
-        if (m && m.sessionId === session.id) {
+        const m = await ProjectOutlineDefenseMember.query()
+          .where('session_id', session.id)
+          .where('id', Number(a.memberId))
+          .first()
+        if (m) {
           m.attendance = a.attendance
           await m.save()
         }
@@ -291,21 +294,22 @@ export default class ProjectOutlineMinutesService {
     const members = await ProjectOutlineDefenseMember.query().where('session_id', session.id)
     if (payload.attendances?.length) {
       for (const a of payload.attendances) {
-        const m = members.find((x) => x.id === a.memberId)
+        // Number() tránh lệch kiểu id (string/number) khiến điểm danh không lưu
+        const m = members.find((x) => Number(x.id) === Number(a.memberId))
         if (m) {
           m.attendance = a.attendance
           await m.save()
         }
       }
     }
-    await members[0]?.refresh?.()
     const refreshed = await ProjectOutlineDefenseMember.query().where('session_id', session.id)
     const present = refreshed.filter((m) => m.attendance === 'PRESENT')
-    if (
-      !present.some((m) => m.roleInCouncil === 'CHU_TICH') ||
-      !present.some((m) => m.roleInCouncil === 'THU_KY')
-    ) {
-      throw new Error('Cần ghi nhận Chủ tịch và Thư ký có mặt trước khi chốt.')
+    const chuTichCoMat = present.some((m) => m.roleInCouncil === 'CHU_TICH')
+    const thuKyCoMat = present.some((m) => m.roleInCouncil === 'THU_KY')
+    if (!chuTichCoMat || !thuKyCoMat) {
+      throw new Error(
+        'Cần ghi nhận Chủ tịch và Thư ký có mặt trước khi chốt (cột «Có mặt» trong điểm danh).'
+      )
     }
 
     // Lưu draft trước

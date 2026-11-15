@@ -57,12 +57,13 @@ export default class extends BaseSeeder {
 
     await this.seedFile({
       code: 'BM06_DEFAULT',
-      name: 'Mẫu hợp đồng BM.06 (chuẩn)',
-      description: 'Mẫu DOCX có biến {{...}} — seed từ BM06_Mau_hop_dong_co_bien.docx',
+      name: 'Mẫu hợp đồng thực hiện nhiệm vụ (BM-02.14 / BM.06)',
+      description: 'Mẫu chuẩn BM-02.14_Hop_dong_co_bien.docx — biến {{...}} theo phụ lục hợp đồng.',
       templateType: 'HOP_DONG',
       formCode: 'BM06',
-      fileName: 'BM06_Mau_hop_dong_co_bien.docx',
-      source: app.makePath('resources/bm06/BM06_Mau_hop_dong_co_bien.docx'),
+      fileName: 'BM-02.14_Hop_dong_co_bien.docx',
+      source: app.makePath('resources/bm06/BM-02.14_Hop_dong_co_bien.docx'),
+      forceUpdate: true,
     })
 
     await this.seedFile({
@@ -95,6 +96,7 @@ export default class extends BaseSeeder {
     formCode: string
     fileName: string
     source: string
+    forceUpdate?: boolean
   }) {
     try {
       await fs.access(input.source)
@@ -126,8 +128,8 @@ export default class extends BaseSeeder {
         : undefined
 
     const existing = await ContractTemplate.query().where('code', input.code).first()
-    // QĐ thành lập HĐ: luôn cập nhật lại file + kích hoạt mặc định (tránh seed cũ bỏ qua).
-    if (existing && input.templateType === 'QUYET_DINH') {
+    // QĐ / HĐ chuẩn: cập nhật lại file + kích hoạt mặc định khi forceUpdate.
+    if (existing && (input.forceUpdate || input.templateType === 'QUYET_DINH')) {
       existing.name = input.name
       existing.description = input.description
       existing.templateType = input.templateType
@@ -140,7 +142,15 @@ export default class extends BaseSeeder {
       existing.mergeConfig = mergeConfig
       existing.isDefault = true
       existing.status = 'ACTIVE'
+      existing.version = (existing.version || 1) + 1
       await existing.save()
+      // Chỉ 1 mẫu mặc định cho mỗi loại
+      if (input.templateType === 'HOP_DONG') {
+        await ContractTemplate.query()
+          .where('template_type', 'HOP_DONG')
+          .whereNot('id', existing.id)
+          .update({ isDefault: false })
+      }
       console.info(`[19_contract_template] Đã cập nhật ${input.code}`)
       return
     }

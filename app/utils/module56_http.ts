@@ -8,14 +8,22 @@ const MAP: Record<string, [number, string]> = {
   PERIOD_NOT_FOUND: [404, 'Không tìm thấy kỳ báo cáo.'],
   USER_NOT_FOUND: [404, 'Không tìm thấy tài khoản.'],
   OUTLINE_NOT_READY: [422, 'Nhiệm vụ chưa mở triển khai.'],
-  BAD_EXECUTION_STATUS: [422, 'Trạng thái triển khai không cho phép thao tác này.'],
+  BAD_EXECUTION_STATUS: [
+    422,
+    'Trạng thái triển khai không cho phép thao tác này (cần Đang thực hiện).',
+  ],
   BAD_CONTRACT_STATUS: [422, 'Trạng thái hợp đồng không cho phép thao tác này.'],
   BAD_STATUS: [422, 'Trạng thái hồ sơ không cho phép thao tác này.'],
   CONTRACT_NOT_DRAFT: [422, 'Chỉ sửa phân bổ kinh phí khi hợp đồng còn dự thảo.'],
-  BUDGET_LINES_INCOMPLETE: [422, 'Cần đủ 10 mục chi.'],
-  BUDGET_SUM_MISMATCH: [422, 'Tổng 10 mục chi phải bằng kinh phí đã duyệt.'],
-  MUC_09_OVER_5_PERCENT: [422, 'Mục quản lý chung không được quá 5% tổng kinh phí.'],
-  INVALID_BUDGET_CODE: [422, 'Mã mục chi không hợp lệ.'],
+  BUDGET_LINES_INCOMPLETE: [422, 'Cần đủ các khoản chi theo danh mục.'],
+  BUDGET_SUM_MISMATCH: [422, 'Tổng các khoản chi phải bằng kinh phí đã duyệt.'],
+  FUNDING_SUM_MISMATCH: [422, 'Tổng nguồn kinh phí phải bằng tổng kinh phí hợp đồng.'],
+  MUC_09_OVER_5_PERCENT: [
+    422,
+    'Khoản quản lý chung (mục 13) không được quá 5% tổng kinh phí.',
+  ],
+  LINES_REQUIRED: [422, 'Cần ít nhất một dòng khoản chi tạm ứng.'],
+  INVALID_BUDGET_CODE: [422, 'Mã khoản chi không hợp lệ.'],
   CNNV_NOT_CONFIRMED: [422, 'CNNV chưa xác nhận nội dung hợp đồng.'],
   REASON_REQUIRED: [422, 'Cần nhập lý do.'],
   ISSUE_NO_REQUIRED: [422, 'Cần số văn bản phát hành.'],
@@ -23,7 +31,7 @@ const MAP: Record<string, [number, string]> = {
   INVALID_AMOUNT: [422, 'Số tiền không hợp lệ.'],
   INVALID_KIND: [422, 'Loại hồ sơ không hợp lệ.'],
   FORM_INCOMPLETE: [422, 'Thiếu thông tin bắt buộc.'],
-  FIELDS_REQUIRED: [422, 'Cần ít nhất một điều khoản được phép sửa.'],
+  FIELDS_REQUIRED: [422, 'Cần nhập nội dung dự thảo hợp đồng.'],
   FILE_REQUIRED: [422, 'Cần file đính kèm.'],
   FILE_TOO_LARGE: [422, 'File vượt dung lượng cho phép.'],
   INVALID_FILES: [422, 'Danh sách file không hợp lệ.'],
@@ -33,6 +41,11 @@ const MAP: Record<string, [number, string]> = {
   INVALID_METHOD: [422, 'Cách mua chỉ nhận mua trực tiếp hoặc đấu thầu.'],
   REPORT_LOCKED: [422, 'Báo cáo đã nộp, không sửa được.'],
   NEXT_PLAN_REQUIRED: [422, 'Kế hoạch tiếp theo là bắt buộc.'],
+  CONTENT_ROWS_INCOMPLETE: [
+    422,
+    'Phần II: mỗi nội dung nghiên cứu cần điền Tiến độ thực hiện và Nội dung đã thực hiện.',
+  ],
+  PRODUCT_ROWS_INCOMPLETE: [422, 'Phần II: mỗi sản phẩm theo thuyết minh cần điền Sản phẩm đã đạt.'],
   ADJUSTMENT_OPEN: [422, 'Đang có phiếu điều chỉnh chưa kết thúc.'],
   LEAD_CONFIRM_REQUIRED: [422, 'Gia hạn từ lần 2 cần trưởng hoặc phó phòng KH xác nhận.'],
   INVALID_DATE: [422, 'Ngày không hợp lệ.'],
@@ -65,7 +78,15 @@ export function mapModule56Error(response: HttpContext['response'], err: unknown
   const code = (err as Error)?.message || ''
   const hit = MAP[code]
   if (!hit) return false
-  const [status, message] = hit
+  const [status, baseMessage] = hit
+  let message = baseMessage
+  // BAD_EXECUTION_STATUS: kèm trạng thái hiện tại nếu có
+  if (code === 'BAD_EXECUTION_STATUS') {
+    const cur = (err as Error & { current?: string | null })?.current
+    message = cur
+      ? `${baseMessage} Hiện tại: ${cur}.`
+      : `${baseMessage} Hiện tại: chưa mở triển khai.`
+  }
   const body = { success: false, message }
   if (status === 403) response.forbidden(body)
   else if (status === 404) response.notFound(body)

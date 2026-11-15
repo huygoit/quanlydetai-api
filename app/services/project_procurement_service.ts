@@ -1,5 +1,7 @@
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
+import ProjectContract from '#models/project_contract'
+import ProjectOutline from '#models/project_outline'
 import ProjectProcurement from '#models/project_procurement'
 import type { ProcurementItem } from '#models/project_procurement'
 import ProjectAsset from '#models/project_asset'
@@ -65,11 +67,90 @@ export default class ProjectProcurementService {
     return rows.map((r) => this.serialize(r))
   }
 
+  /** Inbox CSVC — danh sách yêu cầu mua sắm chờ xử lý (toàn hệ thống) */
+  static async listInboxCsvc(userId: number, statusFilter?: string) {
+    await assertPerm(userId, 'project.procurement_handle')
+    const q = ProjectProcurement.query().orderBy('id', 'desc')
+    const st = String(statusFilter || '').trim()
+    if (st) q.where('status', st)
+    else q.where('status', 'MS_CHO_CSVC')
+    const rows = await q.limit(200)
+    const outlineIds = [...new Set(rows.map((r) => r.projectOutlineId))]
+    const outlines = outlineIds.length
+      ? await ProjectOutline.query().whereIn('id', outlineIds)
+      : []
+    const outlineMap = new Map(outlines.map((o) => [o.id, o]))
+    const contractIds = [
+      ...new Set(
+        outlines
+          .map((o) => Number(o.activeContractId || 0))
+          .filter((id) => id > 0)
+      ),
+    ]
+    const contracts = contractIds.length
+      ? await ProjectContract.query().whereIn('id', contractIds)
+      : []
+    const contractMap = new Map(contracts.map((c) => [c.id, c]))
+
+    return rows.map((r) => {
+      const o = outlineMap.get(r.projectOutlineId)
+      const cid = Number(o?.activeContractId || 0)
+      const hd = cid ? contractMap.get(cid) : null
+      return {
+        ...this.serialize(r),
+        outlineCode: o?.code || null,
+        outlineTitle: o?.title || null,
+        contractId: cid || null,
+        contractNo: hd?.contractNo || null,
+        redirectTo: this.linkCsvc(r.id),
+      }
+    })
+  }
+
+  static async show(id: number, userId: number) {
+    const row = await ProjectProcurement.find(id)
+    if (!row) throw new Error('NOT_FOUND')
+    const outline = await loadOutline(row.projectOutlineId)
+    await this.assertSee(userId, outline)
+    const cid = Number(outline.activeContractId || 0)
+    const hd = cid ? await ProjectContract.find(cid) : null
+    const isCsvc = await hasPerm(userId, 'project.procurement_handle')
+    return {
+      ...this.serialize(row),
+      outlineCode: outline.code,
+      outlineTitle: outline.title,
+      contractId: cid || null,
+      contractNo: hd?.contractNo || null,
+      redirectTo: isCsvc
+        ? this.linkCsvc(row.id)
+        : this.linkHopDongMua(outline, row.id),
+    }
+  }
+
+  /** Menu CSVC — mở danh sách + highlight phiếu */
+  private static linkCsvc(procurementId: number) {
+    return `/projects/procurements?id=${procurementId}`
+  }
+
+  /** Hub HĐ tab mua sắm (PKH / CNNV / TC) */
+  private static linkHopDongMua(
+    outline: { activeContractId?: number | null; id?: number },
+    procurementId?: number
+  ) {
+    const cid = Number(outline.activeContractId || 0)
+    const q = procurementId ? `&procurementId=${procurementId}` : ''
+    if (cid > 0) return `/projects/contracts/${cid}?tab=muasam${q}`
+    return `/projects/execution/${outline.id}?tab=mua${q}`
+  }
+
   static async save(userId: number, body: Record<string, unknown>, submit: boolean) {
     const outline = await loadOutline(Number(body.projectOutlineId || body.project_outline_id))
     assertReady(outline)
     assertExecution(outline, ['DANG_THUC_HIEN'])
-    await assertCnnv(userId, outline)
+    // CNNV tạo đề nghị; PKH (contract_manage) tạo hộ được
+    const isOwner = await isCnnv(userId, outline)
+    const isPkh = await hasPerm(userId, 'project.contract_manage')
+    if (!isOwner && !isPkh) throw new Error('FORBIDDEN')
 
     const id = Number(body.id || 0)
     let row = id ? await ProjectProcurement.find(id) : null
@@ -91,8 +172,8 @@ export default class ProjectProcurementService {
     const snap = await budgetSnapshot(outline.id)
     const remaining = snap.find((l) => l.code === lineCode)?.remaining ?? 0
     const overBudget = total > remaining
+    // Form không còn bắt nhập giải trình vượt dự toán
     const note = String(body.overBudgetNote || body.over_budget_note || '').trim()
-    if (submit && overBudget && !note) throw new Error('OVER_BUDGET_NOTE_REQUIRED')
 
     if (!row) {
       row = new ProjectProcurement()
@@ -119,7 +200,7 @@ export default class ProjectProcurementService {
         type: 'PROJECT_UPDATE',
         title: 'Đề nghị mua sắm',
         message: `${outline.code}: ${total}${overBudget ? ' (vượt dự toán)' : ''}`,
-        link: `/projects/procurements/${row.id}`,
+        link: this.linkHopDongMua(outline, row.id),
       })
     }
     return this.serialize(row)
@@ -138,7 +219,7 @@ export default class ProjectProcurementService {
         type: 'PROJECT_UPDATE',
         title: 'Hồ sơ mua sắm chờ CSVC',
         message: outline.code,
-        link: `/projects/procurements/${row.id}`,
+        link: this.linkCsvc(row.id),
       })
     } else if (action === 'return' && row.status === 'MS_CHO_PKH') {
       if (!reason.trim()) throw new Error('REASON_REQUIRED')
@@ -188,7 +269,7 @@ export default class ProjectProcurementService {
         type: 'PROJECT_UPDATE',
         title: 'CSVC từ chối mua sắm',
         message: `${outline.code}: ${reason.trim()}`,
-        link: `/projects/procurements/${row.id}`,
+        link: this.linkHopDongMua(outline, row.id),
       })
     } else {
       if (!reason.trim()) throw new Error('REASON_REQUIRED')
@@ -200,7 +281,7 @@ export default class ProjectProcurementService {
         type: 'PROJECT_UPDATE',
         title: 'Đấu thầu thất bại',
         message: `${outline.code}: ${reason.trim()}`,
-        link: `/projects/procurements/${row.id}`,
+        link: this.linkHopDongMua(outline, row.id),
       })
       await this.tellOwner(outline.ownerId, 'Đấu thầu thất bại', reason, row.id)
     }
@@ -219,7 +300,7 @@ export default class ProjectProcurementService {
       type: 'PROJECT_UPDATE',
       title: 'Mua sắm chờ thanh toán',
       message: outline.code,
-      link: `/projects/procurements/${row.id}`,
+      link: this.linkHopDongMua(outline, row.id),
     })
     return this.serialize(row)
   }
@@ -246,7 +327,8 @@ export default class ProjectProcurementService {
       row.voucherDate = date
       await row.save()
       await writeLedger(outline.id, row.lineCode, 'SPENT', Number(row.totalAmount), 'MS', row.id, userId, null, trx)
-      if (row.lineCode === 'MUC_03') {
+      // Mua sắm / thuê tài sản → ghi tài sản nhiệm vụ
+      if (row.lineCode === 'MUC_04') {
         const existed = await ProjectAsset.query({ client: trx }).where('procurement_id', row.id).first()
         if (!existed) {
           await ProjectAsset.createMany(
@@ -288,11 +370,16 @@ export default class ProjectProcurementService {
 
   private static async tellOwner(userId: number | null, title: string, message: string, id: number) {
     if (!userId) return
+    const row = await ProjectProcurement.find(id)
+    if (!row) return
+    const outline = await loadOutline(row.projectOutlineId).catch(() => null)
     await NotificationService.push(userId, {
       type: 'PROJECT_UPDATE',
       title,
       message,
-      link: `/projects/procurements/${id}`,
+      link: outline
+        ? this.linkHopDongMua(outline, row.id)
+        : `/projects/execution/${row.projectOutlineId}?tab=mua`,
     })
   }
 

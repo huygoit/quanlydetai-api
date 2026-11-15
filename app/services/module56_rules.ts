@@ -1,25 +1,39 @@
-import { BUDGET_LINE_CODES } from '#constants/module56'
+import { BUDGET_LINE_CODES, BUDGET_LINE_QUAN_LY } from '#constants/module56'
 import { BM06_TEMPLATE_VARIABLE_KEYS } from '#constants/bm06_template_variables'
+import {
+  formatBangNguonKinhPhi,
+  formatBangTienDo,
+  normalizeFundingRows,
+  normalizeMilestoneRows,
+} from '#constants/contract_draft_form'
+import { formatVndPlain, numberToVietnameseWords } from '#utils/vietnamese_number_words'
 
 /**
  * Trường lấy lại từ thuyết minh mỗi lần sinh hợp đồng.
  * Các key còn lại giữ giá trị Phòng KH đã sửa.
  */
+/**
+ * Key lấy lại từ thuyết minh mỗi lần sinh.
+ * Thời gian / tiến độ / kinh phí do form dự thảo giữ (không ghi đè khi regen).
+ */
 export const BM06_OUTLINE_KEYS = [
   'loai_nhiem_vu',
   'ten_nhiem_vu',
-  'so_thang_thuc_hien',
-  'thang_bat_dau',
-  'nam_bat_dau',
-  'thang_ket_thuc',
-  'nam_ket_thuc',
+  'ma_so_nhiem_vu',
+  'muc_tieu',
+  'noi_dung_thuc_hien',
+  'san_pham_yeu_cau',
+  'chu_nhiem',
+  'chuc_vu_chu_nhiem',
+  'don_vi_chu_nhiem',
+  'email_chu_nhiem',
+  'dien_thoai_chu_nhiem',
+  'to_chuc_ben_b',
   'ten_ben_b',
   'dai_dien_ben_b',
+  'chuc_vu_ben_b',
+  'chuc_vu_dai_dien_ben_b',
   'email_ben_b',
-  'tong_kinh_phi',
-  'tong_kinh_phi_bang_chu',
-  'kinh_phi_nsnn',
-  'kinh_phi_nsnn_bang_chu',
 ] as const
 
 const outlineKeySet = new Set<string>(BM06_OUTLINE_KEYS)
@@ -29,7 +43,7 @@ export function isBm06EditableKey(key: string) {
   return bm06KeySet.has(key) && !outlineKeySet.has(key)
 }
 
-/** Giữ điều khoản Phòng KH đã nhập khi sinh lại từ thuyết minh. */
+/** Giữ phần form dự thảo / điều khoản đã nhập khi sinh lại từ thuyết minh. */
 export function mergeBm06Edits(
   fresh: Record<string, string>,
   previous: Record<string, string> | null | undefined
@@ -40,6 +54,34 @@ export function mergeBm06Edits(
     if (!isBm06EditableKey(key)) continue
     const old = previous[key]
     if (old != null && String(old).trim() !== '') next[key] = String(old)
+  }
+  // Giữ JSON nội bộ tiến độ / nguồn kinh phí
+  for (const key of ['_tien_do_json', '_nguon_kinh_phi_json']) {
+    const old = previous[key]
+    if (old != null && String(old).trim() !== '') next[key] = String(old)
+  }
+  // Đồng bộ lại chữ bảng từ JSON đã giữ (nếu có)
+  if (next._tien_do_json || next._nguon_kinh_phi_json) {
+    try {
+      const milestones = normalizeMilestoneRows(
+        next._tien_do_json ? JSON.parse(next._tien_do_json) : []
+      )
+      const funding = normalizeFundingRows(
+        next._nguon_kinh_phi_json ? JSON.parse(next._nguon_kinh_phi_json) : []
+      )
+      if (milestones.length) next.bang_tien_do = formatBangTienDo(milestones)
+      if (funding.some((f) => f.amount > 0) || next._nguon_kinh_phi_json) {
+        next.bang_nguon_kinh_phi = formatBangNguonKinhPhi(funding, formatVndPlain)
+        const tong = funding.reduce((s, r) => s + r.amount, 0)
+        if (tong > 0) {
+          next.tong_kinh_phi = formatVndPlain(tong)
+          next.kinh_phi_bang_chu = numberToVietnameseWords(tong)
+          next.tong_kinh_phi_bang_chu = next.kinh_phi_bang_chu
+        }
+      }
+    } catch {
+      // giữ nguyên nếu JSON lỗi
+    }
   }
   return next
 }
@@ -65,8 +107,8 @@ export function assertBudgetAmounts(amounts: Map<string, number>, approvedTotal:
   let sum = 0
   for (const code of BUDGET_LINE_CODES) sum += amounts.get(code) || 0
   if (sum !== approvedTotal) throw new Error('BUDGET_SUM_MISMATCH')
-  const muc09 = amounts.get('MUC_09') || 0
-  if (muc09 > Math.round(sum * 0.05)) throw new Error('MUC_09_OVER_5_PERCENT')
+  const ql = amounts.get(BUDGET_LINE_QUAN_LY) || 0
+  if (ql > Math.round(sum * 0.05)) throw new Error('MUC_09_OVER_5_PERCENT')
 }
 
 /** Có mặt >= 2/3 số thành viên đã gán. */

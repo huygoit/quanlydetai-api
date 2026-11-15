@@ -78,15 +78,6 @@ export default class ProjectContract extends BaseModel {
   declare note: string | null
 
   @column()
-  declare externalContractNo: string | null
-
-  @column()
-  declare externalAgency: string | null
-
-  @column()
-  declare externalFileUrl: string | null
-
-  @column()
   declare returnReason: string | null
 
   @column.dateTime()

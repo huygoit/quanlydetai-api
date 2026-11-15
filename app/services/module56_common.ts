@@ -72,8 +72,12 @@ export function assertReady(outline: ProjectOutline) {
 }
 
 export function assertExecution(outline: ProjectOutline, allowed: ExecutionStatus[]) {
-  if (!outline.executionStatus || !allowed.includes(outline.executionStatus as ExecutionStatus)) {
-    throw new Error('BAD_EXECUTION_STATUS')
+  const cur = outline.executionStatus
+  if (!cur || !allowed.includes(cur as ExecutionStatus)) {
+    // Gắn trạng thái hiện tại vào message để FE/log dễ đối chiếu
+    const err = new Error('BAD_EXECUTION_STATUS') as Error & { current?: string | null }
+    err.current = cur
+    throw err
   }
 }
 
@@ -86,7 +90,7 @@ export async function assertPerm(userId: number, code: string) {
 }
 
 export async function isCnnv(userId: number, outline: ProjectOutline) {
-  return outline.ownerId === userId
+  return Number(outline.ownerId) === Number(userId)
 }
 
 export async function assertCnnv(userId: number, outline: ProjectOutline) {

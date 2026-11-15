@@ -215,7 +215,8 @@ export default class ProjectOutlineFinalApprovalService {
       canApprove:
         outline.status === STATUS_CHO_BGH &&
         (outline.revisionGateStatus === 'CHO_BGH' || !outline.revisionGateStatus),
-      canPublish: outline.status === STATUS_CHO_HC,
+      /** Hồ sơ tồn đọng flow cũ (đã ký BGH, chưa mở M5) */
+      canPublish: outline.status === STATUS_CHO_HC && !!outline.bghSignedAt,
     }
   }
 
@@ -225,8 +226,13 @@ export default class ProjectOutlineFinalApprovalService {
     payload: { approvedBudget: number; note?: string | null }
   ) {
     if (!(await this.canBgh(actorId))) throw new Error('Không có quyền BGH phê duyệt.')
-    if (outline.status === STATUS_CHO_HC && outline.bghSignedAt) {
+    if (outline.status === STATUS_APPROVED && outline.bghSignedAt && outline.module5Opened) {
       return { outline, idempotent: true }
+    }
+    // Tồn đọng flow cũ: đã ký BGH nhưng còn chờ HC → mở Module 5 luôn
+    if (outline.status === STATUS_CHO_HC && outline.bghSignedAt) {
+      await this.openModule5AfterBgh(outline, actorId)
+      return { outline, idempotent: false }
     }
     if (outline.status !== STATUS_CHO_BGH) {
       throw new Error('Hồ sơ không ở trạng thái chờ BGH phê duyệt.')
@@ -244,7 +250,6 @@ export default class ProjectOutlineFinalApprovalService {
     outline.bghSignedAt = DateTime.now()
     outline.bghSignedBy = actorId
     outline.revisionGateStatus = null
-    outline.status = STATUS_CHO_HC
     await outline.save()
 
     await ProjectOutlineService.writeAudit(
@@ -252,26 +257,11 @@ export default class ProjectOutlineFinalApprovalService {
       actorId,
       'BGH_SIGN_APPROVE',
       from,
-      STATUS_CHO_HC,
+      STATUS_APPROVED,
       { approvedBudget: budget, note: outline.bghDecisionNote }
     )
 
-    await NotificationService.pushToPermission('project.contract_publish', {
-      type: 'PROJECT_UPDATE',
-      title: 'QĐ giao thực hiện chờ TC-HC phát hành',
-      message: `${outline.code}: KP duyệt ${budget.toLocaleString('vi-VN')} đ`,
-      link: `/projects/outline-approvals/${outline.id}`,
-    })
-
-    if (outline.ownerId) {
-      await NotificationService.push(outline.ownerId, {
-        type: 'PROJECT_UPDATE',
-        title: 'BGH đã ký phê duyệt — chờ phát hành QĐ',
-        message: `${outline.code}: kinh phí ${budget.toLocaleString('vi-VN')} đ`,
-        link: `/projects/outlines/form/${outline.id}`,
-      })
-    }
-
+    await this.openModule5AfterBgh(outline, actorId)
     return { outline, idempotent: false }
   }
 
@@ -322,26 +312,46 @@ export default class ProjectOutlineFinalApprovalService {
     return { outline, idempotent: false }
   }
 
+  /**
+   * API cũ — chỉ xử lý hồ sơ tồn đọng còn CHO_HC_PHAT_HANH_QD.
+   * Flow mới: BGH duyệt đã mở Module 5 luôn.
+   */
   static async hcPublish(
     outline: ProjectOutline,
     actorId: number,
     payload?: { decisionFileUrl?: string | null }
   ) {
-    if (!(await this.canHc(actorId))) throw new Error('Không có quyền TC-HC phát hành QĐ.')
+    const duoc =
+      (await this.canHc(actorId)) || (await this.canBgh(actorId))
+    if (!duoc) throw new Error('Không có quyền mở Module 5 cho hồ sơ tồn đọng.')
     if (outline.status === STATUS_APPROVED && outline.module5Opened) {
       return { outline, idempotent: true }
     }
     if (outline.status !== STATUS_CHO_HC) {
-      throw new Error('Hồ sơ không chờ TC-HC phát hành QĐ giao thực hiện.')
+      throw new Error('Hồ sơ không còn ở trạng thái chờ phát hành (flow cũ).')
     }
     if (!outline.bghSignedAt || outline.approvedBudget == null) {
       throw new Error('Thiếu chữ ký BGH hoặc kinh phí được duyệt.')
     }
+    if (payload?.decisionFileUrl?.trim()) {
+      outline.assignmentDecisionUrl = payload.decisionFileUrl.trim()
+      await outline.save()
+    }
+    await this.openModule5AfterBgh(outline, actorId)
+    return { outline, idempotent: false }
+  }
+
+  /** BGH duyệt xong → TM_DUOC_DUYET, mở Module 5, sinh dự thảo HĐ. */
+  private static async openModule5AfterBgh(outline: ProjectOutline, actorId: number) {
+    if (!outline.bghSignedAt || outline.approvedBudget == null) {
+      throw new Error('Thiếu chữ ký BGH hoặc kinh phí được duyệt.')
+    }
+    if (outline.status === STATUS_APPROVED && outline.module5Opened) {
+      return
+    }
 
     const from = outline.status
     const budget = Number(outline.approvedBudget)
-    outline.assignmentDecisionUrl =
-      payload?.decisionFileUrl?.trim() || outline.assignmentDecisionUrl || null
     outline.hcPublishedAt = DateTime.now()
     outline.hcPublishedBy = actorId
     outline.status = STATUS_APPROVED
@@ -353,7 +363,7 @@ export default class ProjectOutlineFinalApprovalService {
     await ProjectOutlineService.writeAudit(
       outline.id,
       actorId,
-      'HC_PUBLISH_ASSIGNMENT_DECISION',
+      'OPEN_MODULE5_AFTER_BGH',
       from,
       STATUS_APPROVED,
       {
@@ -363,9 +373,18 @@ export default class ProjectOutlineFinalApprovalService {
       }
     )
 
+    const { buildOutlineApprovedEmail } = await import('#utils/outline_approval_email')
+    const mail = buildOutlineApprovedEmail({
+      code: outline.code,
+      title: outline.title,
+      ownerName: outline.ownerName,
+      approvedBudget: budget,
+      bghNote: outline.bghDecisionNote,
+      outlineId: outline.id,
+    })
     const module5Link = `/projects/execution/${outline.id}`
     if (outline.ownerId) {
-      const msg = `${outline.code}: đã phê duyệt. Kinh phí được duyệt ${budget.toLocaleString('vi-VN')} đ. Mở Module 5: ${module5Link}`
+      const msg = `${outline.code}: đã phê duyệt. Kinh phí được duyệt ${budget.toLocaleString('vi-VN')} đ.`
       await NotificationService.push(outline.ownerId, {
         type: 'PROJECT_UPDATE',
         title: 'Thuyết minh được phê duyệt — mở triển khai',
@@ -374,10 +393,11 @@ export default class ProjectOutlineFinalApprovalService {
       })
       await EmailLogService.logStubToUser(
         outline.ownerId,
-        `[KH&CN] Phê duyệt thuyết minh ${outline.code}`,
-        `Kết quả: Được duyệt (TM_DUOC_DUYET)\nKinh phí được duyệt: ${budget.toLocaleString('vi-VN')} đ\nGhi chú BGH: ${outline.bghDecisionNote || '—'}\nLink Module 5: ${module5Link}`,
+        mail.subject,
+        mail.text,
         'project_outline',
-        outline.id
+        outline.id,
+        mail.html
       )
     }
 
@@ -394,7 +414,5 @@ export default class ProjectOutlineFinalApprovalService {
     } catch (e) {
       console.error('[US-04 BGH] Sinh dự thảo hợp đồng thất bại:', (e as Error)?.message || e)
     }
-
-    return { outline, idempotent: false }
   }
 }

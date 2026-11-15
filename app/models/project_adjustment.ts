@@ -6,12 +6,22 @@ import type { OutlineMilestone } from '#models/project_outline'
 
 export type AdjustmentBudgetLine = { code: string; amount: number }
 
+export type AdjustmentProgressUpdate = {
+  periodId: number
+  progress?: string | null
+  done?: string | null
+  title?: string | null
+  dueOn?: string | null
+}
+
 export type AdjustmentChanges = {
   endDate?: string | null
   principalUserId?: number | null
   content?: string | null
   milestones?: OutlineMilestone[] | null
   budgetLines?: AdjustmentBudgetLine[] | null
+  /** Điều chỉnh tiến độ / nội dung kỳ đã báo cáo */
+  progressUpdates?: AdjustmentProgressUpdate[] | null
 }
 
 export default class ProjectAdjustment extends BaseModel {
@@ -29,8 +39,9 @@ export default class ProjectAdjustment extends BaseModel {
   @column()
   declare reason: string
 
-  @column()
-  declare evidenceUrl: string | null
+  /** File minh chứng upload (không nhập URL tay) */
+  @column(jsonAttr<{ fileName: string; fileUrl: string; fileSize: number }[]>([]))
+  declare evidenceAttachments: { fileName: string; fileUrl: string; fileSize: number }[]
 
   @column(jsonAttr<AdjustmentChanges>({}))
   declare changes: AdjustmentChanges

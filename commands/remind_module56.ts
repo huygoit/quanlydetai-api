@@ -5,7 +5,8 @@ import ProjectFinalService from '#services/project_final_service'
 
 /**
  * Nhắc báo cáo tiến độ (30/14/7/3 ngày) và giải trình BM.13 (ngày 10, 13).
- * Chạy định kỳ: node ace remind:module56
+ * Duyệt toàn bộ nhiệm vụ đang thực hiện + kỳ/mốc công việc.
+ * Chạy 1 lần/ngày: node ace remind:module56
  */
 export default class RemindModule56 extends BaseCommand {
   static commandName = 'remind:module56'

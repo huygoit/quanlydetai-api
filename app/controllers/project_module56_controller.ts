@@ -1,4 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import ProjectOutline from '#models/project_outline'
+import ProjectOutlineService from '#services/project_outline_service'
 import ProjectBudgetService from '#services/project_budget_service'
 import ProjectPaymentService from '#services/project_payment_service'
 import ProjectProcurementService from '#services/project_procurement_service'
@@ -22,6 +24,24 @@ export default class ProjectModule56Controller {
     }
   }
 
+  /**
+   * Nhiệm vụ CNNV đang / sẽ triển khai — theo owner_id, không phụ thuộc quyền soạn TM.
+   * Dùng menu Tài chính / Báo cáo tiến độ.
+   */
+  async myOwnedTasks({ auth, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, async () => {
+      const rows = await ProjectOutline.query()
+        .where('owner_id', user.id)
+        .where((q) => {
+          q.where('status', 'SAN_SANG_THUC_HIEN').orWhereNotNull('execution_status')
+        })
+        .orderBy('updated_at', 'desc')
+        .limit(200)
+      return rows.map((o) => ProjectOutlineService.serialize(o))
+    })
+  }
+
   async budgetShow({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
     return this.run(response, () => ProjectBudgetService.snapshotFor(Number(params.outlineId), user.id))
@@ -42,10 +62,20 @@ export default class ProjectModule56Controller {
     )
   }
 
+  async paymentShow({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () => ProjectPaymentService.show(Number(params.id), user.id))
+  }
+
   async paymentSave({ auth, request, response }: HttpContext) {
     const user = auth.use('api').user!
     const submit = request.input('submit') === true || request.input('submit') === 'true'
     return this.run(response, () => ProjectPaymentService.save(user.id, request.body(), submit))
+  }
+
+  async paymentDelete({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () => ProjectPaymentService.remove(Number(params.id), user.id), 'Đã xóa')
   }
 
   async paymentPkh({ auth, params, request, response }: HttpContext) {
@@ -76,8 +106,25 @@ export default class ProjectModule56Controller {
 
   async procurements({ auth, request, response }: HttpContext) {
     const user = auth.use('api').user!
+    const outlineId = Number(request.input('outlineId') || 0)
+    // Không truyền outlineId → inbox CSVC (toàn hệ thống)
+    if (!outlineId) {
+      return this.run(response, () =>
+        ProjectProcurementService.listInboxCsvc(
+          user.id,
+          String(request.input('status', '') || '')
+        )
+      )
+    }
     return this.run(response, () =>
-      ProjectProcurementService.list(Number(request.input('outlineId')), user.id)
+      ProjectProcurementService.list(outlineId, user.id)
+    )
+  }
+
+  async procurementShow({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () =>
+      ProjectProcurementService.show(Number(params.id), user.id)
     )
   }
 
@@ -164,10 +211,44 @@ export default class ProjectModule56Controller {
     )
   }
 
+  async progressDelete({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(
+      response,
+      () => ProjectProgressService.remove(Number(params.id), user.id),
+      'Đã xóa báo cáo'
+    )
+  }
+
   async adjustments({ auth, request, response }: HttpContext) {
     const user = auth.use('api').user!
     return this.run(response, () =>
       ProjectAdjustmentService.list(Number(request.input('outlineId')), user.id)
+    )
+  }
+
+  async adjustmentShow({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () =>
+      ProjectAdjustmentService.show(Number(params.id), user.id)
+    )
+  }
+
+  async adjustmentContext({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () =>
+      ProjectAdjustmentService.context(Number(request.input('outlineId')), user.id)
+    )
+  }
+
+  async adjustmentPrincipals({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () =>
+      ProjectAdjustmentService.searchPrincipals(
+        Number(request.input('outlineId')),
+        user.id,
+        String(request.input('keyword', ''))
+      )
     )
   }
 

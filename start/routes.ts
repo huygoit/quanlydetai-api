@@ -33,6 +33,7 @@ import ProjectOutlineDefensesController from '#controllers/project_outline_defen
 import ProjectOutlineBudgetsController from '#controllers/project_outline_budgets_controller'
 import ProjectOutlineApprovalsController from '#controllers/project_outline_approvals_controller'
 import AdminContractTemplatesController from '#controllers/admin/contract_templates_controller'
+import AdminSchoolOrgProfilesController from '#controllers/admin/school_org_profiles_controller'
 import ProjectContractsController from '#controllers/project_contracts_controller'
 import ProjectModule56Controller from '#controllers/project_module56_controller'
 import CallForProposalsController from '#controllers/call_for_proposals_controller'
@@ -429,6 +430,16 @@ router
       .use(middleware.permission('contract_template.delete'))
   })
   .prefix('/api/admin/contract-templates')
+  // Bắt buộc auth trước permission — thiếu thì user=null → 401 → FE đá session
+  .use([middleware.auth()])
+
+// --- Admin: profile trường / Bên A (BM.06)
+router
+  .group(() => {
+    router.get('/', [AdminSchoolOrgProfilesController, 'show'])
+    router.put('/', [AdminSchoolOrgProfilesController, 'update'])
+  })
+  .prefix('/api/admin/school-profile')
   .use([middleware.auth()])
 
 // --- Catalog loại quy trình đề tài (đọc, chỉ cần đăng nhập)
@@ -985,8 +996,7 @@ router
     router.post('/by-outline/:outlineId/generate', [ProjectContractsController, 'generate'])
     router.get('/:id/download', [ProjectContractsController, 'download'])
     router.get('/:id/flow', [ProjectContractsController, 'flow'])
-    router.put('/:id/external', [ProjectContractsController, 'saveExternal'])
-    router.put('/:id/clauses', [ProjectContractsController, 'updateClauses'])
+    router.put('/:id/draft-form', [ProjectContractsController, 'saveDraftForm'])
     router.put('/:id/budget-lines', [ProjectModule56Controller, 'budgetSave'])
     router.post('/:id/submit-cnnv', [ProjectContractsController, 'submitCnnv'])
     router.post('/:id/cnnv-confirm', [ProjectContractsController, 'cnnvConfirm'])
@@ -1004,12 +1014,16 @@ router
 
 router
   .group(() => {
+    router.get('/my-owned-tasks', [ProjectModule56Controller, 'myOwnedTasks'])
     router.get('/budget/:outlineId', [ProjectModule56Controller, 'budgetShow'])
     router.get('/payments', [ProjectModule56Controller, 'payments'])
     router.post('/payments', [ProjectModule56Controller, 'paymentSave'])
+    router.get('/payments/:id', [ProjectModule56Controller, 'paymentShow'])
+    router.delete('/payments/:id', [ProjectModule56Controller, 'paymentDelete'])
     router.post('/payments/:id/pkh', [ProjectModule56Controller, 'paymentPkh'])
     router.post('/payments/:id/tc', [ProjectModule56Controller, 'paymentTc'])
     router.get('/procurements', [ProjectModule56Controller, 'procurements'])
+    router.get('/procurements/:id', [ProjectModule56Controller, 'procurementShow'])
     router.post('/procurements', [ProjectModule56Controller, 'procurementSave'])
     router.post('/procurements/:id/pkh', [ProjectModule56Controller, 'procurementPkh'])
     router.post('/procurements/:id/csvc', [ProjectModule56Controller, 'procurementCsvc'])
@@ -1017,8 +1031,12 @@ router
     router.post('/procurements/:id/tc', [ProjectModule56Controller, 'procurementTc'])
     router.get('/progress', [ProjectModule56Controller, 'progress'])
     router.post('/progress/periods/:periodId', [ProjectModule56Controller, 'progressSave'])
+    router.delete('/progress/:id', [ProjectModule56Controller, 'progressDelete'])
     router.post('/progress/:id/pkh', [ProjectModule56Controller, 'progressPkh'])
     router.get('/adjustments', [ProjectModule56Controller, 'adjustments'])
+    router.get('/adjustments/context', [ProjectModule56Controller, 'adjustmentContext'])
+    router.get('/adjustments/principals', [ProjectModule56Controller, 'adjustmentPrincipals'])
+    router.get('/adjustments/:id', [ProjectModule56Controller, 'adjustmentShow'])
     router.post('/adjustments', [ProjectModule56Controller, 'adjustmentSave'])
     router.post('/adjustments/:id/pkh', [ProjectModule56Controller, 'adjustmentPkh'])
     router.post('/adjustments/:id/lead-confirm', [ProjectModule56Controller, 'adjustmentLead'])

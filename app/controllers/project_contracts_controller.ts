@@ -135,21 +135,20 @@ export default class ProjectContractsController {
     }
   }
 
-  async saveExternal({ auth, params, request, response }: HttpContext) {
+  /** Lưu form dự thảo + xuất lại Word từ mẫu Admin + profile trường */
+  async saveDraftForm({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
     try {
-      const data = await ProjectContractFlowService.saveExternal(Number(params.id), user.id, request.body())
-      return response.ok({ success: true, data })
-    } catch (err) {
-      return this.mapError(response, err)
-    }
-  }
-
-  async updateClauses({ auth, params, request, response }: HttpContext) {
-    const user = auth.use('api').user!
-    try {
-      const data = await ProjectContractFlowService.updateClauses(Number(params.id), user.id, request.body())
-      return response.ok({ success: true, data })
+      const data = await ProjectContractFlowService.saveDraftForm(
+        Number(params.id),
+        user.id,
+        request.body()
+      )
+      return response.ok({
+        success: true,
+        message: 'Đã lưu dự thảo và cập nhật file Word.',
+        data,
+      })
     } catch (err) {
       return this.mapError(response, err)
     }
