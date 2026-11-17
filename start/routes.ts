@@ -577,6 +577,7 @@ router
 router
   .group(() => {
     router.get('/author-profiles', [ProfileController, 'authorProfilesLookup'])
+    router.get('/author-profiles/:id', [ProfileController, 'authorProfilePrincipal'])
     router.get('/author-students', [ProfileController, 'authorStudentsLookup'])
   })
   .prefix('/api/lookup')
@@ -924,6 +925,7 @@ router
     router.get('/:id/revision-context', [ProjectOutlinesController, 'revisionContext'])
     router.get('/:id/versions', [ProjectOutlinesController, 'versions'])
     router.get('/:id/revision-diff', [ProjectOutlinesController, 'revisionDiff'])
+    router.get('/:id/export-docx', [ProjectOutlinesController, 'exportDocx'])
     router.post('/:id/submit-revision', [ProjectOutlinesController, 'submitRevision'])
     router.post('/:id/revision-council', [ProjectOutlinesController, 'revisionCouncil'])
     router.post('/:id/revision-pkh', [ProjectOutlinesController, 'revisionPkh'])

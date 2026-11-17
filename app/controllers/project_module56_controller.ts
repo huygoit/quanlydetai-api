@@ -154,7 +154,11 @@ export default class ProjectModule56Controller {
         user.id,
         request.input('action'),
         String(request.input('method', '')),
-        String(request.input('reason', ''))
+        String(request.input('reason', '')),
+        {
+          receivedAt: request.input('receivedAt') || request.input('received_at'),
+          attachments: request.input('attachments'),
+        }
       )
     )
   }

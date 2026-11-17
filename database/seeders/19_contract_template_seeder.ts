@@ -56,6 +56,17 @@ export default class extends BaseSeeder {
     }
 
     await this.seedFile({
+      code: 'BM0202_DEFAULT',
+      name: 'Mẫu thuyết minh nhiệm vụ KHCN (BM-02.02)',
+      description: 'Mẫu chuẩn BM-02.02_Thuyet_minh_co_bien.docx — biến {{...}} theo phụ lục thuyết minh.',
+      templateType: 'THUYET_MINH',
+      formCode: 'BM0202',
+      fileName: 'BM-02.02_Thuyet_minh_co_bien.docx',
+      source: app.makePath('resources/bm0202/BM-02.02_Thuyet_minh_co_bien.docx'),
+      forceUpdate: true,
+    })
+
+    await this.seedFile({
       code: 'BM06_DEFAULT',
       name: 'Mẫu hợp đồng thực hiện nhiệm vụ (BM-02.14 / BM.06)',
       description: 'Mẫu chuẩn BM-02.14_Hop_dong_co_bien.docx — biến {{...}} theo phụ lục hợp đồng.',
@@ -92,7 +103,7 @@ export default class extends BaseSeeder {
     code: string
     name: string
     description: string
-    templateType: 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO' | 'QUYET_DINH'
+    templateType: 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO' | 'QUYET_DINH' | 'THUYET_MINH'
     formCode: string
     fileName: string
     source: string
@@ -145,9 +156,9 @@ export default class extends BaseSeeder {
       existing.version = (existing.version || 1) + 1
       await existing.save()
       // Chỉ 1 mẫu mặc định cho mỗi loại
-      if (input.templateType === 'HOP_DONG') {
+      if (input.templateType === 'HOP_DONG' || input.templateType === 'THUYET_MINH') {
         await ContractTemplate.query()
-          .where('template_type', 'HOP_DONG')
+          .where('template_type', input.templateType)
           .whereNot('id', existing.id)
           .update({ isDefault: false })
       }

@@ -487,6 +487,20 @@ export default class ProposalRegistrationReviewService {
     outline.ownerUnit = don.ownerUnit
     outline.requestedBudget = Number(don.proposedBudget || 0)
     outline.hostUnit = don.ownerUnit
+    if (don.ownerUnit?.trim()) {
+      outline.hostOrganization = {
+        ...(outline.hostOrganization || {
+          name: '',
+          orgCode: null,
+          phone: null,
+          address: null,
+          leaderName: null,
+          experienceHtml: null,
+          teamCapacityHtml: null,
+        }),
+        name: don.ownerUnit.trim(),
+      }
+    }
     outline.startDate = batDau
     outline.endDate = batDau.plus({ months: Number(don.durationMonths || 1) }).minus({ days: 1 })
     await outline.save()

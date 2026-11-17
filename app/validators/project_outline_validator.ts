@@ -15,6 +15,9 @@ const productSchema = vine.object({
 
 const partnerSchema = vine.object({
   name: vine.string().trim().maxLength(255),
+  orgCode: vine.string().trim().maxLength(100).optional().nullable(),
+  phone: vine.string().trim().maxLength(50).optional().nullable(),
+  address: vine.string().trim().maxLength(500).optional().nullable(),
   role: vine.string().trim().maxLength(255).optional().nullable(),
 })
 
@@ -65,21 +68,141 @@ export const updateOutlineDraftValidator = vine.compile(
     startDate: vine.string().trim().optional().nullable(),
     endDate: vine.string().trim().optional().nullable(),
     requestedBudget: vine.number().min(0).optional(),
+    fundingBreakdown: vine
+      .object({
+        schoolFund: vine.number().min(0).optional(),
+        externalFund: vine.number().min(0).optional(),
+        stateBudget: vine.number().min(0).optional(),
+        nonStateBudget: vine.number().min(0).optional(),
+        lumpSumMode: vine.enum(['FULL', 'PARTIAL'] as const).optional().nullable(),
+        lumpSumAmount: vine.number().min(0).optional(),
+        nonLumpSumAmount: vine.number().min(0).optional(),
+        // Tương thích payload cũ
+        externalStateLocal: vine.number().min(0).optional(),
+        externalEnterprise: vine.number().min(0).optional(),
+        externalSponsor: vine.number().min(0).optional(),
+        externalOther: vine.number().min(0).optional(),
+      })
+      .optional()
+      .nullable(),
+    principalInfo: vine
+      .object({
+        profileId: vine.number().positive().optional().nullable(),
+        fullName: vine.string().trim().maxLength(255).optional().nullable(),
+        identityNumber: vine.string().trim().maxLength(50).optional().nullable(),
+        dateOfBirth: vine.string().trim().maxLength(30).optional().nullable(),
+        gender: vine.string().trim().maxLength(20).optional().nullable(),
+        academicTitleDegree: vine.string().trim().maxLength(255).optional().nullable(),
+        professionalTitle: vine.string().trim().maxLength(255).optional().nullable(),
+        position: vine.string().trim().maxLength(255).optional().nullable(),
+        phone: vine.string().trim().maxLength(50).optional().nullable(),
+        email: vine.string().trim().maxLength(255).optional().nullable(),
+        organization: vine.string().trim().maxLength(500).optional().nullable(),
+        workAddress: vine.string().trim().maxLength(500).optional().nullable(),
+      })
+      .optional()
+      .nullable(),
     hostUnit: vine.string().trim().maxLength(255).optional().nullable(),
+    hostOrganization: vine
+      .object({
+        name: vine.string().trim().maxLength(255).optional().nullable(),
+        orgCode: vine.string().trim().maxLength(100).optional().nullable(),
+        phone: vine.string().trim().maxLength(50).optional().nullable(),
+        address: vine.string().trim().maxLength(500).optional().nullable(),
+        leaderName: vine.string().trim().maxLength(255).optional().nullable(),
+        experienceHtml: vine.string().trim().optional().nullable(),
+        teamCapacityHtml: vine.string().trim().optional().nullable(),
+      })
+      .optional()
+      .nullable(),
     partnerUnits: vine.array(partnerSchema).optional(),
-    applicationScope: vine.string().trim().optional().nullable(),
     urgency: vine.string().trim().optional().nullable(),
     detailedObjectives: vine.string().trim().optional().nullable(),
     researchContent: vine.string().trim().optional().nullable(),
     methodology: vine.string().trim().optional().nullable(),
     milestones: vine.array(milestoneSchema).optional(),
     expectedProducts: vine.array(productSchema).optional(),
+    expectedResults: vine
+      .object({
+        publications: vine
+          .array(
+            vine.object({
+              id: vine.string().trim().optional(),
+              category: vine.string().trim().optional(),
+              content: vine.string().trim().optional(),
+              quantity: vine.string().trim().optional().nullable(),
+              scienceRequirement: vine.string().trim().optional().nullable(),
+              note: vine.string().trim().optional().nullable(),
+            })
+          )
+          .optional(),
+        appliedProducts: vine
+          .array(
+            vine.object({
+              id: vine.string().trim().optional(),
+              name: vine.string().trim().optional(),
+              scienceRequirement: vine.string().trim().optional().nullable(),
+              note: vine.string().trim().optional().nullable(),
+            })
+          )
+          .optional(),
+        tangibleProducts: vine
+          .array(
+            vine.object({
+              id: vine.string().trim().optional(),
+              name: vine.string().trim().optional(),
+              unit: vine.string().trim().optional().nullable(),
+              qualityRequired: vine.string().trim().optional().nullable(),
+              qualitySampleDomestic: vine.string().trim().optional().nullable(),
+              qualitySampleWorld: vine.string().trim().optional().nullable(),
+              quantityScale: vine.string().trim().optional().nullable(),
+            })
+          )
+          .optional(),
+        ipProducts: vine
+          .array(
+            vine.object({
+              id: vine.string().trim().optional(),
+              name: vine.string().trim().optional(),
+              scienceRequirement: vine.string().trim().optional().nullable(),
+              note: vine.string().trim().optional().nullable(),
+            })
+          )
+          .optional(),
+        postgraduateTraining: vine
+          .array(
+            vine.object({
+              id: vine.string().trim().optional(),
+              level: vine.string().trim().optional(),
+              quantity: vine.string().trim().optional().nullable(),
+              major: vine.string().trim().optional().nullable(),
+              note: vine.string().trim().optional().nullable(),
+            })
+          )
+          .optional(),
+      })
+      .optional()
+      .nullable(),
     summary: vine.string().trim().optional().nullable(),
     outlineFileUrl: vine.string().trim().maxLength(500).optional().nullable(),
     appendixFileUrl: vine.string().trim().maxLength(500).optional().nullable(),
     revisionExplanation: vine.string().trim().optional().nullable(),
     members: vine.array(memberSchema).optional(),
     budgetLines: vine.array(budgetLineSchema).optional(),
+    budgetMatrix: vine.any().optional().nullable(),
+    otherContents: vine
+      .object({
+        applicationTransferHtml: vine.string().trim().optional().nullable(),
+        outputEffectivenessHtml: vine.string().trim().optional().nullable(),
+        impactAssessmentHtml: vine.string().trim().optional().nullable(),
+        riskManagementHtml: vine.string().trim().optional().nullable(),
+        ethicsDataApprovalHtml: vine.string().trim().optional().nullable(),
+        dataManagementPlanHtml: vine.string().trim().optional().nullable(),
+        ipProtectionHtml: vine.string().trim().optional().nullable(),
+        aiUsageHtml: vine.string().trim().optional().nullable(),
+      })
+      .optional()
+      .nullable(),
   })
 )
 

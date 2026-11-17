@@ -2,6 +2,8 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import { normalizeOptionalHttpUrl } from '#utils/optional_http_url'
 import ScientificProfile from '#models/scientific_profile'
+import PersonalProfile from '#models/personal_profile'
+import Staff from '#models/staff'
 import Student from '#models/student'
 import ProfileLanguage from '#models/profile_language'
 import ProfileAttachment from '#models/profile_attachment'
@@ -698,6 +700,73 @@ export default class ProfileController {
       organization: p.organization ?? null,
       department: p.departmentUnit?.name ?? p.faculty ?? p.department ?? null,
     }))
+    return response.ok({ success: true, data })
+  }
+
+  /**
+   * GET /api/lookup/author-profiles/:id
+   * Chi tiết đủ để hiển thị khối Chủ nhiệm nhiệm vụ (đã đăng nhập).
+   */
+  async authorProfilePrincipal({ params, response }: HttpContext) {
+    const id = Number(params.id)
+    if (!Number.isFinite(id) || id <= 0) {
+      return response.badRequest({ success: false, message: 'ID hồ sơ không hợp lệ.' })
+    }
+
+    const sci = await ScientificProfile.query()
+      .where('id', id)
+      .preload('departmentUnit')
+      .first()
+    if (!sci) {
+      return response.notFound({ success: false, message: 'Không tìm thấy hồ sơ.' })
+    }
+
+    const [personal, staff] = await Promise.all([
+      PersonalProfile.query().where('user_id', sci.userId).first(),
+      Staff.query().where('user_id', sci.userId).first(),
+    ])
+
+    const hocHam = getScientificProfileAcademicTitleLabel(sci.academicTitle) || ''
+    const hocVi =
+      getScientificProfileDegreeLabel(sci.degree) ||
+      personal?.academicDegree ||
+      staff?.professionalDegree ||
+      ''
+    const academicTitleDegree = [hocHam, hocVi].filter(Boolean).join(' / ') || null
+
+    const gender = sci.gender || personal?.gender || staff?.gender || null
+    const dateOfBirth =
+      sci.dateOfBirth?.toISODate() ||
+      personal?.dateOfBirth?.toISODate() ||
+      staff?.dateOfBirth?.toISODate() ||
+      null
+
+    const data = {
+      profileId: sci.id,
+      fullName: sci.fullName || personal?.fullName || staff?.fullName || null,
+      identityNumber: personal?.identityNumber || staff?.identityNumber || null,
+      dateOfBirth,
+      gender,
+      academicTitleDegree,
+      professionalTitle:
+        sci.currentTitle || personal?.professionalQualification || staff?.currentJob || null,
+      position:
+        sci.managementRole ||
+        personal?.positionTitle ||
+        staff?.positionTitle ||
+        staff?.concurrentPosition ||
+        null,
+      phone: personal?.phone || sci.phone || staff?.phone || null,
+      email: sci.workEmail || personal?.workEmail || personal?.personalEmail || staff?.email || null,
+      organization: sci.organization || staff?.departmentName || null,
+      workAddress:
+        personal?.address ||
+        staff?.currentAddress ||
+        staff?.permanentAddress ||
+        [sci.faculty, sci.departmentUnit?.name || sci.department].filter(Boolean).join(', ') ||
+        null,
+    }
+
     return response.ok({ success: true, data })
   }
 

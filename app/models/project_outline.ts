@@ -9,6 +9,7 @@ import ProjectOutlineBudgetLine from '#models/project_outline_budget_line'
 import ProjectOutlineReviewAssignment from '#models/project_outline_review_assignment'
 
 import type { ExecutionStatus } from '#constants/module56'
+import { jsonAttr } from '#utils/json_attr'
 
 export type ProjectOutlineStatus =
   | 'THUYETMINH_DRAFT'
@@ -41,9 +42,159 @@ export type OutlineProduct = {
   quality?: string | null
 }
 
+/** Công bố khoa học */
+export type OutlineExpectedPublication = {
+  id: string
+  /** Trong nước / Quốc tế */
+  category: 'DOMESTIC' | 'INTERNATIONAL' | string
+  content: string
+  quantity?: string | null
+  scienceRequirement?: string | null
+  note?: string | null
+}
+
+/** Sản phẩm nguyên lý / phương pháp / phần mềm / … */
+export type OutlineExpectedAppliedProduct = {
+  id: string
+  name: string
+  scienceRequirement?: string | null
+  note?: string | null
+}
+
+/** Mẫu / hàng hóa / thiết bị / giống … */
+export type OutlineExpectedTangibleProduct = {
+  id: string
+  name: string
+  unit?: string | null
+  qualityRequired?: string | null
+  qualitySampleDomestic?: string | null
+  qualitySampleWorld?: string | null
+  quantityScale?: string | null
+}
+
+/** Đăng ký SHTT / SHCN / giống … */
+export type OutlineExpectedIpProduct = {
+  id: string
+  name: string
+  scienceRequirement?: string | null
+  note?: string | null
+}
+
+/** Đào tạo sau đại học */
+export type OutlineExpectedTraining = {
+  id: string
+  level: string
+  quantity?: string | null
+  major?: string | null
+  note?: string | null
+}
+
+/** Kết quả dự kiến — 5 nhóm */
+export type OutlineExpectedResults = {
+  publications: OutlineExpectedPublication[]
+  appliedProducts: OutlineExpectedAppliedProduct[]
+  tangibleProducts: OutlineExpectedTangibleProduct[]
+  ipProducts: OutlineExpectedIpProduct[]
+  postgraduateTraining: OutlineExpectedTraining[]
+}
+
 export type OutlinePartnerUnit = {
   name: string
+  orgCode?: string | null
+  phone?: string | null
+  address?: string | null
+  /** Giữ tương thích dữ liệu cũ */
   role?: string | null
+}
+
+/** Tổ chức chủ trì nhiệm vụ */
+export type OutlineHostOrganization = {
+  name: string
+  orgCode?: string | null
+  phone?: string | null
+  address?: string | null
+  leaderName?: string | null
+  /** Năng lực, kinh nghiệm CSVC / dự án (HTML) */
+  experienceHtml?: string | null
+  /** Đội ngũ nhân lực (HTML) */
+  teamCapacityHtml?: string | null
+}
+
+/** Snapshot chủ nhiệm nhiệm vụ (hiển thị BM / form) */
+export type OutlinePrincipalInfo = {
+  profileId?: number | null
+  fullName?: string | null
+  identityNumber?: string | null
+  dateOfBirth?: string | null
+  gender?: string | null
+  academicTitleDegree?: string | null
+  professionalTitle?: string | null
+  position?: string | null
+  phone?: string | null
+  email?: string | null
+  organization?: string | null
+  workAddress?: string | null
+}
+
+/** Ma trận kinh phí thực hiện (nguồn × khoản chi) — mirror FE constants */
+export type OutlineBudgetMatrix = {
+  STATE_LUMP: Record<string, number>
+  STATE_NON_LUMP: Record<string, number>
+  NON_STATE: Record<string, number>
+}
+
+/** Các mục mô tả bổ sung (ứng dụng, hiệu quả, rủi ro, đạo đức/AI) */
+export type OutlineOtherContents = {
+  /** Khả năng ứng dụng & chuyển giao kết quả */
+  applicationTransferHtml?: string | null
+  /** Dự kiến hiệu quả đầu ra */
+  outputEffectivenessHtml?: string | null
+  /** Dự kiến tác động của kết quả */
+  impactAssessmentHtml?: string | null
+  /** Quản lý rủi ro và biện pháp kiểm soát */
+  riskManagementHtml?: string | null
+  /** Đối tượng/dữ liệu đặc thù & thủ tục phê duyệt */
+  ethicsDataApprovalHtml?: string | null
+  /** Kế hoạch quản lý dữ liệu */
+  dataManagementPlanHtml?: string | null
+  /** SHTT / quyền bên thứ ba */
+  ipProtectionHtml?: string | null
+  /** Sử dụng AI (nếu có) */
+  aiUsageHtml?: string | null
+}
+
+/** Phương thức khoán chi (BM-02.02 §5) */
+export type OutlineLumpSumMode = 'FULL' | 'PARTIAL'
+
+/**
+ * Phân bổ nguồn kinh phí đề xuất (BM-02.02 §4–5).
+ * a) schoolFund + externalFund | b) stateBudget + nonStateBudget
+ * §5: lumpSumMode + lumpSumAmount + nonLumpSumAmount
+ * Trường legacy external* chỉ còn khi đọc JSON cũ.
+ */
+export type OutlineFundingBreakdown = {
+  /** Kinh phí từ Trường */
+  schoolFund: number
+  /** Kinh phí ngoài Trường */
+  externalFund: number
+  /** Ngân sách nhà nước */
+  stateBudget: number
+  /** Ngoài ngân sách nhà nước (Quỹ KHCN Trường…) */
+  nonStateBudget: number
+  /** FULL = khoán đến SP cuối; PARTIAL = khoán từng phần */
+  lumpSumMode: OutlineLumpSumMode | null
+  /** Kinh phí khoán */
+  lumpSumAmount: number
+  /** Kinh phí không khoán */
+  nonLumpSumAmount: number
+  /** @deprecated — gộp vào externalFund */
+  externalStateLocal?: number
+  /** @deprecated */
+  externalEnterprise?: number
+  /** @deprecated */
+  externalSponsor?: number
+  /** @deprecated */
+  externalOther?: number
 }
 
 export default class ProjectOutline extends BaseModel {
@@ -82,8 +233,26 @@ export default class ProjectOutline extends BaseModel {
   @column()
   declare requestedBudget: number
 
+  @column(jsonAttr<OutlineFundingBreakdown | null>(null))
+  declare fundingBreakdown: OutlineFundingBreakdown | null
+
+  @column(
+    jsonAttr<OutlineBudgetMatrix | null>({
+      STATE_LUMP: {},
+      STATE_NON_LUMP: {},
+      NON_STATE: {},
+    })
+  )
+  declare budgetMatrix: OutlineBudgetMatrix | null
+
+  @column(jsonAttr<OutlinePrincipalInfo | null>(null))
+  declare principalInfo: OutlinePrincipalInfo | null
+
   @column()
   declare hostUnit: string | null
+
+  @column(jsonAttr<OutlineHostOrganization | null>(null))
+  declare hostOrganization: OutlineHostOrganization | null
 
   @column({
     prepare: (v: OutlinePartnerUnit[] | null) => (v == null ? '[]' : JSON.stringify(v)),
@@ -101,9 +270,6 @@ export default class ProjectOutline extends BaseModel {
     },
   })
   declare partnerUnits: OutlinePartnerUnit[]
-
-  @column()
-  declare applicationScope: string | null
 
   @column()
   declare urgency: string | null
@@ -150,6 +316,20 @@ export default class ProjectOutline extends BaseModel {
     },
   })
   declare expectedProducts: OutlineProduct[]
+
+  @column(
+    jsonAttr<OutlineExpectedResults | null>({
+      publications: [],
+      appliedProducts: [],
+      tangibleProducts: [],
+      ipProducts: [],
+      postgraduateTraining: [],
+    })
+  )
+  declare expectedResults: OutlineExpectedResults | null
+
+  @column(jsonAttr<OutlineOtherContents | null>(null))
+  declare otherContents: OutlineOtherContents | null
 
   @column()
   declare summary: string | null

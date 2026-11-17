@@ -7,6 +7,7 @@ import NotificationService from '#services/notification_service'
 import ProjectOutlineService from '#services/project_outline_service'
 import ProjectOutlineReviewService from '#services/project_outline_review_service'
 import ProjectOutlineRevisionService from '#services/project_outline_revision_service'
+import OutlineExportService from '#services/outline_export_service'
 import {
   updateOutlineDraftValidator,
   submitOutlineRevisionValidator,
@@ -253,6 +254,47 @@ export default class ProjectOutlinesController {
     })
   }
 
+  /** GET /api/project-outlines/:id/export-docx — xuất BM-02.02 từ mẫu THUYET_MINH */
+  async exportDocx({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const outline = await this.loadFull(Number(params.id))
+    if (!outline) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
+    }
+    const isPkh = await this.canViewPkh(user.id)
+    const theoDoi = await ProjectOutlineService.userFollowsOutline(outline, user.id)
+    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh && !theoDoi) {
+      return response.forbidden({ success: false, message: 'Không có quyền xuất thuyết minh.' })
+    }
+    try {
+      const exported = await OutlineExportService.exportDocx(outline.id)
+      response.header(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(exported.fileName)}"`
+      )
+      response.header(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      )
+      return response.download(exported.fullPath)
+    } catch (err) {
+      const msg = (err as Error)?.message || ''
+      if (msg === 'NO_DEFAULT_TEMPLATE') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Chưa có mẫu thuyết minh (THUYET_MINH) mặc định. Hãy seed BM0202_DEFAULT.',
+        })
+      }
+      if (msg === 'TEMPLATE_FILE_MISSING') {
+        return response.unprocessableEntity({
+          success: false,
+          message: 'Không tìm thấy file mẫu thuyết minh trên máy chủ.',
+        })
+      }
+      throw err
+    }
+  }
+
   /** GET /api/project-outlines/:id */
   async show({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
@@ -337,7 +379,12 @@ export default class ProjectOutlinesController {
     if (payload.members) {
       await ProjectOutlineService.replaceMembers(outline.id, payload.members)
     }
-    if (payload.budgetLines) {
+    // Ưu tiên ma trận kinh phí → đồng bộ sang budget_lines; fallback payload.budgetLines cũ
+    if (payload.budgetMatrix !== undefined && outline.budgetMatrix) {
+      const { flattenBudgetMatrixToLines } = await import('#constants/outline_budget_matrix')
+      const lines = flattenBudgetMatrixToLines(outline.budgetMatrix)
+      await ProjectOutlineService.replaceBudgetLines(outline.id, lines)
+    } else if (payload.budgetLines) {
       await ProjectOutlineService.replaceBudgetLines(outline.id, payload.budgetLines)
     }
 

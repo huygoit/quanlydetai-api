@@ -31,6 +31,7 @@ const MAP: Record<string, [number, string]> = {
   INVALID_AMOUNT: [422, 'Số tiền không hợp lệ.'],
   INVALID_KIND: [422, 'Loại hồ sơ không hợp lệ.'],
   FORM_INCOMPLETE: [422, 'Thiếu thông tin bắt buộc.'],
+  RECEIVED_DATE_REQUIRED: [422, 'Nhập ngày nhận hàng (mua sắm trực tiếp).'],
   FIELDS_REQUIRED: [422, 'Cần nhập nội dung dự thảo hợp đồng.'],
   FILE_REQUIRED: [422, 'Cần file đính kèm.'],
   FILE_TOO_LARGE: [422, 'File vượt dung lượng cho phép.'],

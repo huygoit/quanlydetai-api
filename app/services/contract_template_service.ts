@@ -6,6 +6,7 @@ import type {
   ThongBaoMergeConfig,
 } from '#models/contract_template'
 import { BM06_TEMPLATE_VARIABLES, BM14_TEMPLATE_VARIABLES } from '#constants/bm06_template_variables'
+import { BM0202_TEMPLATE_VARIABLES } from '#constants/bm0202_template_variables'
 import { THONG_BAO_TEMPLATE_VARIABLES } from '#constants/thong_bao_template_variables'
 import {
   QUYET_DINH_TEMPLATE_VARIABLES,
@@ -80,6 +81,7 @@ export function chuanCauHinhThongBao(
 }
 
 function knownVariablesForType(templateType: string) {
+  if (templateType === 'THUYET_MINH') return BM0202_TEMPLATE_VARIABLES
   if (templateType === 'HOP_DONG') return BM06_TEMPLATE_VARIABLES
   if (templateType === 'THANH_LY') return BM14_TEMPLATE_VARIABLES
   if (templateType === 'THONG_BAO') return THONG_BAO_TEMPLATE_VARIABLES

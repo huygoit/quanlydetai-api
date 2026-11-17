@@ -1,7 +1,7 @@
 /**
- * Loại mẫu DOCX trong Module 5 (hợp đồng, thanh lý, …).
+ * Loại mẫu DOCX trong Module 5 (hợp đồng, thanh lý, thuyết minh…).
  */
-export type DocTemplateTypeCode = 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO' | 'QUYET_DINH'
+export type DocTemplateTypeCode = 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO' | 'QUYET_DINH' | 'THUYET_MINH'
 
 export type DocTemplateTypeDef = {
   code: DocTemplateTypeCode
@@ -12,6 +12,12 @@ export type DocTemplateTypeDef = {
 }
 
 export const DOC_TEMPLATE_TYPES: DocTemplateTypeDef[] = [
+  {
+    code: 'THUYET_MINH',
+    label: 'Thuyết minh nhiệm vụ',
+    defaultFormCode: 'BM0202',
+    description: 'Thuyết minh nhiệm vụ KHCN & ĐMST (BM-02.02)',
+  },
   {
     code: 'HOP_DONG',
     label: 'Hợp đồng',
@@ -54,6 +60,7 @@ export function getDocTemplateType(code: string): DocTemplateTypeDef | undefined
 /** Map dữ liệu cũ form_code → loại */
 export function mapLegacyFormCodeToTemplateType(formCode: string | null | undefined): DocTemplateTypeCode {
   const c = (formCode || '').toUpperCase()
+  if (c === 'BM0202' || c === 'BM-02.02' || c === 'THUYET_MINH' || c === 'TM') return 'THUYET_MINH'
   if (c === 'BM06' || c === 'HOP_DONG') return 'HOP_DONG'
   if (c === 'THANH_LY' || c === 'BBTL') return 'THANH_LY'
   if (c === 'THONG_BAO' || c === 'TB') return 'THONG_BAO'

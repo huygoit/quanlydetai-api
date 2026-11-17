@@ -26,8 +26,11 @@ export type OutlineSnapshot = {
   title: string
   field: string | null
   hostUnit: string | null
+  hostOrganization: unknown
+  fundingBreakdown: unknown
+  budgetMatrix: unknown
+  principalInfo: unknown
   requestedBudget: number
-  applicationScope: string | null
   urgency: string | null
   detailedObjectives: string | null
   researchContent: string | null
@@ -35,6 +38,8 @@ export type OutlineSnapshot = {
   summary: string | null
   milestones: unknown
   expectedProducts: unknown
+  expectedResults: unknown
+  otherContents: unknown
   partnerUnits: unknown
   outlineFileUrl: string | null
   appendixFileUrl: string | null
@@ -63,15 +68,20 @@ const FIELD_LABELS: Record<string, string> = {
   title: 'Tên đề tài',
   field: 'Lĩnh vực',
   hostUnit: 'Đơn vị chủ trì',
+  hostOrganization: 'Tổ chức chủ trì nhiệm vụ',
+  fundingBreakdown: 'Nguồn kinh phí đề xuất',
+  budgetMatrix: 'Kinh phí thực hiện',
+  principalInfo: 'Chủ nhiệm nhiệm vụ',
   requestedBudget: 'Kinh phí đề nghị',
-  applicationScope: 'Phạm vi ứng dụng',
   urgency: 'Tính cấp thiết',
-  detailedObjectives: 'Mục tiêu chi tiết',
-  researchContent: 'Nội dung nghiên cứu',
+  detailedObjectives: 'Mục tiêu',
+  researchContent: 'Nội dung và phương pháp thực hiện',
   methodology: 'Phương pháp',
   summary: 'Tóm tắt',
-  milestones: 'Tiến độ / mốc',
+  milestones: 'Tiến độ thực hiện',
   expectedProducts: 'Sản phẩm dự kiến',
+  expectedResults: 'Kết quả dự kiến',
+  otherContents: 'Nội dung khác',
   partnerUnits: 'Đơn vị phối hợp',
   outlineFileUrl: 'File thuyết minh',
   appendixFileUrl: 'File phụ lục',
@@ -130,7 +140,13 @@ export default class ProjectOutlineRevisionService {
       else if (
         key === 'milestones' ||
         key === 'expectedProducts' ||
+        key === 'expectedResults' ||
+        key === 'otherContents' ||
         key === 'partnerUnits' ||
+        key === 'hostOrganization' ||
+        key === 'fundingBreakdown' ||
+        key === 'budgetMatrix' ||
+        key === 'principalInfo' ||
         key === 'members' ||
         key === 'budgetLines'
       ) {
@@ -160,8 +176,11 @@ export default class ProjectOutlineRevisionService {
       title: outline.title,
       field: outline.field,
       hostUnit: outline.hostUnit,
+      hostOrganization: outline.hostOrganization || null,
+      fundingBreakdown: outline.fundingBreakdown || null,
+      budgetMatrix: outline.budgetMatrix || null,
+      principalInfo: outline.principalInfo || null,
       requestedBudget: Number(outline.requestedBudget || 0),
-      applicationScope: outline.applicationScope,
       urgency: outline.urgency,
       detailedObjectives: outline.detailedObjectives,
       researchContent: outline.researchContent,
@@ -169,6 +188,8 @@ export default class ProjectOutlineRevisionService {
       summary: outline.summary,
       milestones: outline.milestones || [],
       expectedProducts: outline.expectedProducts || [],
+      expectedResults: outline.expectedResults || null,
+      otherContents: outline.otherContents || null,
       partnerUnits: outline.partnerUnits || [],
       outlineFileUrl: outline.outlineFileUrl,
       appendixFileUrl: outline.appendixFileUrl,

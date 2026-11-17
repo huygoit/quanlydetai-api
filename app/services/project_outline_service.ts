@@ -2,11 +2,20 @@ import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 import ProjectOutline from '#models/project_outline'
 import type {
+  OutlineBudgetMatrix,
+  OutlineExpectedResults,
+  OutlineFundingBreakdown,
   OutlineMilestone,
+  OutlineOtherContents,
   OutlinePartnerUnit,
+  OutlinePrincipalInfo,
   OutlineProduct,
   ProjectOutlineStatus,
 } from '#models/project_outline'
+import {
+  flattenBudgetMatrixToLines,
+  normalizeBudgetMatrix,
+} from '#constants/outline_budget_matrix'
 import ProjectOutlineMember from '#models/project_outline_member'
 import ProjectOutlineDefenseMember from '#models/project_outline_defense_member'
 import ProjectOutlineBudgetLine from '#models/project_outline_budget_line'
@@ -20,6 +29,158 @@ import { resolveProposalMemberRole } from '#constants/proposal_member_role'
 import { mapProjectOutlineMemberToApi } from '#utils/project_outline_member_api'
 
 const BUDGET_TOLERANCE = 1000
+
+/** Chuẩn hóa số tiền nguồn kinh phí (≥ 0, làm tròn). */
+function normalizeFundingAmount(v: unknown): number {
+  const n = Math.round(Number(v || 0))
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+function fundingExternalAmount(f: Partial<OutlineFundingBreakdown> | null | undefined): number {
+  const direct = normalizeFundingAmount(f?.externalFund)
+  if (direct > 0) return direct
+  return (
+    normalizeFundingAmount(f?.externalStateLocal) +
+    normalizeFundingAmount(f?.externalEnterprise) +
+    normalizeFundingAmount(f?.externalSponsor) +
+    normalizeFundingAmount(f?.externalOther)
+  )
+}
+
+function normalizeFundingBreakdown(
+  raw?: Partial<OutlineFundingBreakdown> | null
+): OutlineFundingBreakdown {
+  const schoolFund = normalizeFundingAmount(raw?.schoolFund)
+  const legacyExternal =
+    normalizeFundingAmount(raw?.externalStateLocal) +
+    normalizeFundingAmount(raw?.externalEnterprise) +
+    normalizeFundingAmount(raw?.externalSponsor) +
+    normalizeFundingAmount(raw?.externalOther)
+  const externalFund = fundingExternalAmount(raw)
+  let stateBudget = normalizeFundingAmount(raw?.stateBudget)
+  let nonStateBudget = normalizeFundingAmount(raw?.nonStateBudget)
+  // Bản ghi cũ chưa có b) nhưng còn chi tiết ngoài Trường → suy lần cuối
+  if (
+    !stateBudget &&
+    !nonStateBudget &&
+    legacyExternal > 0 &&
+    !normalizeFundingAmount(raw?.externalFund)
+  ) {
+    stateBudget = schoolFund + normalizeFundingAmount(raw?.externalStateLocal)
+    nonStateBudget =
+      normalizeFundingAmount(raw?.externalEnterprise) +
+      normalizeFundingAmount(raw?.externalSponsor) +
+      normalizeFundingAmount(raw?.externalOther)
+  }
+  const modeRaw = String(raw?.lumpSumMode || '').toUpperCase()
+  const lumpSumMode = modeRaw === 'FULL' || modeRaw === 'PARTIAL' ? modeRaw : null
+  return {
+    schoolFund,
+    externalFund,
+    stateBudget,
+    nonStateBudget,
+    lumpSumMode,
+    lumpSumAmount: normalizeFundingAmount(raw?.lumpSumAmount),
+    nonLumpSumAmount: normalizeFundingAmount(raw?.nonLumpSumAmount),
+  }
+}
+
+/** Tổng theo chủ thể bố trí = Trường + ngoài Trường. */
+function fundingTotalByEntity(f: OutlineFundingBreakdown): number {
+  return f.schoolFund + f.externalFund
+}
+
+function emptyExpectedResults(): OutlineExpectedResults {
+  return {
+    publications: [],
+    appliedProducts: [],
+    tangibleProducts: [],
+    ipProducts: [],
+    postgraduateTraining: [],
+  }
+}
+
+function normalizeExpectedResults(
+  raw?: Partial<OutlineExpectedResults> | null
+): OutlineExpectedResults {
+  const src = raw && typeof raw === 'object' ? raw : emptyExpectedResults()
+  const asArr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
+  return {
+    publications: asArr(src.publications).map((r: any, i) => ({
+      id: String(r?.id || `pub-${i + 1}`),
+      category: String(r?.category || 'DOMESTIC'),
+      content: String(r?.content || '').trim(),
+      quantity: String(r?.quantity || '').trim() || null,
+      scienceRequirement: String(r?.scienceRequirement || '').trim() || null,
+      note: String(r?.note || '').trim() || null,
+    })),
+    appliedProducts: asArr(src.appliedProducts).map((r: any, i) => ({
+      id: String(r?.id || `app-${i + 1}`),
+      name: String(r?.name || '').trim(),
+      scienceRequirement: String(r?.scienceRequirement || '').trim() || null,
+      note: String(r?.note || '').trim() || null,
+    })),
+    tangibleProducts: asArr(src.tangibleProducts).map((r: any, i) => ({
+      id: String(r?.id || `tan-${i + 1}`),
+      name: String(r?.name || '').trim(),
+      unit: String(r?.unit || '').trim() || null,
+      qualityRequired: String(r?.qualityRequired || '').trim() || null,
+      qualitySampleDomestic: String(r?.qualitySampleDomestic || '').trim() || null,
+      qualitySampleWorld: String(r?.qualitySampleWorld || '').trim() || null,
+      quantityScale: String(r?.quantityScale || '').trim() || null,
+    })),
+    ipProducts: asArr(src.ipProducts).map((r: any, i) => ({
+      id: String(r?.id || `ip-${i + 1}`),
+      name: String(r?.name || '').trim(),
+      scienceRequirement: String(r?.scienceRequirement || '').trim() || null,
+      note: String(r?.note || '').trim() || null,
+    })),
+    postgraduateTraining: asArr(src.postgraduateTraining).map((r: any, i) => ({
+      id: String(r?.id || `trn-${i + 1}`),
+      level: String(r?.level || '').trim(),
+      quantity: String(r?.quantity || '').trim() || null,
+      major: String(r?.major || '').trim() || null,
+      note: String(r?.note || '').trim() || null,
+    })),
+  }
+}
+
+/** Có ít nhất một dòng kết quả dự kiến có nội dung */
+function hasExpectedResultsContent(er: OutlineExpectedResults | null | undefined): boolean {
+  if (!er) return false
+  if (er.publications.some((r) => r.content.trim())) return true
+  if (er.appliedProducts.some((r) => r.name.trim())) return true
+  if (er.tangibleProducts.some((r) => r.name.trim())) return true
+  if (er.ipProducts.some((r) => r.name.trim())) return true
+  if (er.postgraduateTraining.some((r) => r.level.trim() || r.major?.trim())) return true
+  return false
+}
+
+/** Đồng bộ sang expected_products cũ (tương thích báo cáo / validate cũ) */
+function deriveExpectedProducts(er: OutlineExpectedResults): OutlineProduct[] {
+  const fromApplied = er.appliedProducts
+    .filter((r) => r.name.trim())
+    .map((r) => ({
+      name: r.name.trim(),
+      quantity: null,
+      quality: r.scienceRequirement || null,
+    }))
+  const fromTangible = er.tangibleProducts
+    .filter((r) => r.name.trim())
+    .map((r) => ({
+      name: r.name.trim(),
+      quantity: r.quantityScale || null,
+      quality: r.qualityRequired || null,
+    }))
+  const fromIp = er.ipProducts
+    .filter((r) => r.name.trim())
+    .map((r) => ({
+      name: r.name.trim(),
+      quantity: null,
+      quality: r.scienceRequirement || null,
+    }))
+  return [...fromApplied, ...fromTangible, ...fromIp]
+}
 
 type BudgetLineInput = {
   groupCode: OutlineBudgetGroup
@@ -101,7 +262,17 @@ export default class ProjectOutlineService {
       endDate,
       requestedBudget: Number(proposal.requestedBudgetTotal || 0),
       hostUnit: proposal.ownerUnit || null,
-      applicationScope: this.textToHtml(proposal.applicationPotential),
+      hostOrganization: proposal.ownerUnit
+        ? {
+            name: proposal.ownerUnit,
+            orgCode: null,
+            phone: null,
+            address: null,
+            leaderName: null,
+            experienceHtml: null,
+            teamCapacityHtml: null,
+          }
+        : null,
       // Chưa có field riêng trên đề xuất → lấy tóm tắt làm gợi ý
       urgency: this.textToHtml(proposal.summary),
       detailedObjectives: this.textToHtml(proposal.objectives),
@@ -144,7 +315,10 @@ export default class ProjectOutlineService {
     setIfEmpty('endDate', !outline.endDate)
     setIfEmpty('requestedBudget', !Number(outline.requestedBudget))
     setIfEmpty('hostUnit', !outline.hostUnit?.trim())
-    setIfEmpty('applicationScope', !this.hasHtmlContent(outline.applicationScope))
+    if (!outline.hostOrganization?.name?.trim() && mapped.hostOrganization) {
+      outline.hostOrganization = mapped.hostOrganization
+      changed = true
+    }
     setIfEmpty('urgency', !this.hasHtmlContent(outline.urgency))
     setIfEmpty('detailedObjectives', !this.hasHtmlContent(outline.detailedObjectives))
     setIfEmpty('researchContent', !this.hasHtmlContent(outline.researchContent))
@@ -181,7 +355,17 @@ export default class ProjectOutlineService {
       .where('role', 'PRINCIPAL')
       .where('profile_id', profile.id)
       .first()
-    return !!principal
+    if (principal) return true
+
+    // Chủ nhiệm đã gắn trên bản thuyết minh (seed / soạn form)
+    const outline = await ProjectOutline.query().where('project_proposal_id', proposal.id).select('id').first()
+    if (!outline) return false
+    const outlinePrincipal = await ProjectOutlineMember.query()
+      .where('project_outline_id', outline.id)
+      .where('role', 'PRINCIPAL')
+      .where('profile_id', profile.id)
+      .first()
+    return !!outlinePrincipal
   }
 
   /** Id đề xuất mà user là owner hoặc CNĐT */
@@ -209,32 +393,73 @@ export default class ProjectOutlineService {
       }
     }
 
-    const base = [...new Set([...owned, ...asPrincipal].map((p) => p.id))]
+    // Thuyết minh đã gắn user làm PRINCIPAL (kể cả khi đề xuất chưa có member)
+    let fromOutline: number[] = []
+    if (profile) {
+      const outlineRows = await ProjectOutlineMember.query()
+        .where('profile_id', profile.id)
+        .where('role', 'PRINCIPAL')
+        .select('project_outline_id')
+      const outlineIds = outlineRows
+        .map((r) => Number(r.projectOutlineId))
+        .filter((id) => Number.isFinite(id) && id > 0)
+      if (outlineIds.length) {
+        const outlines = await ProjectOutline.query()
+          .whereIn('id', outlineIds)
+          .select('project_proposal_id')
+        fromOutline = outlines
+          .map((o) => Number(o.projectProposalId))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      }
+    }
+
+    const toId = (v: unknown) => {
+      const n = Number(v)
+      return Number.isFinite(n) && n > 0 ? n : null
+    }
+    const base = [
+      ...new Set(
+        [
+          ...owned.map((p) => toId(p.id)),
+          ...asPrincipal.map((p) => toId(p.id)),
+          ...fromOutline.map((id) => toId(id)),
+        ].filter((id): id is number => id != null)
+      ),
+    ]
     const giao = await OfficialAssignment.query().select('danh_muc_id', 'principal_user_id')
-    const daGiao = new Set(giao.map((g) => Number(g.danhMucId)))
+    const daGiao = new Set(
+      giao.map((g) => toId(g.danhMucId)).filter((id): id is number => id != null)
+    )
     const cuaToi = giao
       .filter((g) => Number(g.principalUserId) === Number(userId))
-      .map((g) => Number(g.danhMucId))
+      .map((g) => toId(g.danhMucId))
+      .filter((id): id is number => id != null)
     return [...new Set([...base.filter((id) => !daGiao.has(id)), ...cuaToi])]
   }
 
   /** Thuyết minh user được theo dõi: là thành viên hoặc nằm trong hội đồng bảo vệ. */
   static async outlineIdsFollowedByUser(userId: number): Promise<number[]> {
     const ids = new Set<number>()
+    const addId = (v: unknown) => {
+      const n = Number(v)
+      if (Number.isFinite(n) && n > 0) ids.add(n)
+    }
     const profile = await ScientificProfile.query().where('user_id', userId).select('id').first()
     if (profile) {
       const rows = await ProjectOutlineMember.query()
         .where('profile_id', profile.id)
         .select('project_outline_id')
-      for (const row of rows) ids.add(row.projectOutlineId)
+      for (const row of rows) addId(row.projectOutlineId)
     }
     const sessions = await ProjectOutlineDefenseMember.query().where('user_id', userId).select('session_id')
-    const sessionIds = sessions.map((s) => s.sessionId)
+    const sessionIds = sessions
+      .map((s) => Number(s.sessionId))
+      .filter((id) => Number.isFinite(id) && id > 0)
     if (sessionIds.length) {
       const outlines = await ProjectOutline.query()
         .whereIn('active_defense_session_id', sessionIds)
         .select('id')
-      for (const row of outlines) ids.add(row.id)
+      for (const row of outlines) addId(row.id)
     }
     return [...ids]
   }
@@ -423,13 +648,14 @@ export default class ProjectOutlineService {
       !!o.endDate,
       Number(o.requestedBudget) >= 0 && o.requestedBudget !== null,
       !!o.hostUnit?.trim(),
-      this.hasHtmlContent(o.applicationScope),
       this.hasHtmlContent(o.urgency),
       this.hasHtmlContent(o.detailedObjectives),
       this.hasHtmlContent(o.researchContent),
-      this.hasHtmlContent(o.methodology),
+      // Tạm ẩn phương pháp trên FE — không tính vào % hoàn thành
+      // this.hasHtmlContent(o.methodology),
       (o.milestones || []).some((m) => this.hasHtmlContent(m.content) || !!m.content?.trim()),
-      (o.expectedProducts || []).some((p) => !!p.name?.trim()),
+      hasExpectedResultsContent(o.expectedResults) ||
+        (o.expectedProducts || []).some((p) => !!p.name?.trim()),
       members.some((m) => m.role === 'PRINCIPAL'),
       members.length > 0 && members.every((m) => !!m.fullName?.trim()),
       budgetLines.length > 0,
@@ -455,17 +681,23 @@ export default class ProjectOutlineService {
     if (o.requestedBudget == null || Number(o.requestedBudget) < 0) {
       errors.push('Kinh phí đề nghị không hợp lệ.')
     }
-    if (!o.hostUnit?.trim()) errors.push('Thiếu đơn vị chủ trì.')
-    if (!this.hasHtmlContent(o.applicationScope)) errors.push('Thiếu phạm vi ứng dụng.')
+    if (!o.hostUnit?.trim() && !o.hostOrganization?.name?.trim()) {
+      errors.push('Thiếu tên tổ chức chủ trì nhiệm vụ.')
+    }
     if (!this.hasHtmlContent(o.urgency)) errors.push('Thiếu tính cấp thiết.')
-    if (!this.hasHtmlContent(o.detailedObjectives)) errors.push('Thiếu mục tiêu chi tiết.')
-    if (!this.hasHtmlContent(o.researchContent)) errors.push('Thiếu nội dung nghiên cứu.')
-    if (!this.hasHtmlContent(o.methodology)) errors.push('Thiếu phương pháp nghiên cứu.')
+    if (!this.hasHtmlContent(o.detailedObjectives)) errors.push('Thiếu mục tiêu.')
+    if (!this.hasHtmlContent(o.researchContent)) {
+      errors.push('Thiếu nội dung và phương pháp thực hiện.')
+    }
+    // Tạm không bắt buộc phương pháp (đã ẩn trên FE)
     if (!(o.milestones || []).some((m) => this.hasHtmlContent(m.content) || !!m.content?.trim())) {
       errors.push('Cần ít nhất một mốc tiến độ.')
     }
-    if (!(o.expectedProducts || []).some((p) => !!p.name?.trim())) {
-      errors.push('Cần ít nhất một sản phẩm dự kiến.')
+    if (
+      !hasExpectedResultsContent(o.expectedResults) &&
+      !(o.expectedProducts || []).some((p) => !!p.name?.trim())
+    ) {
+      errors.push('Cần ít nhất một kết quả/sản phẩm dự kiến.')
     }
     if (!members.some((m) => m.role === 'PRINCIPAL')) {
       errors.push('Thiếu chủ nhiệm đề tài.')
@@ -571,15 +803,28 @@ export default class ProjectOutlineService {
       startDate?: string | null
       endDate?: string | null
       requestedBudget?: number
+      fundingBreakdown?: Partial<OutlineFundingBreakdown> | null
+      budgetMatrix?: Partial<OutlineBudgetMatrix> | null
+      principalInfo?: Partial<OutlinePrincipalInfo> | null
       hostUnit?: string | null
+      hostOrganization?: {
+        name?: string | null
+        orgCode?: string | null
+        phone?: string | null
+        address?: string | null
+        leaderName?: string | null
+        experienceHtml?: string | null
+        teamCapacityHtml?: string | null
+      } | null
       partnerUnits?: OutlinePartnerUnit[]
-      applicationScope?: string | null
       urgency?: string | null
       detailedObjectives?: string | null
       researchContent?: string | null
       methodology?: string | null
       milestones?: OutlineMilestone[]
       expectedProducts?: OutlineProduct[]
+      expectedResults?: Partial<OutlineExpectedResults> | null
+      otherContents?: Partial<OutlineOtherContents> | null
       summary?: string | null
       outlineFileUrl?: string | null
       appendixFileUrl?: string | null
@@ -593,12 +838,95 @@ export default class ProjectOutlineService {
     if (payload.field !== undefined) outline.field = payload.field
     if (payload.startDate !== undefined) outline.startDate = this.parseDate(payload.startDate)
     if (payload.endDate !== undefined) outline.endDate = this.parseDate(payload.endDate)
-    if (payload.requestedBudget !== undefined) {
+    if (payload.fundingBreakdown !== undefined) {
+      if (payload.fundingBreakdown && typeof payload.fundingBreakdown === 'object') {
+        const fb = normalizeFundingBreakdown(payload.fundingBreakdown)
+        outline.fundingBreakdown = fb
+        // Đồng bộ tổng theo chủ thể → requested_budget
+        outline.requestedBudget = fundingTotalByEntity(fb)
+      } else {
+        outline.fundingBreakdown = null
+      }
+    } else if (payload.requestedBudget !== undefined) {
       outline.requestedBudget = Math.round(Number(payload.requestedBudget || 0))
     }
-    if (payload.hostUnit !== undefined) outline.hostUnit = payload.hostUnit
-    if (payload.partnerUnits !== undefined) outline.partnerUnits = payload.partnerUnits
-    if (payload.applicationScope !== undefined) outline.applicationScope = payload.applicationScope
+    if (payload.budgetMatrix !== undefined) {
+      if (payload.budgetMatrix && typeof payload.budgetMatrix === 'object') {
+        outline.budgetMatrix = normalizeBudgetMatrix(payload.budgetMatrix)
+      } else {
+        outline.budgetMatrix = null
+      }
+    }
+    if (payload.principalInfo !== undefined) {
+      if (payload.principalInfo && typeof payload.principalInfo === 'object') {
+        const p = payload.principalInfo
+        outline.principalInfo = {
+          profileId: p.profileId != null ? Number(p.profileId) || null : null,
+          fullName: String(p.fullName || '').trim() || null,
+          identityNumber: String(p.identityNumber || '').trim() || null,
+          dateOfBirth: String(p.dateOfBirth || '').trim() || null,
+          gender: String(p.gender || '').trim() || null,
+          academicTitleDegree: String(p.academicTitleDegree || '').trim() || null,
+          professionalTitle: String(p.professionalTitle || '').trim() || null,
+          position: String(p.position || '').trim() || null,
+          phone: String(p.phone || '').trim() || null,
+          email: String(p.email || '').trim() || null,
+          organization: String(p.organization || '').trim() || null,
+          workAddress: String(p.workAddress || '').trim() || null,
+        }
+      } else {
+        outline.principalInfo = null
+      }
+    }
+    if (payload.hostOrganization !== undefined) {
+      const h = payload.hostOrganization
+      if (h && typeof h === 'object') {
+        outline.hostOrganization = {
+          name: String(h.name || '').trim(),
+          orgCode: String(h.orgCode || '').trim() || null,
+          phone: String(h.phone || '').trim() || null,
+          address: String(h.address || '').trim() || null,
+          leaderName: String(h.leaderName || '').trim() || null,
+          experienceHtml: h.experienceHtml != null ? String(h.experienceHtml) : null,
+          teamCapacityHtml: h.teamCapacityHtml != null ? String(h.teamCapacityHtml) : null,
+        }
+        // Đồng bộ tên → host_unit (validate / báo cáo cũ)
+        if (outline.hostOrganization.name) {
+          outline.hostUnit = outline.hostOrganization.name
+        }
+      } else {
+        outline.hostOrganization = null
+      }
+    }
+    if (payload.hostUnit !== undefined && payload.hostOrganization === undefined) {
+      outline.hostUnit = payload.hostUnit
+      // Bổ sung name vào JSON nếu chưa có
+      if (payload.hostUnit?.trim()) {
+        outline.hostOrganization = {
+          ...(outline.hostOrganization || {
+            name: '',
+            orgCode: null,
+            phone: null,
+            address: null,
+            leaderName: null,
+            experienceHtml: null,
+            teamCapacityHtml: null,
+          }),
+          name: payload.hostUnit.trim(),
+        }
+      }
+    }
+    if (payload.partnerUnits !== undefined) {
+      outline.partnerUnits = (payload.partnerUnits || [])
+        .filter((p) => String(p?.name || '').trim())
+        .map((p) => ({
+          name: String(p.name || '').trim(),
+          orgCode: String(p.orgCode || '').trim() || null,
+          phone: String(p.phone || '').trim() || null,
+          address: String(p.address || '').trim() || null,
+          role: p.role != null ? String(p.role).trim() || null : null,
+        }))
+    }
     if (payload.urgency !== undefined) outline.urgency = payload.urgency
     if (payload.detailedObjectives !== undefined) {
       outline.detailedObjectives = payload.detailedObjectives
@@ -606,7 +934,34 @@ export default class ProjectOutlineService {
     if (payload.researchContent !== undefined) outline.researchContent = payload.researchContent
     if (payload.methodology !== undefined) outline.methodology = payload.methodology
     if (payload.milestones !== undefined) outline.milestones = payload.milestones
-    if (payload.expectedProducts !== undefined) outline.expectedProducts = payload.expectedProducts
+    if (payload.expectedResults !== undefined) {
+      const er = normalizeExpectedResults(payload.expectedResults)
+      outline.expectedResults = er
+      // Đồng bộ bảng sản phẩm cũ từ các nhóm có tên sản phẩm
+      const derived = deriveExpectedProducts(er)
+      if (derived.length) outline.expectedProducts = derived
+    } else if (payload.expectedProducts !== undefined) {
+      outline.expectedProducts = payload.expectedProducts
+    }
+    if (payload.otherContents !== undefined) {
+      if (payload.otherContents && typeof payload.otherContents === 'object') {
+        const c = payload.otherContents
+        const html = (v: unknown) =>
+          v == null ? null : String(v).trim() ? String(v) : null
+        outline.otherContents = {
+          applicationTransferHtml: html(c.applicationTransferHtml),
+          outputEffectivenessHtml: html(c.outputEffectivenessHtml),
+          impactAssessmentHtml: html(c.impactAssessmentHtml),
+          riskManagementHtml: html(c.riskManagementHtml),
+          ethicsDataApprovalHtml: html(c.ethicsDataApprovalHtml),
+          dataManagementPlanHtml: html(c.dataManagementPlanHtml),
+          ipProtectionHtml: html(c.ipProtectionHtml),
+          aiUsageHtml: html(c.aiUsageHtml),
+        }
+      } else {
+        outline.otherContents = null
+      }
+    }
     if (payload.summary !== undefined) outline.summary = payload.summary
     if (payload.outlineFileUrl !== undefined) outline.outlineFileUrl = payload.outlineFileUrl
     if (payload.appendixFileUrl !== undefined) outline.appendixFileUrl = payload.appendixFileUrl
@@ -632,15 +987,20 @@ export default class ProjectOutlineService {
       startDate: o.startDate?.toISO() ?? null,
       endDate: o.endDate?.toISO() ?? null,
       requestedBudget: Number(o.requestedBudget || 0),
+      fundingBreakdown: o.fundingBreakdown || null,
+      budgetMatrix: o.budgetMatrix || null,
+      principalInfo: o.principalInfo || null,
       hostUnit: o.hostUnit,
+      hostOrganization: o.hostOrganization || null,
       partnerUnits: o.partnerUnits || [],
-      applicationScope: o.applicationScope,
       urgency: o.urgency,
       detailedObjectives: o.detailedObjectives,
       researchContent: o.researchContent,
       methodology: o.methodology,
       milestones: o.milestones || [],
       expectedProducts: o.expectedProducts || [],
+      expectedResults: o.expectedResults || emptyExpectedResults(),
+      otherContents: o.otherContents || null,
       summary: o.summary,
       councilFeedback: o.councilFeedback,
       outlineFileUrl: o.outlineFileUrl,

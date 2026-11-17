@@ -246,7 +246,8 @@ export default class ProjectProcurementService {
     userId: number,
     action: 'supply' | 'reject' | 'bid_fail',
     method: string,
-    reason: string
+    reason: string,
+    extra?: { receivedAt?: unknown; attachments?: unknown }
   ) {
     await assertPerm(userId, 'project.procurement_handle')
     const row = await ProjectProcurement.find(id)
@@ -256,10 +257,43 @@ export default class ProjectProcurementService {
       if (method !== 'MUA_TRUC_TIEP' && method !== 'DAU_THAU') throw new Error('INVALID_METHOD')
       row.csvcMethod = method
       row.suppliedAt = DateTime.now()
-      row.status = 'MS_CHO_NHAN'
       row.returnReason = null
-      await row.save()
-      await this.tellOwner(outline.ownerId, 'Hàng đã cung ứng, chờ xác nhận nhận', outline.code, row.id)
+      // Ngày nhận hàng (bắt buộc khi mua trực tiếp)
+      const rawNgay = extra?.receivedAt
+      const ngayNhan = rawNgay ? DateTime.fromISO(String(rawNgay)) : null
+      if (method === 'MUA_TRUC_TIEP') {
+        if (!ngayNhan?.isValid) throw new Error('RECEIVED_DATE_REQUIRED')
+        row.receivedAt = ngayNhan.startOf('day')
+        // Ghép chứng từ CSVC vào attachments (nếu có)
+        if (extra?.attachments != null) {
+          try {
+            const them = parseFiles(extra.attachments, { maxEach: FILE_LIMIT.procurement })
+            row.attachments = [...(row.attachments || []), ...them]
+          } catch {
+            // giữ chứng từ cũ nếu parse lỗi rỗng
+          }
+        }
+        // Mua trực tiếp → chuyển thẳng KH-TC
+        row.status = 'MS_CHO_TC'
+        await row.save()
+        await NotificationService.pushToPermission('project.budget_confirm', {
+          type: 'PROJECT_UPDATE',
+          title: 'Mua sắm chờ thanh toán (CSVC đã cung ứng)',
+          message: outline.code,
+          link: this.linkHopDongMua(outline, row.id),
+        })
+        await this.tellOwner(
+          outline.ownerId,
+          'CSVC đã cung ứng (mua trực tiếp)',
+          outline.code,
+          row.id
+        )
+      } else {
+        if (ngayNhan?.isValid) row.receivedAt = ngayNhan.startOf('day')
+        row.status = 'MS_CHO_NHAN'
+        await row.save()
+        await this.tellOwner(outline.ownerId, 'Hàng đã cung ứng, chờ xác nhận nhận', outline.code, row.id)
+      }
     } else if (action === 'reject') {
       if (!reason.trim()) throw new Error('REASON_REQUIRED')
       row.status = 'MS_TU_CHOI'
