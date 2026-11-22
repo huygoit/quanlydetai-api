@@ -1,5 +1,5 @@
 /**
- * Mã Module 5–6 — khoản chi thống nhất 14 mục (khoan_chi.ts).
+ * Mã Module 5–6 — khoản chi thống nhất theo thuyết minh (khoan_chi.ts).
  */
 
 import {
@@ -98,6 +98,13 @@ export type QtStatus = (typeof QT_FLOW)[number]
 
 export const COUNCIL_ROLES = ['CHU_TICH', 'THU_KY', 'PHAN_BIEN', 'UY_VIEN'] as const
 export type CouncilRole = (typeof COUNCIL_ROLES)[number]
+
+export const COUNCIL_ROLE_LABEL: Record<CouncilRole, string> = {
+  CHU_TICH: 'Chủ tịch',
+  THU_KY: 'Thư ký',
+  PHAN_BIEN: 'Phản biện',
+  UY_VIEN: 'Ủy viên',
+}
 
 export const CLASSIFICATIONS = ['DAT_YEU_CAU', 'CAN_BO_SUNG', 'KHONG_DAT'] as const
 export type FinalClassification = (typeof CLASSIFICATIONS)[number]

@@ -13,6 +13,8 @@ import {
   chuanCauHinhQuyetDinh,
   type QuyetDinhMergeConfig,
 } from '#constants/quyet_dinh_template_variables'
+import { DON_DE_NGHI_TEMPLATE_VARIABLES } from '#constants/don_de_nghi_template_variables'
+import { BAO_CAO_TONG_KET_TEMPLATE_VARIABLES } from '#constants/bao_cao_tong_ket_template_variables'
 import {
   DOC_TEMPLATE_TYPES,
   getDocTemplateType,
@@ -86,6 +88,8 @@ function knownVariablesForType(templateType: string) {
   if (templateType === 'THANH_LY') return BM14_TEMPLATE_VARIABLES
   if (templateType === 'THONG_BAO') return THONG_BAO_TEMPLATE_VARIABLES
   if (templateType === 'QUYET_DINH') return QUYET_DINH_TEMPLATE_VARIABLES
+  if (templateType === 'DON_DE_NGHI') return DON_DE_NGHI_TEMPLATE_VARIABLES
+  if (templateType === 'BAO_CAO_TONG_KET') return BAO_CAO_TONG_KET_TEMPLATE_VARIABLES
   return []
 }
 

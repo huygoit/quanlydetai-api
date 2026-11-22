@@ -97,13 +97,48 @@ export default class extends BaseSeeder {
       fileName: 'Quyet_dinh_thanh_lap_Hoi_dong_TEMPLATE.docx',
       source: app.makePath('resources/quyet-dinh/Quyet_dinh_thanh_lap_Hoi_dong_TEMPLATE.docx'),
     })
+
+    await this.seedFile({
+      code: 'BM0501_DEFAULT',
+      name: 'Đơn đề nghị đánh giá kết quả nhiệm vụ (BM-05.01)',
+      description:
+        'Mẫu chuẩn BM-05.01 — biến {{...}} theo đơn đề nghị đánh giá kết quả thực hiện nhiệm vụ KHCN&ĐMST.',
+      templateType: 'DON_DE_NGHI',
+      formCode: 'BM0501',
+      fileName: 'BM-05.01_Don_de_nghi_danh_gia_ket_qua_co_bien.docx',
+      source: app.makePath(
+        'resources/don-de-nghi/BM-05.01_Don_de_nghi_danh_gia_ket_qua_co_bien.docx'
+      ),
+      forceUpdate: true,
+    })
+
+    await this.seedFile({
+      code: 'BM0502_DEFAULT',
+      name: 'Báo cáo tổng kết kết quả nhiệm vụ (BM-05.02)',
+      description:
+        'Mẫu chuẩn BM-05.02 — biến {{...}}; mỗi bảng dữ liệu là một biến bang_*.',
+      templateType: 'BAO_CAO_TONG_KET',
+      formCode: 'BM0502',
+      fileName: 'BM-05.02_Bao_cao_tong_ket_co_bien.docx',
+      source: app.makePath(
+        'resources/bao-cao-tong-ket/BM-05.02_Bao_cao_tong_ket_co_bien.docx'
+      ),
+      forceUpdate: true,
+    })
   }
 
   private async seedFile(input: {
     code: string
     name: string
     description: string
-    templateType: 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO' | 'QUYET_DINH' | 'THUYET_MINH'
+    templateType:
+      | 'HOP_DONG'
+      | 'THANH_LY'
+      | 'THONG_BAO'
+      | 'QUYET_DINH'
+      | 'THUYET_MINH'
+      | 'DON_DE_NGHI'
+      | 'BAO_CAO_TONG_KET'
     formCode: string
     fileName: string
     source: string
@@ -156,7 +191,12 @@ export default class extends BaseSeeder {
       existing.version = (existing.version || 1) + 1
       await existing.save()
       // Chỉ 1 mẫu mặc định cho mỗi loại
-      if (input.templateType === 'HOP_DONG' || input.templateType === 'THUYET_MINH') {
+      if (
+        input.templateType === 'HOP_DONG' ||
+        input.templateType === 'THUYET_MINH' ||
+        input.templateType === 'DON_DE_NGHI' ||
+        input.templateType === 'BAO_CAO_TONG_KET'
+      ) {
         await ContractTemplate.query()
           .where('template_type', input.templateType)
           .whereNot('id', existing.id)

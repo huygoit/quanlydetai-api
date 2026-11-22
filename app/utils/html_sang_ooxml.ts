@@ -5,7 +5,8 @@
 
 type DinhDang = { dam: boolean; nghieng: boolean; gach: boolean }
 type Manh = { chu: string; dinhDang: DinhDang; xuong?: boolean }
-type LoaiDoan = 'van' | 'cham' | 'so'
+/** cham = • | gach = - | cong = + | so = 1. 2. … */
+type LoaiDoan = 'van' | 'cham' | 'gach' | 'cong' | 'so'
 type Doan = { loai: LoaiDoan; so: number; manh: Manh[] }
 
 const DINH_DANG_TRONG: DinhDang = { dam: false, nghieng: false, gach: false }
@@ -38,39 +39,56 @@ function apStyle(style: string, goc: DinhDang): DinhDang {
 }
 
 function runChu(chu: string, dinhDang: DinhDang) {
+  // Đủ ascii/hAnsi/eastAsia/cs — Word (locale VN) hay lấy nhánh cs/eastAsia;
+  // thiếu bCs/iCs thì đậm/nghiêng trong XML nhưng không hiện khi mở file.
   const rPr = [
-    '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>',
+    '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>',
   ]
-  if (dinhDang.dam) rPr.push('<w:b/>')
-  if (dinhDang.nghieng) rPr.push('<w:i/>')
+  if (dinhDang.dam) rPr.push('<w:b/><w:bCs/>')
+  if (dinhDang.nghieng) rPr.push('<w:i/><w:iCs/>')
   rPr.push('<w:sz w:val="26"/><w:szCs w:val="26"/>')
   if (dinhDang.gach) rPr.push('<w:u w:val="single"/>')
   return `<w:r><w:rPr>${rPr.join('')}</w:rPr><w:t xml:space="preserve">${thoatXml(chu)}</w:t></w:r>`
 }
 
-function xmlDoan(doan: Doan) {
+function coChuThat(doan: Doan | null) {
+  return !!doan && doan.manh.some((m) => m.chu.trim())
+}
+
+function xmlDoan(doan: Doan, sauLaDanhSach = false) {
   const runs: string[] = []
   const thuong = DINH_DANG_TRONG
-  if (doan.loai === 'cham') runs.push(runChu('– ', thuong))
+  // Marker khớp editor: • / - / + / số
+  if (doan.loai === 'cham') runs.push(runChu('• ', thuong))
+  if (doan.loai === 'gach') runs.push(runChu('- ', thuong))
+  if (doan.loai === 'cong') runs.push(runChu('+ ', thuong))
   if (doan.loai === 'so') runs.push(runChu(`${doan.so}. `, thuong))
   for (const manh of doan.manh) {
     if (manh.xuong) runs.push('<w:r><w:br/></w:r>')
     if (manh.chu) runs.push(runChu(manh.chu, manh.dinhDang))
   }
+  // Khớp editor web: canh trái — không thụt đầu dòng / không căn giữa
   const canh =
     doan.loai === 'van'
-      ? '<w:ind w:firstLine="567"/><w:jc w:val="both"/>'
-      : '<w:ind w:left="567" w:hanging="284"/>'
-  return `<w:p><w:pPr><w:spacing w:before="0" w:after="80"/>${canh}</w:pPr>${runs.join('')}</w:p>`
+      ? '<w:jc w:val="left"/>'
+      : '<w:ind w:left="567" w:hanging="284"/><w:jc w:val="left"/>'
+  // Tiêu đề ngay trước list: after=0; list: after nhỏ; đoạn thường: after vừa
+  const laList = doan.loai !== 'van'
+  const after = sauLaDanhSach ? '0' : laList ? '40' : '60'
+  return `<w:p><w:pPr><w:spacing w:before="0" w:after="${after}"/>${canh}</w:pPr>${runs.join('')}</w:p>`
 }
 
-function coChu(doan: Doan | null) {
-  return !!doan && doan.manh.some((m) => m.chu.trim() || m.xuong)
+/** Bỏ <p> trống / chỉ br — nguyên nhân khoảng cách lớn trước danh sách. */
+function locHtmlRong(html: string) {
+  return (html || '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<p(?:\s[^>]*)?>\s*(?:<br\s*\/?>|&nbsp;|\u00a0|\s)*<\/p>/gi, '')
+    .replace(/<div(?:\s[^>]*)?>\s*(?:<br\s*\/?>|&nbsp;|\u00a0|\s)*<\/div>/gi, '')
 }
 
 /** HTML soạn thảo → các thẻ w:p. */
 export function htmlSangOoxml(html: string) {
-  const nguon = (html || '').replace(/<!--[\s\S]*?-->/g, '')
+  const nguon = locHtmlRong(html)
   const token = nguon.match(/<\/?[a-zA-Z][^>]*>|[^<]+/g) || []
   const ketQua: Doan[] = []
   let hienTai: Doan | null = null
@@ -81,17 +99,29 @@ export function htmlSangOoxml(html: string) {
 
   const loaiHienTai = (): LoaiDoan => {
     const cuoi = danhSach[danhSach.length - 1]
-    return cuoi === 'cham' || cuoi === 'so' ? cuoi : 'van'
+    return cuoi === 'cham' || cuoi === 'gach' || cuoi === 'cong' || cuoi === 'so'
+      ? cuoi
+      : 'van'
   }
 
-  const xep = (giuTrong: boolean) => {
+  /** Nhận kiểu UL từ class / data-list (editor RichTextHtmlField). */
+  const loaiTuTheUl = (the: string): LoaiDoan => {
+    if (/data-list\s*=\s*(["'])dash\1|rt-list-dash/i.test(the)) return 'gach'
+    if (/data-list\s*=\s*(["'])plus\1|rt-list-plus/i.test(the)) return 'cong'
+    return 'cham'
+  }
+
+  const xep = () => {
     if (!hienTai) return
-    if (coChu(hienTai) || giuTrong) ketQua.push(hienTai)
+    // Chỉ giữ đoạn có chữ — bỏ đoạn chỉ <br>/trắng
+    if (coChuThat(hienTai)) ketQua.push(hienTai)
     hienTai = null
   }
 
   const themChu = (chu: string) => {
     if (!chu) return
+    // Khoảng trắng giữa thẻ, chưa có đoạn → bỏ (tránh đoạn rỗng)
+    if (!chu.trim() && !hienTai) return
     if (!hienTai) {
       const loai = loaiHienTai()
       const so = loai === 'so' ? demSo[demSo.length - 1] || 1 : 0
@@ -109,14 +139,16 @@ export function htmlSangOoxml(html: string) {
     const ten = raw.replace(/^<\/?/, '').replace(/[\s/>].*$/, '').toLowerCase()
     const style = /style\s*=\s*(["'])([\s\S]*?)\1/i.exec(raw)?.[2] || ''
     if (ten === 'br') {
-      if (!hienTai) hienTai = { loai: loaiHienTai(), so: 0, manh: [] }
-      hienTai.manh.push({ chu: '', dinhDang: { ...dinhDang }, xuong: true })
+      // Chỉ xuống dòng trong đoạn đã có chữ — không tạo đoạn trống
+      if (coChuThat(hienTai)) {
+        hienTai!.manh.push({ chu: '', dinhDang: { ...dinhDang }, xuong: true })
+      }
       continue
     }
     if (ten === 'ul' || ten === 'ol') {
-      xep(false)
+      xep()
       if (!dong) {
-        danhSach.push(ten === 'ol' ? 'so' : 'cham')
+        danhSach.push(ten === 'ol' ? 'so' : loaiTuTheUl(raw))
         if (ten === 'ol') demSo.push(0)
       } else {
         const vua = danhSach.pop()
@@ -126,7 +158,7 @@ export function htmlSangOoxml(html: string) {
     }
     if (ten === 'li') {
       if (!dong) {
-        xep(false)
+        xep()
         if (danhSach[danhSach.length - 1] === 'so') {
           demSo[demSo.length - 1] = (demSo[demSo.length - 1] || 0) + 1
         }
@@ -137,15 +169,15 @@ export function htmlSangOoxml(html: string) {
           manh: [],
         }
       } else {
-        xep(false)
+        xep()
       }
       continue
     }
     if (ten === 'p' || ten === 'div' || /^h[1-6]$/.test(ten)) {
       if (!dong) {
-        if (coChu(hienTai)) xep(false)
+        if (coChuThat(hienTai)) xep()
       } else {
-        xep(false)
+        xep()
       }
       continue
     }
@@ -162,7 +194,13 @@ export function htmlSangOoxml(html: string) {
       }
     }
   }
-  xep(false)
-  if (!ketQua.length) return '<w:p><w:pPr><w:spacing w:after="80"/></w:pPr></w:p>'
-  return ketQua.map(xmlDoan).join('')
+  xep()
+  if (!ketQua.length) return '<w:p><w:pPr><w:spacing w:after="40"/></w:pPr></w:p>'
+  return ketQua
+    .map((doan, i) => {
+      const tiep = ketQua[i + 1]
+      const sauLaDanhSach = !!tiep && tiep.loai !== 'van'
+      return xmlDoan(doan, sauLaDanhSach)
+    })
+    .join('')
 }

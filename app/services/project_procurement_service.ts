@@ -24,6 +24,7 @@ import {
   loadOutline,
   money,
   parseFiles,
+  remainingForAdvance,
   writeLedger,
 } from '#services/module56_common'
 
@@ -170,7 +171,7 @@ export default class ProjectProcurementService {
     const needed = body.neededBy || body.needed_by
     const neededBy = needed ? DateTime.fromISO(String(needed)) : null
     const snap = await budgetSnapshot(outline.id)
-    const remaining = snap.find((l) => l.code === lineCode)?.remaining ?? 0
+    const remaining = remainingForAdvance(snap, lineCode)
     const overBudget = total > remaining
     // Form không còn bắt nhập giải trình vượt dự toán
     const note = String(body.overBudgetNote || body.over_budget_note || '').trim()
@@ -362,7 +363,8 @@ export default class ProjectProcurementService {
       await row.save()
       await writeLedger(outline.id, row.lineCode, 'SPENT', Number(row.totalAmount), 'MS', row.id, userId, null, trx)
       // Mua sắm / thuê tài sản → ghi tài sản nhiệm vụ
-      if (row.lineCode === 'MUC_04') {
+      // VAT_LIEU (NVL / mua sắm / sửa chữa) → ghi tài sản nhiệm vụ
+      if (row.lineCode === 'VAT_LIEU') {
         const existed = await ProjectAsset.query({ client: trx }).where('procurement_id', row.id).first()
         if (!existed) {
           await ProjectAsset.createMany(

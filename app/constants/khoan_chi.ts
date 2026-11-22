@@ -1,106 +1,57 @@
 /**
- * 14 khoản chi dùng chung (hợp đồng / tạm ứng / sổ chi…).
- * Mục 2 tách Trong nước / Nước ngoài để chọn trên form.
+ * Danh mục khoản chi dùng chung toàn hệ thống.
+ * Chuẩn = cột khoản chi thuyết minh (ma trận kinh phí) — hợp đồng / tạm ứng / mua sắm cùng mã.
  */
 
+import {
+  OUTLINE_BUDGET_EXPENSE_COLUMN_ORDER,
+  OUTLINE_BUDGET_EXPENSE_LABELS,
+  type OutlineBudgetExpenseCode,
+} from '#constants/outline_budget_matrix'
+
 export type KhoanChiDef = {
-  code: string
+  code: OutlineBudgetExpenseCode
   stt: number
   label: string
-  /** Nhóm cha khi là dòng con (vd. thuê chuyên gia) */
-  group?: string
   /** Mục quản lý chung ≤ 5% tổng */
   isQuanLyChung?: boolean
 }
 
-export const KHOAN_CHI: KhoanChiDef[] = [
-  {
-    code: 'MUC_01',
-    stt: 1,
-    label: 'Chi thù lao thực hiện nhiệm vụ',
-  },
-  {
-    code: 'MUC_02A',
-    stt: 2,
-    label: 'Thuê chuyên gia - Trong nước',
-    group: 'MUC_02',
-  },
-  {
-    code: 'MUC_02B',
-    stt: 2,
-    label: 'Thuê chuyên gia - Nước ngoài',
-    group: 'MUC_02',
-  },
-  {
-    code: 'MUC_03',
-    stt: 3,
-    label: 'Nguyên liệu, nhiên liệu, mẫu vật',
-  },
-  {
-    code: 'MUC_04',
-    stt: 4,
-    label: 'Sửa chữa, mua sắm, thuê tài sản',
-  },
-  {
-    code: 'MUC_05',
-    stt: 5,
-    label: 'Công tác tổ chức, tham gia hội nghị',
-  },
-  {
-    code: 'MUC_06',
-    stt: 6,
-    label: 'Dịch vụ thuê ngoài',
-  },
-  {
-    code: 'MUC_07',
-    stt: 7,
-    label: 'Điều tra, khảo sát thu thập số liệu',
-  },
-  {
-    code: 'MUC_08',
-    stt: 8,
-    label: 'Văn phòng phẩm, thông tin liên lạc, in ấn',
-  },
-  {
-    code: 'MUC_09',
-    stt: 9,
-    label: 'Công bố công trình khoa học và công nghệ trong nước và quốc tế',
-  },
-  {
-    code: 'MUC_10',
-    stt: 10,
-    label: 'Tự đánh giá kết quả thực hiện nhiệm vụ',
-  },
-  {
-    code: 'MUC_11',
-    stt: 11,
-    label:
-      'Tư vấn xây dựng hồ sơ đăng ký bảo hộ quyền sở hữu trí tuệ ở trong nước và nước ngoài',
-  },
-  {
-    code: 'MUC_12',
-    stt: 12,
-    label: 'Phổ biến, tuyên truyền kết quả của nhiệm vụ',
-  },
-  {
-    code: 'MUC_13',
-    stt: 13,
-    label: 'Công tác quản lý chung nhiệm vụ (bằng 5% tổng kinh phí thực hiện)',
-    isQuanLyChung: true,
-  },
-  {
-    code: 'MUC_14',
-    stt: 14,
-    label: 'Chi khác có liên quan trực tiếp đến triển khai thực hiện nhiệm vụ',
-  },
-]
+export const KHOAN_CHI: KhoanChiDef[] = OUTLINE_BUDGET_EXPENSE_COLUMN_ORDER.map(
+  (code, index) => ({
+    code,
+    stt: index + 1,
+    label: OUTLINE_BUDGET_EXPENSE_LABELS[code],
+    isQuanLyChung: code === 'QUAN_LY',
+  })
+)
 
 export const KHOAN_CHI_CODES = KHOAN_CHI.map((k) => k.code)
 
-export const KHOAN_CHI_QUAN_LY = 'MUC_13'
+export const KHOAN_CHI_QUAN_LY = 'QUAN_LY' as const
 
-/** Mã dùng cho đề nghị mua sắm */
-export const KHOAN_CHI_MUA_SAM = ['MUC_03', 'MUC_04', 'MUC_06'] as const
+/** Mã dùng cho đề nghị mua sắm (NVL/mua sắm + thuê ngoài) */
+export const KHOAN_CHI_MUA_SAM = ['VAT_LIEU', 'THUE_NGOAI'] as const
+
+/** Map mã cũ (14 mục MUC_*) → mã chuẩn thuyết minh — migrate dữ liệu. */
+export const LEGACY_MUC_TO_KHOAN: Record<string, OutlineBudgetExpenseCode> = {
+  MUC_01: 'THU_LAO',
+  MUC_02A: 'THU_LAO',
+  MUC_02B: 'THU_LAO',
+  MUC_02: 'THU_LAO',
+  MUC_03: 'VAT_LIEU',
+  MUC_04: 'VAT_LIEU',
+  MUC_05: 'HOI_NGHI',
+  MUC_06: 'THUE_NGOAI',
+  MUC_07: 'DIEU_TRA',
+  MUC_08: 'VAN_PHONG',
+  MUC_09: 'CONG_BO',
+  MUC_10: 'TU_DANH_GIA',
+  MUC_11: 'TU_VAN_SHTT',
+  MUC_12: 'PHO_BIEN',
+  MUC_13: 'QUAN_LY',
+  MUC_14: 'CHI_KHAC',
+}
 
 export function nhanKhoanChi(code: string) {
   const hit = KHOAN_CHI.find((k) => k.code === code)
@@ -109,5 +60,12 @@ export function nhanKhoanChi(code: string) {
 }
 
 export function laKhoanChiHopLe(code: string) {
-  return KHOAN_CHI_CODES.includes(code)
+  return (KHOAN_CHI_CODES as string[]).includes(code)
+}
+
+export function chuanHoaMaKhoanChi(code: string): string {
+  const raw = String(code || '').trim()
+  if (!raw) return raw
+  if ((KHOAN_CHI_CODES as string[]).includes(raw)) return raw
+  return LEGACY_MUC_TO_KHOAN[raw] || raw
 }

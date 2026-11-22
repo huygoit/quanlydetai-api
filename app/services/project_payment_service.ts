@@ -18,6 +18,7 @@ import {
   loadOutline,
   money,
   parseFiles,
+  remainingForAdvance,
   writeLedger,
 } from '#services/module56_common'
 
@@ -145,7 +146,7 @@ export default class ProjectPaymentService {
       const created = await db.transaction(async (trx) => {
         const out: ProjectPaymentRequest[] = []
         for (const line of lines) {
-          const remain = snap.find((l) => l.code === line.lineCode)?.remaining ?? 0
+          const remain = remainingForAdvance(snap, line.lineCode)
           const row = new ProjectPaymentRequest()
           row.useTransaction(trx)
           row.projectOutlineId = outline.id
@@ -192,8 +193,7 @@ export default class ProjectPaymentService {
     if (amount <= 0) throw new Error('INVALID_AMOUNT')
 
     const snap = await budgetSnapshot(outline.id)
-    const line = snap.find((l) => l.code === lineCode)
-    const overBudget = amount > (line?.remaining ?? 0)
+    const overBudget = amount > remainingForAdvance(snap, lineCode)
 
     if (!row) {
       row = new ProjectPaymentRequest()

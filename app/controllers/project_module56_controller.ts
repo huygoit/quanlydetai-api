@@ -291,6 +291,12 @@ export default class ProjectModule56Controller {
     )
   }
 
+  /** GET — phiếu đánh giá KQCK của tôi (thành viên HĐ) */
+  async finalMyEvalSheets({ auth, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () => ProjectFinalService.listMyEvalSheets(user.id))
+  }
+
   async finalShow({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
     return this.run(response, () => ProjectFinalService.show(Number(params.outlineId), user.id))
@@ -306,6 +312,55 @@ export default class ProjectModule56Controller {
     const submit = request.input('submit') === true || request.input('submit') === 'true'
     return this.run(response, () =>
       ProjectFinalService.saveDossier(Number(params.outlineId), user.id, request.body(), submit)
+    )
+  }
+
+  /** GET — tải đơn đề nghị đánh giá KQNV (BM-05.01) đã đổ biến từ thuyết minh/HĐ */
+  async finalEvaluationRequestDocx({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const exported = await ProjectFinalService.exportDonDeNghi(Number(params.outlineId), user.id)
+      response.header(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(exported.fileName)}"`
+      )
+      return response.download(exported.fullPath)
+    } catch (err) {
+      if (mapModule56Error(response, err)) return
+      throw err
+    }
+  }
+
+  /** GET — tải báo cáo tổng kết BM-05.02 */
+  async finalBaoCaoTongKetDocx({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const exported = await ProjectFinalService.exportBaoCaoTongKet(
+        Number(params.outlineId),
+        user.id
+      )
+      response.header(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(exported.fileName)}"`
+      )
+      return response.download(exported.fullPath)
+    } catch (err) {
+      if (mapModule56Error(response, err)) return
+      throw err
+    }
+  }
+
+  /** PUT — lưu/nộp hồ sơ đề nghị đánh giá KQNV */
+  async finalEvaluationRequest({ auth, params, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    const submit = request.input('submit') === true || request.input('submit') === 'true'
+    return this.run(response, () =>
+      ProjectFinalService.saveEvaluationRequest(
+        Number(params.outlineId),
+        user.id,
+        request.body(),
+        submit
+      )
     )
   }
 

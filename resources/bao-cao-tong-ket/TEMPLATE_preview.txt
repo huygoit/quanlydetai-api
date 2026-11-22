@@ -1,0 +1,48 @@
+Mã biểu mẫu: BM-05.02 | Phiên bản: 1.0 | Ngày áp dụng: …/…/2026
+[BẢNG 1 dòng]
+  R0: ĐẠI HỌC ĐÀ NẴNGTRƯỜNG ĐẠI HỌC SƯ PHẠM | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM            Độc lập – Tự do – Hạnh phúc
+Đà Nẵng, {{ngay_lap}}
+BÁO CÁO TỔNG KẾT KẾT QUẢ THỰC HIỆN NHIỆM VỤ KH,CN&ĐMST
+(Trình bày phù hợp loại hình, quy mô nhiệm vụ; dẫn chiếu minh chứng đã có trong hồ sơ quản lý.)
+1. THÔNG TIN CHUNG
+[BẢNG 8 dòng]
+  R0: - Tên nhiệm vụ | {{ten_nhiem_vu}}
+  R1: - Mã số, cấp quản lý | {{ma_so_cap_quan_ly}}
+  R2: - Chủ nhiệm nhiệm vụ | {{chu_nhiem}}
+  R3: - Tổ chức/đơn vị chủ trì | {{to_chuc_chu_tri}}
+  R4: - Quyết định phê duyệt/Hợp đồng | {{so_qd_hd}}
+  R5: - Thời gian thực hiện (gia hạn nếu có) | {{thoi_gian_thuc_hien}}
+  R6: - Tổng kinh phí được phê duyệt | {{tong_kinh_phi}}
+  R7: - Đơn vị phối hợp, đối tác (nếu có) | {{don_vi_phoi_hop}}
+2. TÓM TẮT KẾT QUẢ
+{{tom_tat_ket_qua}}
+3. TỔNG QUAN VẤN ĐỀ NGHIÊN CỨU
+{{tong_quan_van_de}}
+4. MỤC TIÊU, NỘI DUNG VÀ PHƯƠNG PHÁP NGHIÊN CỨU
+4.1. Mục tiêu, đối tượng và phạm vi nghiên cứu
+{{muc_tieu_doi_tuong_pham_vi}}
+4.2. Nội dung nghiên cứu
+{{noi_dung_nghien_cuu}}
+4.3. Phương pháp nghiên cứu
+{{phuong_phap_nghien_cuu}}
+5. KẾT QUẢ NGHIÊN CỨU
+{{ket_qua_nghien_cuu}}
+6. SẢN PHẨM VÀ HIỆU QUẢ CỦA NHIỆM VỤ
+6.1. Sản phẩm của nhiệm vụ
+{{bang_san_pham}}
+{{ghi_chu_san_pham}}
+6.2. Hiệu quả và khả năng ứng dụng
+{{hieu_qua_ung_dung}}
+7. KẾT LUẬN VÀ KIẾN NGHỊ
+7.1. Kết luận
+{{ket_luan}}
+7.2. Kiến nghị
+{{kien_nghi}}
+8. TÀI LIỆU THAM KHẢO VÀ PHỤ LỤC
+8.1. Tài liệu tham khảo
+{{tai_lieu_tham_khao}}
+8.2. Phụ lục và minh chứng
+{{phu_luc_minh_chung}}
+[BẢNG 2 dòng]
+  R0: XÁC NHẬN CỦA ĐƠN VỊ/ KHOA | CHỦ NHIỆM NHIỆM VỤ
+  R1: (Ký, ghi rõ họ tên) | (Ký, ghi rõ họ tên)

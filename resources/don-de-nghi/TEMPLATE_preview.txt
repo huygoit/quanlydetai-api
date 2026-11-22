@@ -1,0 +1,24 @@
+ĐẠI HỌC ĐÀ NẴNGTRƯỜNG ĐẠI HỌC SƯ PHẠM
+CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM            Độc lập – Tự do – Hạnh phúc
+Đà Nẵng, {{ngay_lap}}
+ĐƠN ĐỀ NGHỊ ĐÁNH GIÁ KẾT QUẢ THỰC HIỆN NHIỆM VỤ KH,CN&ĐMST
+Kính gửi: Hiệu trưởng Trường Đại học Sư phạm - Đại học Đà Nẵng
+1. Thông tin nhiệm vụ
+Tên nhiệm vụ: {{ten_nhiem_vu}}
+Mã số (nếu có): {{ma_so}}     Cấp quản lý: {{cap_quan_ly}}
+Quyết định phê duyệt/Hợp đồng số: {{so_qd_hd}} ngày {{ngay_qd_hd}}
+Chủ nhiệm nhiệm vụ: {{chu_nhiem}}     Tổ chức/đơn vị chủ trì: {{to_chuc_chu_tri}}
+Thời gian thực hiện: từ {{thoi_gian_tu}} đến {{thoi_gian_den}} (gia hạn nếu có: {{gia_han}})
+2. Nội dung đề nghị
+Căn cứ hồ sơ nhiệm vụ được phê duyệt và kết quả thực hiện, Chủ nhiệm nhiệm vụ và tổ chức chủ trì đề nghị Nhà trường tổ chức đánh giá kết quả thực hiện nhiệm vụ nêu trên.
+3. Hồ sơ kèm theo
+- Báo cáo tổng kết kết quả nhiệm vụ (BM-05.02).
+- Danh mục sản phẩm, minh chứng kết quả và dữ liệu liên quan.
+- Các hồ sơ, tài liệu liên quan khác theo quy định hoặc hợp đồng (nếu có)
+- Danh sách giới thiệu Hội đồng đánh giá nghiệm thu (BM-05.03).
+4. Cam kết
+Chúng tôi cam kết các thông tin, số liệu và minh chứng cung cấp là trung thực, chính xác; chịu trách nhiệm về nội dung hồ sơ đề nghị đánh giá theo quy định.
+XÁC NHẬN CỦA ĐƠN VỊ/ KHOA
+CHỦ NHIỆM NHIỆM VỤ
+(Ký, ghi rõ họ tên)
+(Ký, ghi rõ họ tên)

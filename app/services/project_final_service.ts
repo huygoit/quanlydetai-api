@@ -2,7 +2,9 @@ import { DateTime } from 'luxon'
 import fs from 'node:fs/promises'
 import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
+import ProjectContract from '#models/project_contract'
 import ProjectFinalCase from '#models/project_final_case'
+import ProjectOutline from '#models/project_outline'
 import type { CouncilMember, ExplanationItem, FinalProduct, MinutesBody } from '#models/project_final_case'
 import ProjectFinalSheet from '#models/project_final_sheet'
 import ProjectAsset from '#models/project_asset'
@@ -21,11 +23,13 @@ import {
   mergeDocxTemplate,
   resolveGeneratedContractDir,
 } from '#utils/docx_merge_helper'
+import { buildSanPhamYeuCauOoxml } from '#utils/outline_thuyet_minh_merge'
 import { buildFormDocx } from '#utils/simple_docx'
 import { canReopenFinalMinutes, hasCouncilQuorum } from '#services/module56_rules'
 import {
   BUDGET_LINE_CODES,
   CLASSIFICATION_LABEL,
+  COUNCIL_ROLE_LABEL,
   COUNCIL_ROLES,
   FILE_LIMIT,
   type BudgetLineCode,
@@ -33,6 +37,7 @@ import {
   type FinalClassification,
 } from '#constants/module56'
 import { DATETIME_FORMAT } from '#constants/datetime_formats'
+import { buildFinalCouncilInviteEmail } from '#utils/final_council_invite_email'
 import {
   assertCnnv,
   assertExecution,
@@ -65,6 +70,61 @@ export default class ProjectFinalService {
     return this.payload(outline, row, sheets, assets, finance, userId)
   }
 
+  /**
+   * Danh sách phiếu đánh giá KQCK của user (là thành viên hội đồng).
+   * Dùng menu «Phiếu đánh giá KQCK của tôi».
+   */
+  static async listMyEvalSheets(userId: number) {
+    const laThanhVien = (c: ProjectFinalCase) =>
+      (c.councilMembers || []).some(
+        (m) => Number((m as any).userId ?? (m as any).user_id) === Number(userId)
+      )
+    // Có trong council_members là đủ (không bắt buộc meeting_at)
+    const allCases = await ProjectFinalCase.query().orderBy('id', 'desc').limit(800)
+    const mine = allCases.filter(laThanhVien)
+    if (!mine.length) return []
+
+    const outlineIds = mine.map((c) => c.projectOutlineId)
+    const outlines = await ProjectOutline.query().whereIn('id', outlineIds)
+    const byOutline = new Map(outlines.map((o) => [o.id, o]))
+    const sheets = await ProjectFinalSheet.query()
+      .whereIn('project_outline_id', outlineIds)
+      .where('user_id', userId)
+    const sheetByOutline = new Map(sheets.map((s) => [s.projectOutlineId, s]))
+    const contracts = await ProjectContract.query().whereIn('project_outline_id', outlineIds)
+    const contractByOutline = new Map(contracts.map((c) => [c.projectOutlineId, c]))
+
+    return mine
+      .map((c) => {
+        const outline = byOutline.get(c.projectOutlineId)
+        if (!outline) return null
+        const me = (c.councilMembers || []).find(
+          (m) => Number((m as any).userId ?? (m as any).user_id) === Number(userId)
+        )
+        const sheet = sheetByOutline.get(c.projectOutlineId)
+        const contract = contractByOutline.get(c.projectOutlineId)
+        const role = String((me as any)?.role || '')
+        return {
+          outlineId: outline.id,
+          code: outline.code,
+          title: outline.title,
+          ownerName: outline.ownerName,
+          executionStatus: outline.executionStatus,
+          meetingAt: iso(c.meetingAt),
+          location: c.meetingLocation,
+          role: role || null,
+          roleLabel: role
+            ? COUNCIL_ROLE_LABEL[role as keyof typeof COUNCIL_ROLE_LABEL] || role
+            : null,
+          sheetSubmittedAt: iso(sheet?.submittedAt || null),
+          minutesLocked: !!c.minutesLocked,
+          contractId: contract?.id || null,
+          formPath: `/projects/final-eval/${outline.id}`,
+        }
+      })
+      .filter(Boolean)
+  }
+
   static async notify(outlineId: number, userId: number) {
     await assertPerm(userId, 'project.contract_manage')
     const outline = await loadOutline(outlineId)
@@ -80,7 +140,7 @@ export default class ProjectFinalService {
         type: 'PROJECT_UPDATE',
         title: 'Thông báo đánh giá cuối kỳ',
         message: `${outline.code}: nộp hồ sơ BM.10/BM.11 trên hệ thống`,
-        link: `/projects/final/${outline.id}`,
+        link: await this.contractTabPath(outline.id, 'denghi'),
       })
       await EmailLogService.logStubToUser(
         outline.ownerId,
@@ -124,7 +184,7 @@ export default class ProjectFinalService {
         type: 'PROJECT_UPDATE',
         title: 'Hồ sơ đánh giá cuối kỳ',
         message: outline.code,
-        link: `/projects/final/${outline.id}`,
+        link: await this.contractTabPath(outline.id, 'nghiemthu'),
       })
     }
     await row.save()
@@ -141,8 +201,39 @@ export default class ProjectFinalService {
     if (!accept) {
       if (!note.trim()) throw new Error('REASON_REQUIRED')
       outline.executionStatus = 'DGCK_BS'
+      // Cho CNNV nộp lại: bỏ mốc đã nộp
+      row.submittedAt = null
       await row.save()
       await outline.save()
+      const link = await this.contractTabPath(outline.id, 'denghi')
+      if (outline.ownerId) {
+        await NotificationService.push(outline.ownerId, {
+          type: 'PROJECT_UPDATE',
+          title: 'Yêu cầu bổ sung hồ sơ đề nghị đánh giá KQNV',
+          message: `${outline.code}: ${note.trim()}`,
+          link,
+        })
+        await EmailLogService.logStubToUser(
+          outline.ownerId,
+          `[KH&CN] Yêu cầu bổ sung hồ sơ đề nghị đánh giá — ${outline.code}`,
+          [
+            `Kính gửi ${outline.ownerName || 'Quý Thầy/Cô'},`,
+            '',
+            `Phòng Khoa học yêu cầu bổ sung hồ sơ đề nghị đánh giá kết quả nhiệm vụ ${outline.code}.`,
+            '',
+            `Nội dung cần bổ sung:`,
+            note.trim(),
+            '',
+            `Vui lòng đăng nhập hệ thống để chỉnh sửa và nộp lại:`,
+            link,
+            '',
+            'Trân trọng,',
+            'Hệ thống Quản lý Khoa học và Công nghệ',
+          ].join('\n'),
+          'project_final_dossier_bs',
+          row.id
+        )
+      }
       return this.show(outline.id, userId)
     }
     if (!briefPagesOk) throw new Error('BRIEF_PAGES_REQUIRED')
@@ -185,13 +276,37 @@ export default class ProjectFinalService {
     row.reviewDeadline = meetingAt.minus({ days: tight ? 1 : 7 })
     row.councilMembers = members
     await row.save()
+    // Chuông + email: dẫn thẳng tới hồ sơ đề nghị đánh giá KQNV CNNV đã nộp
+    // Link trang phiếu đánh giá KQCK độc lập
+    const dossierPath = `/projects/final-eval/${outline.id}`
+    const when = meetingAt.toFormat(DATETIME_FORMAT)
     for (const m of members) {
       await NotificationService.push(m.userId, {
         type: 'PROJECT_UPDATE',
         title: 'Mời hội đồng đánh giá cuối kỳ',
-        message: `${outline.code} họp ${meetingAt.toFormat(DATETIME_FORMAT)}`,
-        link: `/projects/final/${outline.id}`,
+        message: `${outline.code} — họp ${when}. Vào phiếu đánh giá KQCK.`,
+        link: dossierPath,
       })
+      if (m.email) {
+        const mail = buildFinalCouncilInviteEmail({
+          code: outline.code,
+          title: outline.title,
+          ownerName: outline.ownerName,
+          meetingAtLabel: when,
+          location: row.meetingLocation,
+          roleLabel: COUNCIL_ROLE_LABEL[m.role] || m.role,
+          memberName: m.fullName,
+          dossierPath,
+        })
+        await EmailLogService.logStub({
+          toEmail: m.email,
+          subject: mail.subject,
+          body: mail.text,
+          html: mail.html,
+          relatedType: 'project_final_council',
+          relatedId: row.id,
+        })
+      }
     }
     const data = await this.show(outline.id, userId)
     return { ...data, reviewDeadlineTight: tight }
@@ -205,9 +320,9 @@ export default class ProjectFinalService {
     if (!member) throw new Error('NOT_FOUND')
     await NotificationService.push(member.userId, {
       type: 'PROJECT_UPDATE',
-      title: 'Nhắc nộp phiếu nhận xét BM.12a',
+      title: 'Nhắc nộp phiếu đánh giá KQCK',
       message: outline.code,
-      link: `/projects/final/${outline.id}`,
+      link: `/projects/final-eval/${outline.id}`,
     })
     return { reminded: true }
   }
@@ -216,25 +331,105 @@ export default class ProjectFinalService {
     const outline = await loadOutline(outlineId)
     assertExecution(outline, ['DGCK_HOP_HD'])
     const finalCase = await this.ensure(outline.id)
-    const me = (finalCase.councilMembers || []).find((m) => m.userId === userId && m.role === 'PHAN_BIEN')
+    // Mọi thành viên HĐ đều được nộp phiếu đánh giá
+    const me = (finalCase.councilMembers || []).find(
+      (m) => Number((m as any).userId ?? (m as any).user_id) === Number(userId)
+    )
     if (!me) throw new Error('FORBIDDEN')
     if (finalCase.minutesLocked) throw new Error('MINUTES_LOCKED')
-    const volume = String(body.volumeComment || body.volume_comment || '').trim()
-    const quality = String(body.qualityComment || body.quality_comment || '').trim()
-    const report = String(body.reportComment || body.report_comment || '').trim()
-    const general = String(body.generalComment || body.general_comment || '').trim()
-    if (!volume || !quality || !report || general.length < 100) throw new Error('SHEET_INCOMPLETE')
-    const input = Array.isArray(body.productRows || body.product_rows) ? (body.productRows || body.product_rows) as Record<string, unknown>[] : []
-    const productRows = (outline.expectedProducts || []).map((p) => {
-      const hit = input.find((r) => String(r.name || '') === p.name)
-      return {
-        name: p.name,
-        planned: [p.quantity, p.quality].filter(Boolean).join(' / '),
-        actual: String(hit?.actual || '').trim(),
-        comment: String(hit?.comment || '').trim(),
+
+    const input = Array.isArray(body.productRows || body.product_rows)
+      ? ((body.productRows || body.product_rows) as Record<string, unknown>[])
+      : []
+
+    // Phiếu KQCK mới: đánh dấu rõ hoặc nhận diện theo kết luận / kết quả BC
+    const volumeHint = String(body.volumeComment || body.volume_comment || '').trim()
+    const reportHint = String(body.reportComment || body.report_comment || '').trim()
+    const isEvalV2 =
+      body.evalVersion === 2 ||
+      body.evalVersion === '2' ||
+      ['DAT', 'KHONG_DAT'].includes(volumeHint) ||
+      ['DAT_YEU_CAU', 'CAN_BO_SUNG', 'KHONG_DAT'].includes(reportHint) ||
+      input.some(
+        (r) =>
+          r.soLuong != null ||
+          r.chatLuong != null ||
+          r.quantityOk != null ||
+          r.qualityOk != null
+      )
+
+    let productRows: import('#models/project_final_sheet').SheetProductRow[]
+    let volume: string
+    let quality: string
+    let report: string
+    let general: string
+
+    if (isEvalV2) {
+      // Phiếu đánh giá theo hồ sơ đề nghị: số lượng / chất lượng + kết luận
+      productRows = input.map((r) => {
+        const soLuong = String(r.soLuong || r.quantityOk || '').trim() as 'DAT' | 'KHONG_DAT' | ''
+        const chatLuong = String(r.chatLuong || r.qualityOk || '').trim() as 'DAT' | 'KHONG_DAT' | ''
+        const soLuongNote = String(r.soLuongNote || '').trim()
+        const chatLuongNote = String(r.chatLuongNote || '').trim()
+        const note =
+          String(r.note || r.comment || '').trim() ||
+          [soLuongNote, chatLuongNote].filter(Boolean).join(' | ')
+        if (soLuong !== 'DAT' && soLuong !== 'KHONG_DAT') throw new Error('SHEET_INCOMPLETE')
+        if (chatLuong !== 'DAT' && chatLuong !== 'KHONG_DAT') throw new Error('SHEET_INCOMPLETE')
+        if (soLuong === 'KHONG_DAT' && !soLuongNote && !note) throw new Error('SHEET_INCOMPLETE')
+        if (chatLuong === 'KHONG_DAT' && !chatLuongNote && !note) throw new Error('SHEET_INCOMPLETE')
+        return {
+          key: String(r.key || '').trim() || undefined,
+          name: String(r.name || r.title || '').trim(),
+          soLuong,
+          chatLuong,
+          soLuongNote: soLuongNote || undefined,
+          chatLuongNote: chatLuongNote || undefined,
+          note,
+          actual: soLuong,
+          comment: note,
+        }
+      })
+      if (productRows.some((r) => !r.name)) throw new Error('SHEET_INCOMPLETE')
+
+      volume = String(body.volumeComment || body.volume_comment || '').trim() // Kết quả BC: DAT | KHONG_DAT
+      quality = String(body.qualityComment || body.quality_comment || '').trim() // Ghi chú BC
+      report = String(body.reportComment || body.report_comment || '').trim() // Kết luận
+      general = String(body.generalComment || body.general_comment || '').trim()
+      if (volume !== 'DAT' && volume !== 'KHONG_DAT') throw new Error('SHEET_INCOMPLETE')
+      if (volume === 'KHONG_DAT' && !quality) throw new Error('SHEET_INCOMPLETE')
+      if (!['DAT_YEU_CAU', 'CAN_BO_SUNG', 'KHONG_DAT'].includes(report)) {
+        throw new Error('SHEET_INCOMPLETE')
       }
-    })
-    if (productRows.some((r) => !r.actual || !r.comment)) throw new Error('SHEET_INCOMPLETE')
+      if (report === 'CAN_BO_SUNG') {
+        let okBoSung = false
+        try {
+          const meta = JSON.parse(general || '{}') as { supplementContent?: string }
+          okBoSung = !!String(meta.supplementContent || '').trim()
+        } catch {
+          okBoSung = false
+        }
+        if (!okBoSung) throw new Error('SHEET_INCOMPLETE')
+      }
+    } else {
+      // Phiếu BM.12a cũ (phản biện)
+      if (me.role !== 'PHAN_BIEN') throw new Error('FORBIDDEN')
+      volume = String(body.volumeComment || body.volume_comment || '').trim()
+      quality = String(body.qualityComment || body.quality_comment || '').trim()
+      report = String(body.reportComment || body.report_comment || '').trim()
+      general = String(body.generalComment || body.general_comment || '').trim()
+      if (!volume || !quality || !report || general.length < 100) throw new Error('SHEET_INCOMPLETE')
+      productRows = (outline.expectedProducts || []).map((p) => {
+        const hit = input.find((r) => String(r.name || '') === p.name)
+        return {
+          name: p.name,
+          planned: [p.quantity, p.quality].filter(Boolean).join(' / '),
+          actual: String(hit?.actual || '').trim(),
+          comment: String(hit?.comment || '').trim(),
+        }
+      })
+      if (productRows.some((r) => !r.actual || !r.comment)) throw new Error('SHEET_INCOMPLETE')
+    }
 
     let sheet = await ProjectFinalSheet.query()
       .where('project_outline_id', outline.id)
@@ -245,6 +440,7 @@ export default class ProjectFinalService {
       sheet.projectOutlineId = outline.id
       sheet.userId = userId
     }
+    if (sheet.submittedAt) throw new Error('MINUTES_LOCKED')
     sheet.productRows = productRows
     sheet.volumeComment = volume
     sheet.qualityComment = quality
@@ -330,7 +526,7 @@ export default class ProjectFinalService {
         type: 'PROJECT_UPDATE',
         title: 'Đã có biên bản đánh giá cuối kỳ',
         message: `${outline.code}: ${CLASSIFICATION_LABEL[classification]}`,
-        link: `/projects/final/${outline.id}`,
+        link: await this.contractTabPath(outline.id, 'danhgia'),
       })
     }
     return this.show(outline.id, userId)
@@ -449,7 +645,7 @@ export default class ProjectFinalService {
           type: 'PROJECT_UPDATE',
           title: 'Bản giải trình chờ thư ký',
           message: outline.code,
-          link: `/projects/final/${outline.id}`,
+          link: await this.contractTabPath(outline.id, 'giaitrinh'),
         })
       }
     }
@@ -474,7 +670,7 @@ export default class ProjectFinalService {
           type: 'PROJECT_UPDATE',
           title: 'Bản giải trình chờ chủ tịch',
           message: outline.code,
-          link: `/projects/final/${outline.id}`,
+          link: await this.contractTabPath(outline.id, 'giaitrinh'),
         })
       }
     } else if (row.explanationStatus === 'CHO_CHU_TICH') {
@@ -550,7 +746,7 @@ export default class ProjectFinalService {
         type: 'PROJECT_UPDATE',
         title: 'Quyết toán chờ KH-TC',
         message: outline.code,
-        link: `/projects/final/${outline.id}`,
+        link: await this.contractTabPath(outline.id, 'quyettoan'),
       })
     }
     await row.save()
@@ -657,7 +853,7 @@ export default class ProjectFinalService {
       type: 'PROJECT_UPDATE',
       title: 'Biên bản thanh lý chờ ký',
       message: outline.code,
-      link: `/projects/final/${outline.id}`,
+      link: await this.contractTabPath(outline.id, 'thanhly'),
     })
     return this.show(outline.id, userId)
   }
@@ -682,7 +878,7 @@ export default class ProjectFinalService {
       type: 'PROJECT_UPDATE',
       title: 'Thanh lý chờ phát hành',
       message: outline.code,
-      link: `/projects/final/${outline.id}`,
+      link: await this.contractTabPath(outline.id, 'thanhly'),
     })
     return this.show(outline.id, userId)
   }
@@ -703,7 +899,7 @@ export default class ProjectFinalService {
         type: 'PROJECT_UPDATE',
         title: 'Biên bản thanh lý chờ xác nhận',
         message: `${outline.code}: số ${no}`,
-        link: `/projects/final/${outline.id}`,
+        link: await this.contractTabPath(outline.id, 'thanhly'),
       })
     }
     return this.show(outline.id, userId)
@@ -751,11 +947,12 @@ export default class ProjectFinalService {
 
   private static async remindExplanation(userId: number, outlineId: number, day: number) {
     const title = `Nhắc hoàn thiện hồ sơ (ngày ${day}/14)`
+    const link = await this.contractTabPath(outlineId, 'giaitrinh')
     await NotificationService.push(userId, {
       type: 'PROJECT_UPDATE',
       title,
       message: `Nhiệm vụ #${outlineId}`,
-      link: `/projects/final/${outlineId}`,
+      link,
     })
     await EmailLogService.logStubToUser(userId, title, `Nhiệm vụ #${outlineId}`, 'final_case', outlineId)
   }
@@ -777,16 +974,15 @@ export default class ProjectFinalService {
         type: 'PROJECT_UPDATE',
         title: 'Giải trình cần sửa',
         message: reason.trim(),
-        link: `/projects/final/${outline.id}`,
+        link: await this.contractTabPath(outline.id, 'giaitrinh'),
       })
     }
     return this.show(outline.id, actorId)
   }
 
-  private static canSubmitNow(outline: Awaited<ReturnType<typeof loadOutline>>, row: ProjectFinalCase) {
-    if (row.notifiedAt) return true
-    if (!outline.endDate) return false
-    return today() >= outline.endDate.minus({ days: 30 }).startOf('day')
+  /** CNNV được nộp hồ sơ nghiệm thu bất cứ lúc nào (hoàn thành trước hạn). */
+  private static canSubmitNow(_outline: Awaited<ReturnType<typeof loadOutline>>, _row: ProjectFinalCase) {
+    return true
   }
 
   private static parseProducts(
@@ -818,10 +1014,25 @@ export default class ProjectFinalService {
     return row
   }
 
+  /** Link FE chi tiết HĐ + tab (ưu tiên hồ sơ đề nghị đánh giá). */
+  private static async contractTabPath(outlineId: number, tab = 'denghi') {
+    const contract = await ProjectContract.query().where('project_outline_id', outlineId).first()
+    if (contract) {
+      return `/projects/contracts/${contract.id}?tab=${tab}`
+    }
+    return `/projects/execution/${outlineId}`
+  }
+
   private static async assertSee(userId: number, outline: Awaited<ReturnType<typeof loadOutline>>) {
     if (await isCnnv(userId, outline)) return
     const row = await ProjectFinalCase.query().where('project_outline_id', outline.id).first()
-    if ((row?.councilMembers || []).some((m) => m.userId === userId)) return
+    if (
+      (row?.councilMembers || []).some(
+        (m) => Number((m as any).userId ?? (m as any).user_id) === Number(userId)
+      )
+    ) {
+      return
+    }
     if (
       (await hasPerm(userId, 'project.contract_manage')) ||
       (await hasPerm(userId, 'project.outline_approve')) ||
@@ -850,6 +1061,8 @@ export default class ProjectFinalService {
       code: outline.code,
       title: outline.title,
       executionStatus: outline.executionStatus,
+      /** Dùng form phiếu đánh giá KQCK (thành viên HĐ không gọi được getOutline) */
+      expectedResults: outline.expectedResults || null,
       overdueExplanation: !!(
         row.explanationDeadline &&
         outline.executionStatus === 'DGCK_CHINH_SUA' &&
@@ -1037,6 +1250,230 @@ export default class ProjectFinalService {
     row.liquidationFileName = stored
     row.liquidationStoredFileName = stored
     row.liquidationFileUrl = buildPublicGeneratedContractUrl(stored)
+  }
+
+  /**
+   * Xuất DOCX đơn đề nghị đánh giá KQNV (BM-05.01) từ mẫu DON_DE_NGHI mặc định.
+   */
+  static async exportDonDeNghi(outlineId: number, userId: number) {
+    const outline = await loadOutline(outlineId)
+    await this.assertSee(userId, outline)
+    const template = await ContractTemplateService.getDefaultActive('DON_DE_NGHI')
+    if (!template) throw new Error('NO_DEFAULT_TEMPLATE')
+    const templatePath = await findContractTemplateFilePath(template.storedFileName)
+    if (!templatePath) throw new Error('TEMPLATE_FILE_MISSING')
+
+    const hopDong = await ProjectContract.query()
+      .where('project_outline_id', outline.id)
+      .orderBy('id', 'desc')
+      .first()
+    const now = DateTime.now()
+    const ngayLap = `ngày ${now.toFormat('dd')} tháng ${now.toFormat('MM')} năm ${now.toFormat('yyyy')}`
+    const start = outline.startDate?.toFormat('dd/MM/yyyy') || ''
+    const end = outline.endDate?.toFormat('dd/MM/yyyy') || ''
+    const giaHan =
+      Number(outline.extensionCount || 0) > 0
+        ? `${outline.extensionCount} lần`
+        : ''
+
+    const data: Record<string, string> = {
+      ngay_lap: ngayLap,
+      ten_nhiem_vu: outline.title || '',
+      ma_so: outline.code || '',
+      cap_quan_ly: outline.level || '',
+      so_qd_hd: hopDong?.contractNo || '',
+      ngay_qd_hd: hopDong?.createdAt?.toFormat('dd/MM/yyyy') || '',
+      chu_nhiem: outline.ownerName || '',
+      to_chuc_chu_tri: outline.hostUnit || outline.ownerUnit || '',
+      thoi_gian_tu: start,
+      thoi_gian_den: end,
+      gia_han: giaHan,
+    }
+
+    const safeCode = (outline.code || String(outline.id)).replace(/[^\w.-]/g, '_')
+    const merged = await mergeDocxTemplate({
+      templatePath,
+      data,
+      outputFileName: `BM0501_${safeCode}_${Date.now()}.docx`,
+    })
+    return {
+      fileName: `BM-05.01_Don_de_nghi_${safeCode}.docx`,
+      fullPath: merged.fullPath,
+      fileUrl: merged.fileUrl,
+    }
+  }
+
+  /**
+   * Xuất DOCX báo cáo tổng kết (BM-05.02) từ mẫu BAO_CAO_TONG_KET.
+   * Thông tin chung: biến theo từng dòng. bang_san_pham: cả bảng.
+   */
+  static async exportBaoCaoTongKet(outlineId: number, userId: number) {
+    const outline = await loadOutline(outlineId)
+    await this.assertSee(userId, outline)
+    const template = await ContractTemplateService.getDefaultActive('BAO_CAO_TONG_KET')
+    if (!template) throw new Error('NO_DEFAULT_TEMPLATE')
+    const templatePath = await findContractTemplateFilePath(template.storedFileName)
+    if (!templatePath) throw new Error('TEMPLATE_FILE_MISSING')
+
+    const hopDong = await ProjectContract.query()
+      .where('project_outline_id', outline.id)
+      .orderBy('id', 'desc')
+      .first()
+    const now = DateTime.now()
+    const ngayLap = `ngày ${now.toFormat('dd')} tháng ${now.toFormat('MM')} năm ${now.toFormat('yyyy')}`
+    const start = outline.startDate?.toFormat('dd/MM/yyyy') || ''
+    const end = outline.endDate?.toFormat('dd/MM/yyyy') || ''
+    const giaHan =
+      Number(outline.extensionCount || 0) > 0 ? ` (gia hạn: ${outline.extensionCount} lần)` : ''
+    const kinhPhi = Number(outline.approvedBudget ?? outline.confirmedBudget ?? 0)
+    const soHd = hopDong?.contractNo || ''
+    const ngayHd = hopDong?.createdAt?.toFormat('dd/MM/yyyy') || ''
+    const toChucChuTri =
+      outline.hostOrganization?.name?.trim() ||
+      outline.hostUnit?.trim() ||
+      outline.ownerUnit?.trim() ||
+      ''
+    // Đơn vị phối hợp lấy từ thuyết minh (partnerUnits)
+    const donViPhoiHop = (outline.partnerUnits || [])
+      .map((p) => {
+        const ten = String(p?.name || '').trim()
+        if (!ten) return ''
+        const extras = [p?.orgCode, p?.phone, p?.address]
+          .map((x) => String(x || '').trim())
+          .filter(Boolean)
+        return extras.length ? `${ten} (${extras.join(', ')})` : ten
+      })
+      .filter(Boolean)
+      .join('; ')
+
+    // Các bảng sản phẩm giống thuyết minh — chỉ xuất nhóm có dữ liệu
+    const erGoc = outline.expectedResults
+    const erLoc = {
+      publications: (erGoc?.publications || []).filter((r) => r.content?.trim()),
+      appliedProducts: (erGoc?.appliedProducts || []).filter((r) => r.name?.trim()),
+      tangibleProducts: (erGoc?.tangibleProducts || []).filter((r) => r.name?.trim()),
+      ipProducts: (erGoc?.ipProducts || []).filter((r) => r.name?.trim()),
+      postgraduateTraining: (erGoc?.postgraduateTraining || []).filter(
+        (r) => r.level?.trim() || r.major?.trim()
+      ),
+    }
+    let bangSanPham = buildSanPhamYeuCauOoxml(erLoc)
+    if (!bangSanPham) {
+      bangSanPham =
+        '<w:p><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman"/><w:i/><w:sz w:val="26"/></w:rPr><w:t>Chưa có sản phẩm trên thuyết minh.</w:t></w:r></w:p>'
+    }
+
+    const stripHtml = (html: string | null | undefined) =>
+      html ? String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : ''
+
+    const data: Record<string, string> = {
+      ngay_lap: ngayLap,
+      ten_nhiem_vu: outline.title || '',
+      ma_so_cap_quan_ly: [outline.code, outline.level].filter(Boolean).join(' — '),
+      chu_nhiem: outline.ownerName || '',
+      to_chuc_chu_tri: toChucChuTri,
+      so_qd_hd: [soHd, ngayHd ? `ngày ${ngayHd}` : ''].filter(Boolean).join(' — '),
+      thoi_gian_thuc_hien: `${start} → ${end}${giaHan}`.replace(/^ → | → $/g, ''),
+      tong_kinh_phi: kinhPhi ? `${kinhPhi.toLocaleString('vi-VN')} đồng` : '',
+      don_vi_phoi_hop: donViPhoiHop,
+      tom_tat_ket_qua: '',
+      tong_quan_van_de: '',
+      muc_tieu_doi_tuong_pham_vi: stripHtml(outline.detailedObjectives),
+      noi_dung_nghien_cuu: stripHtml(outline.researchContent),
+      phuong_phap_nghien_cuu: stripHtml(outline.methodology),
+      ket_qua_nghien_cuu: '',
+      bang_san_pham: '',
+      ghi_chu_san_pham: '',
+      hieu_qua_ung_dung: '',
+      ket_luan: '',
+      kien_nghi: '',
+      tai_lieu_tham_khao: '',
+      phu_luc_minh_chung: '',
+    }
+
+    const safeCode = (outline.code || String(outline.id)).replace(/[^\w.-]/g, '_')
+    const merged = await mergeDocxTemplate({
+      templatePath,
+      data,
+      tableBlocks: {
+        bang_san_pham: bangSanPham,
+      },
+      outputFileName: `BM0502_${safeCode}_${Date.now()}.docx`,
+    })
+    return {
+      fileName: `BM-05.02_Bao_cao_tong_ket_${safeCode}.docx`,
+      fullPath: merged.fullPath,
+      fileUrl: merged.fileUrl,
+    }
+  }
+
+  /**
+   * Lưu / nộp hồ sơ đề nghị đánh giá KQNV (đơn BM-05.01 + báo cáo BM-05.02 + minh chứng KQDK).
+   */
+  static async saveEvaluationRequest(
+    outlineId: number,
+    userId: number,
+    body: Record<string, unknown>,
+    submit: boolean
+  ) {
+    const outline = await loadOutline(outlineId)
+    assertReady(outline)
+    await assertCnnv(userId, outline)
+    const row = await this.ensure(outline.id)
+    const allowed =
+      !outline.executionStatus ||
+      ['DANG_THUC_HIEN', 'DGCK_DRAFT', 'DGCK_BS'].includes(outline.executionStatus)
+    if (!allowed) throw new Error('BAD_EXECUTION_STATUS')
+
+    // Đơn đề nghị BM-05.01 đã ký / hoàn chỉnh
+    row.summaryFile = parseOneFile(
+      body.donFile ?? body.summaryFile ?? body.summary_file,
+      FILE_LIMIT.summary
+    )
+    // Báo cáo tổng kết BM-05.02 hoàn chỉnh
+    row.briefFile = parseOneFile(body.reportFile ?? body.briefFile ?? body.brief_file, FILE_LIMIT.brief)
+
+    const rawProducts = Array.isArray(body.products) ? body.products : []
+    row.products = rawProducts
+      .map((item) => {
+        const r = (item || {}) as Record<string, unknown>
+        const name = String(r.name || r.title || '').trim()
+        if (!name) return null
+        return {
+          name,
+          fileUrl: String(r.fileUrl || r.file_url || '').trim() || null,
+          link: String(r.link || '').trim() || null,
+        } as FinalProduct
+      })
+      .filter((x): x is FinalProduct => !!x)
+
+    const meta = {
+      kind: 'EVALUATION_REQUEST',
+      evidences: Array.isArray(body.evidences) ? body.evidences : [],
+    }
+    row.publicationsNote = JSON.stringify(meta)
+
+    if (!outline.executionStatus || outline.executionStatus === 'DANG_THUC_HIEN') {
+      outline.executionStatus = 'DGCK_DRAFT'
+    }
+
+    if (submit) {
+      if (!row.products.length) throw new Error('DOSSIER_INCOMPLETE')
+      const thieuMinhChung = row.products.some((p) => !p.fileUrl && !p.link)
+      if (thieuMinhChung) throw new Error('DOSSIER_INCOMPLETE')
+      row.submittedAt = DateTime.now()
+      outline.executionStatus = 'DGCK_CHO_PKH'
+      await NotificationService.pushToPermission('project.contract_manage', {
+        type: 'PROJECT_UPDATE',
+        title: 'Hồ sơ đề nghị đánh giá KQNV',
+        message: outline.code,
+        link: await this.contractTabPath(outline.id, 'denghi'),
+      })
+    }
+
+    await row.save()
+    await outline.save()
+    return this.show(outline.id, userId)
   }
 
   private static async writeProfiles(

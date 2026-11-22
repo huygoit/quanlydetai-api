@@ -7,6 +7,11 @@ import ProjectProgressService from '#services/project_progress_service'
 import NotificationService from '#services/notification_service'
 import { BUDGET_LINE_CODES } from '#constants/module56'
 import {
+  calcRowTotal,
+  type OutlineBudgetExpenseAmounts,
+  type OutlineBudgetMatrix,
+} from '#constants/outline_budget_matrix'
+import {
   normalizeFundingRows,
   normalizeMilestoneRows,
 } from '#constants/contract_draft_form'
@@ -143,7 +148,10 @@ export default class ProjectContractFlowService {
     return this.detail(saved.id, userId)
   }
 
-  /** Đảm bảo đủ danh mục khoản chi (tổng = KP) để trình CNNV — mặc định gán MUC_01. */
+  /**
+   * Đảm bảo đủ danh mục khoản chi (cùng mã thuyết minh) — tổng = KP.
+   * Đổ 1–1 từ ma trận TM; lệch làm tròn cộng vào THU_LAO.
+   */
   private static async ensureBudgetLinesForSubmit(outlineId: number, total: number) {
     const lines = await ProjectBudgetLine.query()
       .where('project_outline_id', outlineId)
@@ -151,17 +159,54 @@ export default class ProjectContractFlowService {
     const sum = lines.reduce((s, l) => s + Number(l.amount || 0), 0)
     if (lines.length >= BUDGET_LINE_CODES.length && sum === total && total > 0) return
 
+    const outline = await loadOutline(outlineId)
+    const fromMatrix = this.amountsFromBudgetMatrix(outline.budgetMatrix)
+    let mappedSum = BUDGET_LINE_CODES.reduce((s, c) => s + (fromMatrix.get(c) || 0), 0)
+    const target = Math.max(0, Math.round(total))
+    if (mappedSum <= 0) {
+      fromMatrix.set('THU_LAO', target)
+    } else if (mappedSum !== target) {
+      // Tỷ lệ hóa theo tổng KP hợp đồng (tránh cộng lệch làm âm một mục)
+      const ratio = target / mappedSum
+      for (const code of BUDGET_LINE_CODES) {
+        fromMatrix.set(code, Math.round((fromMatrix.get(code) || 0) * ratio))
+      }
+      mappedSum = BUDGET_LINE_CODES.reduce((s, c) => s + (fromMatrix.get(c) || 0), 0)
+      fromMatrix.set(
+        'THU_LAO',
+        Math.max(0, (fromMatrix.get('THU_LAO') || 0) + (target - mappedSum))
+      )
+    }
+
     await db.transaction(async (trx) => {
       await ProjectBudgetLine.query({ client: trx }).where('project_outline_id', outlineId).delete()
       await ProjectBudgetLine.createMany(
-        BUDGET_LINE_CODES.map((code, i) => ({
+        BUDGET_LINE_CODES.map((code) => ({
           projectOutlineId: outlineId,
           code,
-          amount: i === 0 ? Math.max(0, Math.round(total)) : 0,
+          amount: fromMatrix.get(code) || 0,
         })),
         { client: trx }
       )
     })
+  }
+
+  /** Cộng ma trận TM theo đúng mã cột (đã khớp danh mục hợp đồng). */
+  private static amountsFromBudgetMatrix(matrix: unknown): Map<string, number> {
+    const out = new Map<string, number>()
+    for (const code of BUDGET_LINE_CODES) out.set(code, 0)
+    if (!matrix || typeof matrix !== 'object') return out
+
+    const m = matrix as OutlineBudgetMatrix
+    for (const key of ['STATE_LUMP', 'STATE_NON_LUMP', 'NON_STATE'] as const) {
+      const row = (m[key] || {}) as OutlineBudgetExpenseAmounts
+      const { amounts } = calcRowTotal(row)
+      for (const code of BUDGET_LINE_CODES) {
+        const n = Math.round(Number(amounts[code] || 0))
+        if (n > 0) out.set(code, (out.get(code) || 0) + n)
+      }
+    }
+    return out
   }
 
   static async submitToCnnv(contractId: number, userId: number) {

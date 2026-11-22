@@ -72,8 +72,7 @@ export const BM0202_TEMPLATE_VARIABLES: Bm0202VariableDef[] = [
   { key: 'tc_nang_luc', label: 'Năng lực, kinh nghiệm tổ chức', group: '7. Tổ chức chủ trì' },
   { key: 'tc_doi_ngu', label: 'Đội ngũ nhân lực thực hiện', group: '7. Tổ chức chủ trì' },
 
-  // 8. Tổ chức phối hợp (tối đa 5 + khối văn bản)
-  { key: 'danh_sach_to_chuc_phoi_hop', label: 'Danh sách tổ chức phối hợp (văn bản)', group: '8. Phối hợp' },
+  // 8. Tổ chức phối hợp (mẫu BM-02.02 chỉ 8.1 và 8.2)
   { key: 'tcp_1_ten', label: 'Tổ chức phối hợp 1 — tên', group: '8. Phối hợp' },
   { key: 'tcp_1_ma_so', label: 'Tổ chức phối hợp 1 — mã số', group: '8. Phối hợp' },
   { key: 'tcp_1_dien_thoai', label: 'Tổ chức phối hợp 1 — ĐT', group: '8. Phối hợp' },
@@ -82,10 +81,6 @@ export const BM0202_TEMPLATE_VARIABLES: Bm0202VariableDef[] = [
   { key: 'tcp_2_ma_so', label: 'Tổ chức phối hợp 2 — mã số', group: '8. Phối hợp' },
   { key: 'tcp_2_dien_thoai', label: 'Tổ chức phối hợp 2 — ĐT', group: '8. Phối hợp' },
   { key: 'tcp_2_dia_chi', label: 'Tổ chức phối hợp 2 — địa chỉ', group: '8. Phối hợp' },
-  { key: 'tcp_3_ten', label: 'Tổ chức phối hợp 3 — tên', group: '8. Phối hợp' },
-  { key: 'tcp_3_ma_so', label: 'Tổ chức phối hợp 3 — mã số', group: '8. Phối hợp' },
-  { key: 'tcp_3_dien_thoai', label: 'Tổ chức phối hợp 3 — ĐT', group: '8. Phối hợp' },
-  { key: 'tcp_3_dia_chi', label: 'Tổ chức phối hợp 3 — địa chỉ', group: '8. Phối hợp' },
 
   // 9–11 nội dung mô tả
   { key: 'tinh_cap_thiet', label: 'Tính cấp thiết', group: '9–11. Nội dung' },
@@ -111,7 +106,9 @@ export const BM0202_TEMPLATE_VARIABLES: Bm0202VariableDef[] = [
   { key: 'yeu_cau_ai', label: 'Sử dụng trí tuệ nhân tạo', group: '13–17. Khác' },
   { key: 'yeu_cau_dac_thu_khac', label: 'Yêu cầu đặc thù khác', group: '13–17. Khác' },
 
-  // Chữ ký
-  { key: 'chu_ky_chu_nhiem', label: 'Họ tên ký — chủ nhiệm', group: 'Chữ ký' },
-  { key: 'chu_ky_dai_dien_to_chuc', label: 'Họ tên ký — đại diện tổ chức', group: 'Chữ ký' },
+  // Chữ ký (cuối thuyết minh)
+  { key: 'ten_chu_nhiem', label: 'Họ tên chủ nhiệm (chữ ký — IN HOA)', group: 'Chữ ký' },
+  { key: 'ten_dai_dien_to_chuc', label: 'Họ tên đại diện tổ chức (chữ ký — IN HOA)', group: 'Chữ ký' },
+  { key: 'chu_ky_chu_nhiem', label: 'Họ tên ký — chủ nhiệm (alias)', group: 'Chữ ký' },
+  { key: 'chu_ky_dai_dien_to_chuc', label: 'Họ tên ký — đại diện tổ chức (alias)', group: 'Chữ ký' },
 ]

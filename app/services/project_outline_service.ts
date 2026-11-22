@@ -28,8 +28,6 @@ import ScientificProfile from '#models/scientific_profile'
 import { resolveProposalMemberRole } from '#constants/proposal_member_role'
 import { mapProjectOutlineMemberToApi } from '#utils/project_outline_member_api'
 
-const BUDGET_TOLERANCE = 1000
-
 /** Chuẩn hóa số tiền nguồn kinh phí (≥ 0, làm tròn). */
 function normalizeFundingAmount(v: unknown): number {
   const n = Math.round(Number(v || 0))
@@ -707,10 +705,11 @@ export default class ProjectOutlineService {
     }
     if (!budgetLines.length) errors.push('Thiếu kinh phí chi tiết.')
     const totalDetail = budgetLines.reduce((s, l) => s + Number(l.amount || 0), 0)
-    const diff = Math.abs(totalDetail - Number(o.requestedBudget || 0))
-    if (diff > BUDGET_TOLERANCE) {
+    const deXuat = Number(o.requestedBudget || 0)
+    // Chỉ chặn khi tổng chi tiết lớn hơn kinh phí đề xuất (được phép nhỏ hơn)
+    if (totalDetail > deXuat) {
       errors.push(
-        `Chênh lệch kinh phí chi tiết và kinh phí đề nghị là ${diff.toLocaleString('vi-VN')}đ (cho phép ≤ 1.000đ).`
+        `Tổng kinh phí chi tiết (${totalDetail.toLocaleString('vi-VN')}đ) lớn hơn kinh phí đề xuất (${deXuat.toLocaleString('vi-VN')}đ).`
       )
     }
     if (!o.outlineFileUrl?.trim()) errors.push('Thiếu file thuyết minh (PDF/DOCX).')

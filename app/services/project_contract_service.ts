@@ -24,6 +24,10 @@ import {
   findGeneratedContractFilePath,
   mergeDocxTemplate,
 } from '#utils/docx_merge_helper'
+import {
+  buildSanPhamYeuCauOoxml,
+  htmlSangVanBan,
+} from '#utils/outline_thuyet_minh_merge'
 import { formatVndPlain, numberToVietnameseWords } from '#utils/vietnamese_number_words'
 import { mergeBm06Edits } from '#services/module56_rules'
 import User from '#models/user'
@@ -216,17 +220,19 @@ export default class ProjectContractService {
 
     const milestones = milestonesFromOutline(outline.milestones)
     const funding = emptyFundingRows(budget)
-    const sanPham = (outline.expectedProducts || [])
-      .map((p, i) => {
-        const extra = [p.quantity, p.quality].filter(Boolean).join(' / ')
-        return `${i + 1}. ${p.name || ''}${extra ? ` (${extra})` : ''}`
-      })
-      .filter((s) => s.replace(/^\d+\.\s*$/, '').trim())
-      .join('\n')
 
     const toChucBenB = outline.hostUnit || outline.ownerUnit || ''
     const ngayBd = start ? start.toFormat('dd/MM/yyyy') : ''
     const ngayKt = end ? end.toFormat('dd/MM/yyyy') : ''
+
+    // Plain fallback — xuất DOCX dùng htmlBlocks / tableBlocks
+    const mucTieuPlain = htmlSangVanBan(outline.detailedObjectives || outline.summary)
+    const noiDungPlain = [
+      htmlSangVanBan(outline.researchContent),
+      htmlSangVanBan(outline.methodology),
+    ]
+      .filter(Boolean)
+      .join('\n\n')
 
     const data: Record<string, string> = {
       so_hop_dong: `HD-${outline.code}`,
@@ -237,9 +243,9 @@ export default class ProjectContractService {
 
       ten_nhiem_vu: outline.title || '',
       ma_so_nhiem_vu: outline.code || '',
-      muc_tieu: outline.summary || '',
-      noi_dung_thuc_hien: outline.researchContent || outline.methodology || '',
-      san_pham_yeu_cau: sanPham,
+      muc_tieu: mucTieuPlain,
+      noi_dung_thuc_hien: noiDungPlain,
+      san_pham_yeu_cau: '',
       bang_tien_do: formatBangTienDo(milestones),
       so_thang: months,
       ngay_bat_dau: ngayBd,
@@ -467,13 +473,13 @@ export default class ProjectContractService {
     const templatePath = await findContractTemplateFilePath(template.storedFileName)
     if (!templatePath) throw new Error('TEMPLATE_FILE_MISSING')
 
-    // Chèn bảng Word thật tại {{bang_tien_do}} / {{bang_nguon_kinh_phi}}
+    // Chèn bảng Word thật + HTML editor (mục tiêu / nội dung / sản phẩm)
     const draft = this.readDraftForm(outline, mergePayload)
     const bangTienDo = draft.milestones.map((m, i) => ({
       stt: String(i + 1),
-      noiDung: m.content || '',
+      noiDung: htmlSangVanBan(m.content) || m.content || '',
       thoiGian: chuanHoaThoiGian(m.thoiGian) || '',
-      sanPham: m.sanPham || '',
+      sanPham: htmlSangVanBan(m.sanPham) || m.sanPham || '',
     }))
     const bangNguon = [
       ...draft.funding.map((f) => ({
@@ -487,12 +493,24 @@ export default class ProjectContractService {
       },
     ]
 
+    const htmlBlocks = {
+      muc_tieu: outline.detailedObjectives || outline.summary || '',
+      noi_dung_thuc_hien: [outline.researchContent, outline.methodology]
+        .filter((x) => htmlSangVanBan(x))
+        .join(''),
+    }
+    const tableBlocks = {
+      san_pham_yeu_cau: buildSanPhamYeuCauOoxml(outline.expectedResults),
+    }
+
     const merged = await mergeDocxTemplate({
       templatePath,
       data: mergePayload,
       outputFileName: `${outline.code.replace(/[^\w.-]/g, '_')}-${Date.now()}.docx`,
       bangTienDo,
       bangNguonKinhPhi: bangNguon,
+      htmlBlocks,
+      tableBlocks,
     })
 
     const fileName = `BM06_${outline.code}_draft_v${existing ? (existing.version || 1) + 1 : 1}.docx`

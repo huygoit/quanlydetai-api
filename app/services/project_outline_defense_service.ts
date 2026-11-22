@@ -18,9 +18,6 @@ import { hasAtLeastBusinessDays } from '#utils/business_days'
 import { generateDefenseMinutesHtml } from '#utils/defense_minutes'
 import { DATETIME_FORMAT } from '#constants/datetime_formats'
 
-/** TBD nghiệp vụ — mặc định tối thiểu 1 người ngoài trường */
-const MIN_EXTERNAL_MEMBERS = 1
-
 type MemberInput = {
   userId?: number | null
   scientificProfileId?: number | null
@@ -156,41 +153,107 @@ export default class ProjectOutlineDefenseService {
     if (chuTich.length !== 1) throw new Error('Hội đồng cần đúng 1 Chủ tịch.')
     if (thuKy.length !== 1) throw new Error('Hội đồng cần đúng 1 Thư ký.')
     if (uyVien.length < 1) throw new Error('Hội đồng cần ít nhất 1 Ủy viên.')
-    const external = members.filter((m) => m.isExternal)
-    if (external.length < MIN_EXTERNAL_MEMBERS) {
-      throw new Error(`Cần tối thiểu ${MIN_EXTERNAL_MEMBERS} thành viên ngoài trường.`)
+    // Thành viên ngoài trường: chỉ thêm qua admin/hồ sơ hệ thống — không bắt buộc trên form lập phiên
+  }
+
+  /** Tập xung đột lợi ích theo một hoặc nhiều TM */
+  static async getConflictSetsForOutlines(outlineIds: number[]) {
+    const profileIds = new Set<number>()
+    const blockedUserIds = new Set<number>()
+    const ids = [...new Set(outlineIds.map((x) => Number(x)).filter((x) => x > 0))]
+    if (!ids.length) return { profileIds, blockedUserIds }
+
+    const outlines = await ProjectOutline.query().whereIn('id', ids)
+    for (const o of outlines) blockedUserIds.add(Number(o.ownerId))
+
+    const outlineMembers = await ProjectOutlineMember.query().whereIn(
+      'project_outline_id',
+      ids
+    )
+    for (const m of outlineMembers) {
+      if (m.profileId) profileIds.add(m.profileId)
     }
-    for (const m of external) {
-      if (!m.proposedSourceNote?.trim()) {
-        throw new Error(`Thành viên ngoài "${m.memberName}" cần ghi nguồn đề xuất.`)
+
+    if (profileIds.size) {
+      const profiles = await ScientificProfile.query().whereIn('id', [...profileIds])
+      for (const p of profiles) {
+        if (p.userId) blockedUserIds.add(Number(p.userId))
       }
     }
+
+    const reviewers = await ProjectOutlineReviewAssignment.query()
+      .whereIn('project_outline_id', ids)
+      .whereIn('status', ['INVITED', 'ACTIVE', 'COMPLETED'])
+    for (const r of reviewers) {
+      if (r.reviewerUserId) blockedUserIds.add(Number(r.reviewerUserId))
+      if (r.scientificProfileId) profileIds.add(r.scientificProfileId)
+    }
+
+    return { profileIds, blockedUserIds }
+  }
+
+  /**
+   * Tìm ứng viên HĐ: họ tên (từng từ), work_email, email đăng nhập.
+   * Vẫn trả về người xung đột — gắn conflictReason để FE cảnh báo.
+   */
+  static async searchCouncilCandidates(keyword: string, outlineIds: number[] = []) {
+    const q = String(keyword || '').trim()
+    if (q.length < 2) return []
+
+    const { profileIds, blockedUserIds } = await this.getConflictSetsForOutlines(outlineIds)
+    const tokens = q.split(/\s+/).map((t) => t.trim()).filter((t) => t.length >= 1)
+    const likeFull = `%${q}%`
+
+    const rows = await ScientificProfile.query()
+      .whereNotNull('user_id')
+      .where((b) => {
+        b.whereILike('work_email', likeFull)
+        b.orWhere((nameQ) => {
+          for (const t of tokens) {
+            nameQ.whereILike('full_name', `%${t}%`)
+          }
+        })
+        b.orWhereExists((sub) => {
+          sub
+            .from('users')
+            .whereColumn('users.id', 'scientific_profiles.user_id')
+            .where((ub) => {
+              ub.whereILike('users.email', likeFull)
+              for (const t of tokens) {
+                ub.orWhereILike('users.full_name', `%${t}%`)
+              }
+            })
+        })
+      })
+      .preload('user')
+      .orderBy('full_name', 'asc')
+      .limit(40)
+
+    return rows.map((p) => {
+      const conflict =
+        (p.userId != null && blockedUserIds.has(Number(p.userId))) ||
+        profileIds.has(p.id)
+      const loginEmail = (p as any).user?.email as string | undefined
+      return {
+        scientificProfileId: p.id,
+        userId: p.userId,
+        memberName: p.fullName,
+        memberEmail: p.workEmail || loginEmail || null,
+        unit: [p.organization, p.faculty, p.department].filter(Boolean).join(' — ') || null,
+        degree: p.degree,
+        academicTitle: p.academicTitle,
+        isExternal: false,
+        conflict,
+        conflictReason: conflict
+          ? 'Xung đột lợi ích (CNĐT / thành viên đề tài / phản biện kín)'
+          : null,
+      }
+    })
   }
 
   /** Xung đột lợi ích: owner, thành viên TM, phản biện kín đang/đã phân công */
   static async assertNoConflict(outlineId: number, members: MemberInput[]) {
-    const outline = await ProjectOutline.findOrFail(outlineId)
-    const outlineMembers = await ProjectOutlineMember.query().where(
-      'project_outline_id',
-      outlineId
-    )
-    const profileIds = new Set(
-      outlineMembers.map((m) => m.profileId).filter((x): x is number => !!x)
-    )
-    const blockedUserIds = new Set<number>([outline.ownerId])
-
-    for (const pid of profileIds) {
-      const p = await ScientificProfile.find(pid)
-      if (p?.userId) blockedUserIds.add(p.userId)
-    }
-
-    const reviewers = await ProjectOutlineReviewAssignment.query()
-      .where('project_outline_id', outlineId)
-      .whereIn('status', ['INVITED', 'ACTIVE', 'COMPLETED'])
-    for (const r of reviewers) {
-      if (r.reviewerUserId) blockedUserIds.add(r.reviewerUserId)
-      if (r.scientificProfileId) profileIds.add(r.scientificProfileId)
-    }
+    const { profileIds, blockedUserIds } = await this.getConflictSetsForOutlines([outlineId])
 
     for (const m of members) {
       if (m.userId && blockedUserIds.has(Number(m.userId))) {

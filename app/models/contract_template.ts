@@ -2,7 +2,14 @@ import { DateTime } from 'luxon'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 
 export type ContractTemplateStatus = 'ACTIVE' | 'INACTIVE'
-export type ContractTemplateType = 'HOP_DONG' | 'THANH_LY' | 'THONG_BAO' | 'QUYET_DINH' | 'THUYET_MINH'
+export type ContractTemplateType =
+  | 'HOP_DONG'
+  | 'THANH_LY'
+  | 'THONG_BAO'
+  | 'QUYET_DINH'
+  | 'THUYET_MINH'
+  | 'DON_DE_NGHI'
+  | 'BAO_CAO_TONG_KET'
 
 /** Giá trị cố định của một mẫu thông báo, điền vào {{biến}} khi xuất file. */
 export type ThongBaoMergeConfig = {
@@ -46,7 +53,7 @@ export default class ContractTemplate extends BaseModel {
   @column()
   declare description: string | null
 
-  /** HOP_DONG | THANH_LY | THONG_BAO | QUYET_DINH | THUYET_MINH */
+  /** HOP_DONG | THANH_LY | THONG_BAO | QUYET_DINH | THUYET_MINH | DON_DE_NGHI | BAO_CAO_TONG_KET */
   @column()
   declare templateType: ContractTemplateType
 

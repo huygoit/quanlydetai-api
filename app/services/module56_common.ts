@@ -146,6 +146,11 @@ export async function budgetSnapshot(outlineId: number): Promise<LineBalance[]> 
   })
 }
 
+/** Số còn lại để tạm ứng/chi theo khoản (cùng mã với thuyết minh). */
+export function remainingForAdvance(snap: LineBalance[], code: string): number {
+  return snap.find((l) => l.code === code)?.remaining ?? 0
+}
+
 export async function writeLedger(
   outlineId: number,
   lineCode: string,

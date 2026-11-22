@@ -2,7 +2,6 @@ import type { HttpContext } from '@adonisjs/core/http'
 import ProjectOutlineDefenseSession from '#models/project_outline_defense_session'
 import ProjectOutlineDefenseMember from '#models/project_outline_defense_member'
 import ProjectOutlineDefenseScoreSheet from '#models/project_outline_defense_score_sheet'
-import ScientificProfile from '#models/scientific_profile'
 import PermissionService from '#services/permission_service'
 import ProjectOutlineDefenseService from '#services/project_outline_defense_service'
 import ProjectOutlineAppraisalService from '#services/project_outline_appraisal_service'
@@ -128,6 +127,31 @@ export default class ProjectOutlineDefensesController {
   }
 
   /** GET /api/project-outline-defenses/:id/available-members */
+  /**
+   * GET /api/project-outline-defenses/council-candidates?keyword=&outlineIds=1,2
+   * Tìm thành viên HĐ khi lập phiên (chưa có sessionId).
+   */
+  async councilCandidates({ auth, request, response }: HttpContext) {
+    const user = auth.use('api').user!
+    if (!(await this.assertPkh(user.id))) {
+      return response.forbidden({ success: false, message: 'Chỉ PKH.' })
+    }
+    const keyword = String(request.input('keyword', '') || '').trim()
+    const rawIds = request.input('outlineIds')
+    const outlineIds = Array.isArray(rawIds)
+      ? rawIds.map((x) => Number(x)).filter((x) => x > 0)
+      : String(rawIds || '')
+          .split(',')
+          .map((x) => Number(x.trim()))
+          .filter((x) => x > 0)
+
+    const data = await ProjectOutlineDefenseService.searchCouncilCandidates(
+      keyword,
+      outlineIds
+    )
+    return response.ok({ success: true, data })
+  }
+
   async availableMembers({ auth, params, request, response }: HttpContext) {
     const user = auth.use('api').user!
     if (!(await this.assertPkh(user.id))) {
@@ -148,40 +172,10 @@ export default class ProjectOutlineDefensesController {
       existing.map((m) => m.scientificProfileId).filter((x): x is number => !!x)
     )
     const keyword = String(request.input('keyword', '') || '').trim()
-    const q = ScientificProfile.query()
-      .select(
-        'id',
-        'user_id',
-        'full_name',
-        'work_email',
-        'degree',
-        'academic_title',
-        'organization',
-        'faculty',
-        'department'
-      )
-      .whereNotNull('user_id')
-      .limit(30)
-    if (keyword) {
-      q.where((b) => {
-        b.whereILike('full_name', `%${keyword}%`)
-          .orWhereILike('work_email', `%${keyword}%`)
-          .orWhereILike('organization', `%${keyword}%`)
-      })
-    }
-    const rows = await q
-    const data = rows
-      .filter((p) => !usedProfiles.has(p.id))
-      .map((p) => ({
-        scientificProfileId: p.id,
-        userId: p.userId,
-        memberName: p.fullName,
-        memberEmail: p.workEmail,
-        unit: [p.organization, p.faculty, p.department].filter(Boolean).join(' — ') || null,
-        degree: p.degree,
-        academicTitle: p.academicTitle,
-        isExternal: false,
-      }))
+    const candidates = await ProjectOutlineDefenseService.searchCouncilCandidates(keyword, [
+      session.projectOutlineId,
+    ])
+    const data = candidates.filter((p) => !usedProfiles.has(p.scientificProfileId))
     return response.ok({ success: true, data })
   }
 

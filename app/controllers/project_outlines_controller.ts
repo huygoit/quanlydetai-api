@@ -8,6 +8,7 @@ import ProjectOutlineService from '#services/project_outline_service'
 import ProjectOutlineReviewService from '#services/project_outline_review_service'
 import ProjectOutlineRevisionService from '#services/project_outline_revision_service'
 import OutlineExportService from '#services/outline_export_service'
+import ScientificProfileAdminService from '#services/scientific_profile_admin_service'
 import {
   updateOutlineDraftValidator,
   submitOutlineRevisionValidator,
@@ -55,6 +56,11 @@ export default class ProjectOutlinesController {
       (await PermissionService.userHasPermission(userId, 'project.update')) ||
       (await PermissionService.userHasPermission(userId, 'project.view'))
     )
+  }
+
+  /** ADMIN / SUPER_ADMIN — thao tác vận hành (mở lại nháp…). */
+  private async isAdminHeThong(userId: number) {
+    return ScientificProfileAdminService.userHasAdminKeKhaiRole(userId)
   }
 
   private async loadFull(id: number) {
@@ -262,8 +268,14 @@ export default class ProjectOutlinesController {
       return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
     }
     const isPkh = await this.canViewPkh(user.id)
+    const isAdmin = await this.isAdminHeThong(user.id)
     const theoDoi = await ProjectOutlineService.userFollowsOutline(outline, user.id)
-    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh && !theoDoi) {
+    if (
+      !(await this.assertCanWriteOutline(outline, user.id)) &&
+      !isPkh &&
+      !isAdmin &&
+      !theoDoi
+    ) {
       return response.forbidden({ success: false, message: 'Không có quyền xuất thuyết minh.' })
     }
     try {
@@ -303,8 +315,14 @@ export default class ProjectOutlinesController {
       return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
     }
     const isPkh = await this.canViewPkh(user.id)
+    const isAdmin = await this.isAdminHeThong(user.id)
     const theoDoi = await ProjectOutlineService.userFollowsOutline(outline, user.id)
-    if (!(await this.assertCanWriteOutline(outline, user.id)) && !isPkh && !theoDoi) {
+    if (
+      !(await this.assertCanWriteOutline(outline, user.id)) &&
+      !isPkh &&
+      !isAdmin &&
+      !theoDoi
+    ) {
       return response.forbidden({ success: false, message: 'Không có quyền xem.' })
     }
     if (outline.status === 'CHINH_SUA_TM') {
@@ -502,6 +520,58 @@ export default class ProjectOutlinesController {
       success: true,
       data: ProjectOutlineService.serialize(full!),
       message: 'Đã nộp thuyết minh chính thức. Phòng Khoa học đã nhận thông báo.',
+    })
+  }
+
+  /**
+   * POST /api/project-outlines/:id/reopen-draft
+   * Admin mở lại bản nháp từ mọi trạng thái (vận hành / sửa dữ liệu test).
+   */
+  async reopenDraft({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    if (!(await this.isAdminHeThong(user.id))) {
+      return response.forbidden({
+        success: false,
+        message: 'Chỉ Admin được mở lại thuyết minh về nháp.',
+      })
+    }
+    const outline = await this.loadFull(Number(params.id))
+    if (!outline) {
+      return response.notFound({ success: false, message: 'Không tìm thấy thuyết minh.' })
+    }
+    if (outline.status === 'THUYETMINH_DRAFT') {
+      return response.badRequest({
+        success: false,
+        message: 'Thuyết minh đang ở trạng thái nháp.',
+      })
+    }
+
+    const from = outline.status
+    outline.status = 'THUYETMINH_DRAFT'
+    outline.withdrawnAt = DateTime.now()
+    outline.submittedAt = null
+    outline.submittedBy = null
+    await outline.save()
+
+    await ProjectOutlineService.writeAudit(
+      outline.id,
+      user.id,
+      'ADMIN_REOPEN_DRAFT',
+      from,
+      'THUYETMINH_DRAFT',
+      {
+        note: 'Admin mở lại về nháp',
+        hadContract: !!outline.activeContractId,
+        contractStatus: outline.contractStatus,
+        module5Opened: !!outline.module5Opened,
+      }
+    )
+
+    const full = await this.loadFull(outline.id)
+    return response.ok({
+      success: true,
+      data: ProjectOutlineService.serialize(full!),
+      message: `Đã mở lại về nháp (trước đó: ${from}).`,
     })
   }
 

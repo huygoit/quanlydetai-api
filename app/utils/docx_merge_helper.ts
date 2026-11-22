@@ -76,25 +76,33 @@ function thoatXml(s: string) {
     .replace(/>/g, '&gt;')
 }
 
-function doanTrongO(text: string, dam: boolean, canGiua: boolean) {
+function doanTrongO(text: string, dam: boolean, canGiua: boolean, coChu = 26) {
   const jc = canGiua ? '<w:jc w:val="center"/>' : ''
-  const b = dam ? '<w:b/>' : ''
+  const b = dam ? '<w:b/><w:bCs/>' : ''
+  const sz = String(coChu)
   const dong = (text || '').split('\n')
   if (!dong.length) dong.push('')
   return dong
     .map(
       (line) =>
         // w:sz tính half-point → 26 = 13pt
-        `<w:p><w:pPr><w:spacing w:before="40" w:after="40"/>${jc}</w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>${b}<w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr><w:t xml:space="preserve">${thoatXml(line)}</w:t></w:r></w:p>`
+        `<w:p><w:pPr><w:spacing w:before="20" w:after="20"/>${jc}</w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>${b}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${thoatXml(line)}</w:t></w:r></w:p>`
     )
     .join('')
 }
 
-function oBang(text: string, rong: number, dam: boolean, canGiua: boolean, nen?: string) {
+function oBang(
+  text: string,
+  rong: number,
+  dam: boolean,
+  canGiua: boolean,
+  nen?: string,
+  coChu = 26
+) {
   const shd = nen ? `<w:shd w:val="clear" w:color="auto" w:fill="${nen}"/>` : ''
   const bien = (canh: string) =>
     `<w:${canh} w:val="single" w:sz="4" w:space="0" w:color="000000"/>`
-  return `<w:tc><w:tcPr><w:tcW w:w="${rong}" w:type="dxa"/><w:tcBorders>${bien('top')}${bien('left')}${bien('bottom')}${bien('right')}</w:tcBorders>${shd}<w:vAlign w:val="center"/></w:tcPr>${doanTrongO(text, dam, canGiua)}</w:tc>`
+  return `<w:tc><w:tcPr><w:tcW w:w="${rong}" w:type="dxa"/><w:tcBorders>${bien('top')}${bien('left')}${bien('bottom')}${bien('right')}</w:tcBorders>${shd}<w:vAlign w:val="center"/></w:tcPr>${doanTrongO(text, dam, canGiua, coChu)}</w:tc>`
 }
 
 function xmlKhungBang(cot: number[], hangTieuDe: string, hangDuLieu: string) {
@@ -151,6 +159,92 @@ export function xmlBangNguonKinhPhi(hang: HangBangNguonKinhPhi[]): string {
   return xmlKhungBang(cot, hangTieuDe, hangDuLieu || hangTieuDe)
 }
 
+export type OBangTuyChinh = {
+  text: string
+  dam?: boolean
+  canGiua?: boolean
+  nen?: string
+}
+
+const TONG_RONG_BANG = 9354
+
+/** Chia đều bề rộng cột (dxa) theo số cột. */
+export function chiaCotBang(soCot: number, tong = TONG_RONG_BANG): number[] {
+  const n = Math.max(1, soCot)
+  const base = Math.floor(tong / n)
+  const cot = Array.from({ length: n }, () => base)
+  cot[n - 1] = tong - base * (n - 1)
+  return cot
+}
+
+/**
+ * Sinh bảng Word từ tiêu đề + hàng dữ liệu (dùng chung BM-02.02 / hợp đồng).
+ * Ô nhận chuỗi hoặc { text, dam, canGiua, nen }.
+ */
+export function xmlBangTuDuLieu(params: {
+  headers: string[]
+  rows: Array<Array<string | OBangTuyChinh>>
+  colWidths?: number[]
+  emptyText?: string
+  /** Cột căn giữa (0-based); mặc định cột STT đầu tiên nếu header là STT/TT */
+  centerCols?: number[]
+  /** Cỡ chữ half-point (26 = 13pt). Ma trận kinh phí dùng ~16–18. */
+  coChu?: number
+  /** Nền dòng tiêu đề */
+  nenTieuDe?: string
+}): string {
+  const headers = params.headers || []
+  const coChu = params.coChu ?? 26
+  const nenTd = params.nenTieuDe || 'D9E2F3'
+  const cot = params.colWidths?.length === headers.length ? params.colWidths : chiaCotBang(headers.length)
+  const tong = cot.reduce((a, b) => a + b, 0)
+  const center = new Set(
+    params.centerCols ??
+      (headers[0] && /^(STT|TT)$/i.test(headers[0]) ? [0] : [])
+  )
+  // Cột số tiền thường căn giữa nếu header gợi ý
+  headers.forEach((h, i) => {
+    if (/số lượng|số tiền|đơn vị|thời gian|tổng số/i.test(h)) center.add(i)
+  })
+
+  const hangTieuDe = `<w:tr>${headers
+    .map((t, i) => oBang(t, cot[i]!, true, true, nenTd, coChu))
+    .join('')}</w:tr>`
+
+  let hangDuLieu = ''
+  if (!params.rows.length) {
+    hangDuLieu = `<w:tr><w:tc><w:tcPr><w:tcW w:w="${tong}" w:type="dxa"/><w:gridSpan w:val="${headers.length}"/><w:vAlign w:val="center"/></w:tcPr>${doanTrongO(params.emptyText || 'Chưa có dữ liệu.', false, true, coChu)}</w:tc></w:tr>`
+  } else {
+    hangDuLieu = params.rows
+      .map((row) => {
+        const cells = headers
+          .map((_, i) => {
+            const raw = row[i]
+            if (raw && typeof raw === 'object') {
+              return oBang(
+                raw.text ?? '',
+                cot[i]!,
+                !!raw.dam,
+                raw.canGiua ?? center.has(i),
+                raw.nen,
+                coChu
+              )
+            }
+            return oBang(String(raw ?? ''), cot[i]!, false, center.has(i), undefined, coChu)
+          })
+          .join('')
+        return `<w:tr>${cells}</w:tr>`
+      })
+      .join('')
+  }
+  return xmlKhungBang(cot, hangTieuDe, hangDuLieu)
+}
+
+/** Mốc chèn bảng theo tên biến merge (vd bang_tien_do → ___BANG_bang_tien_do___). */
+export function taoMocBang(bien: string) {
+  return `___BANG_${bien}___`
+}
+
 /** `<w:p` thật, không nhầm với `<w:pPr`. */
 function timDauDoanVan(xml: string, viTri: number) {
   let i = viTri
@@ -166,7 +260,61 @@ function timDauDoanVan(xml: string, viTri: number) {
   return -1
 }
 
-/** Thay đoạn chứa mốc bằng XML bảng. `batBuoc=false` → bỏ qua nếu không có mốc. */
+/**
+ * Tìm vị trí mốc trong document.xml.
+ * Word đôi khi tách chữ thành nhiều <w:t> — vẫn khớp bằng cách bỏ qua thẻ XML.
+ */
+function timViTriMoc(xml: string, moc: string): number {
+  const thang = xml.indexOf(moc)
+  if (thang >= 0) return thang
+  let mi = 0
+  let start = -1
+  for (let i = 0; i < xml.length; i++) {
+    const ch = xml[i]
+    if (ch === '<') {
+      const gt = xml.indexOf('>', i)
+      if (gt < 0) break
+      i = gt
+      continue
+    }
+    if (ch === moc[mi]) {
+      if (mi === 0) start = i
+      mi++
+      if (mi === moc.length) return start
+    } else if (mi > 0) {
+      i = start
+      mi = 0
+      start = -1
+    }
+  }
+  return -1
+}
+
+/** Lấy chữ thuần từ mảnh OOXML (bỏ thẻ). */
+function textThuanTuXml(xmlFrag: string): string {
+  return xmlFrag
+    .replace(/<w:tab[^/]*\/>/g, '\t')
+    .replace(/<w:br[^/]*\/>/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCharCode(Number(n)))
+}
+
+/**
+ * Giữ nhãn đứng trước mốc trong cùng đoạn (vd «Mục tiêu: {{muc_tieu}}»).
+ * Trước đây thay cả <w:p> → mất nhãn, nội dung trông như thiếu/vỡ.
+ */
+function xmlDoanNhanTruocMoc(chu: string): string {
+  const t = chu.replace(/\s+/g, ' ').trim()
+  if (!t) return ''
+  // Nhãn mục (Mục tiêu / Nội dung…): đậm + đủ bCs để Word locale VN hiện đúng
+  return `<w:p><w:pPr><w:spacing w:before="120" w:after="40"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/><w:b/><w:bCs/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr><w:t xml:space="preserve">${thoatXml(t)}</w:t></w:r></w:p>`
+}
+
+/** Thay đoạn chứa mốc bằng XML bảng/HTML. `batBuoc=false` → bỏ qua nếu không có mốc. */
 export function chenBangTheoMoc(
   docx: Buffer,
   moc: string,
@@ -180,7 +328,7 @@ export function chenBangTheoMoc(
     return docx
   }
   const xml = file.asText()
-  const viTri = xml.indexOf(moc)
+  const viTri = timViTriMoc(xml, moc)
   if (viTri < 0) {
     if (batBuoc) throw new Error('TEMPLATE_RENDER_FAILED')
     return docx
@@ -191,7 +339,10 @@ export function chenBangTheoMoc(
     if (batBuoc) throw new Error('TEMPLATE_RENDER_FAILED')
     return docx
   }
-  const moi = xml.slice(0, dauDoan) + xmlBang + xml.slice(hetDoan + '</w:p>'.length)
+  // Giữ chữ trước mốc trong cùng đoạn (nhãn «Mục tiêu:», «Nội dung thực hiện:», …)
+  const tienTo = textThuanTuXml(xml.slice(dauDoan, viTri))
+  const chen = xmlDoanNhanTruocMoc(tienTo) + xmlBang
+  const moi = xml.slice(0, dauDoan) + chen + xml.slice(hetDoan + '</w:p>'.length)
   zip.file('word/document.xml', moi)
   return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' }) as Buffer
 }
@@ -208,18 +359,29 @@ export function chenBangNhiemVu(docx: Buffer, hang: HangBangNhiemVu[]): Buffer {
  * Thay đoạn {{noi_dung}} bằng các đoạn Word giữ đậm, nghiêng, gạch chân và danh sách.
  */
 export function chenNoiDungHtml(docx: Buffer, html: string): Buffer {
-  const zip = new PizZip(docx)
-  const file = zip.file('word/document.xml')
-  if (!file) throw new Error('TEMPLATE_RENDER_FAILED')
-  const xml = file.asText()
-  const viTri = xml.indexOf(DAU_NOI_DUNG)
-  if (viTri < 0) throw new Error('TEMPLATE_RENDER_FAILED')
-  const dauDoan = timDauDoanVan(xml, viTri)
-  const hetDoan = xml.indexOf('</w:p>', viTri)
-  if (dauDoan < 0 || hetDoan < 0) throw new Error('TEMPLATE_RENDER_FAILED')
-  const moi = xml.slice(0, dauDoan) + htmlSangOoxml(html) + xml.slice(hetDoan + '</w:p>'.length)
-  zip.file('word/document.xml', moi)
-  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' }) as Buffer
+  return chenBangTheoMoc(docx, DAU_NOI_DUNG, htmlSangOoxml(html), true)
+}
+
+/**
+ * Chèn nhiều khối HTML (editor) vào các mốc ___HTML_xxx___ sau khi docxtemplater render.
+ * Mỗi mốc thay cả đoạn <w:p> chứa mốc bằng các đoạn Word giữ định dạng.
+ */
+export function chenNhieuHtmlTheoMoc(
+  docx: Buffer,
+  blocks: Record<string, string | null | undefined>
+): Buffer {
+  let buf = docx
+  for (const [moc, html] of Object.entries(blocks)) {
+    if (!moc) continue
+    const xml = htmlSangOoxml(html || '')
+    buf = chenBangTheoMoc(buf, moc, xml, false)
+  }
+  return buf
+}
+
+/** Tạo mốc chèn HTML theo tên biến merge (vd tinh_cap_thiet → ___HTML_tinh_cap_thiet___). */
+export function taoMocHtml(bien: string) {
+  return `___HTML_${bien}___`
 }
 
 export { DAU_BANG_NHIEM_VU, DAU_NOI_DUNG }
@@ -254,6 +416,10 @@ export async function mergeDocxTemplate(params: {
   outputFileName?: string
   bangTienDo?: HangBangTienDo[]
   bangNguonKinhPhi?: HangBangNguonKinhPhi[]
+  /** Mốc → HTML editor; sau render sẽ chèn OOXML giữ định dạng */
+  htmlBlocks?: Record<string, string | null | undefined>
+  /** key = tên biến {{bang_tien_do}} → XML <w:tbl>… sau render */
+  tableBlocks?: Record<string, string | null | undefined>
 }): Promise<{
   storedFileName: string
   fileUrl: string
@@ -263,6 +429,33 @@ export async function mergeDocxTemplate(params: {
   const data = { ...params.data }
   if (params.bangTienDo) data.bang_tien_do = DAU_BANG_TIEN_DO
   if (params.bangNguonKinhPhi) data.bang_nguon_kinh_phi = DAU_BANG_NGUON_KINH_PHI
+
+  // tableBlocks: {{bang_*}} → mốc rồi thay bằng <w:tbl>
+  const bangTheoMoc: Record<string, string> = {}
+  if (params.tableBlocks) {
+    for (const [bien, xml] of Object.entries(params.tableBlocks)) {
+      if (!bien || !xml) continue
+      const moc = bien.startsWith('___BANG_') ? bien : taoMocBang(bien)
+      const tenBien = bien.startsWith('___BANG_')
+        ? bien.replace(/^___BANG_/, '').replace(/___$/, '')
+        : bien
+      data[tenBien] = moc
+      bangTheoMoc[moc] = xml
+    }
+  }
+
+  // htmlBlocks: key = tên biến {{tinh_cap_thiet}} → đặt mốc rồi chèn OOXML sau render
+  const htmlTheoMoc: Record<string, string | null | undefined> = {}
+  if (params.htmlBlocks) {
+    for (const [bien, html] of Object.entries(params.htmlBlocks)) {
+      const moc = bien.startsWith('___HTML_') ? bien : taoMocHtml(bien)
+      const tenBien = bien.startsWith('___HTML_')
+        ? bien.replace(/^___HTML_/, '').replace(/___$/, '')
+        : bien
+      data[tenBien] = moc
+      htmlTheoMoc[moc] = html
+    }
+  }
 
   let buf = await renderDocxBuffer(params.templatePath, data)
   if (params.bangTienDo) {
@@ -275,6 +468,12 @@ export async function mergeDocxTemplate(params: {
       xmlBangNguonKinhPhi(params.bangNguonKinhPhi),
       false
     )
+  }
+  for (const [moc, xml] of Object.entries(bangTheoMoc)) {
+    buf = chenBangTheoMoc(buf, moc, xml, false)
+  }
+  if (Object.keys(htmlTheoMoc).length) {
+    buf = chenNhieuHtmlTheoMoc(buf, htmlTheoMoc)
   }
 
   const dir = await resolveGeneratedContractDir()

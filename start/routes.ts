@@ -935,6 +935,7 @@ router
     router.put('/:id', [ProjectOutlinesController, 'update'])
     router.post('/:id/submit', [ProjectOutlinesController, 'submit'])
     router.post('/:id/withdraw', [ProjectOutlinesController, 'withdraw'])
+    router.post('/:id/reopen-draft', [ProjectOutlinesController, 'reopenDraft'])
   })
   .prefix('/api/project-outlines')
   .middleware([middleware.auth()])
@@ -943,6 +944,7 @@ router
 router
   .group(() => {
     router.get('/eligible', [ProjectOutlineDefensesController, 'eligible'])
+    router.get('/council-candidates', [ProjectOutlineDefensesController, 'councilCandidates'])
     router.get('/', [ProjectOutlineDefensesController, 'index'])
     router.post('/', [ProjectOutlineDefensesController, 'store'])
     router.get('/my-tasks', [ProjectOutlineDefensesController, 'myTasks'])
@@ -1044,9 +1046,22 @@ router
     router.post('/adjustments/:id/lead-confirm', [ProjectModule56Controller, 'adjustmentLead'])
     router.post('/adjustments/:id/bgh', [ProjectModule56Controller, 'adjustmentBgh'])
     router.get('/achievements', [ProjectModule56Controller, 'achievements'])
+    router.get('/final/my-eval-sheets', [ProjectModule56Controller, 'finalMyEvalSheets'])
     router.get('/final/:outlineId', [ProjectModule56Controller, 'finalShow'])
     router.post('/final/:outlineId/notify', [ProjectModule56Controller, 'finalNotify'])
     router.put('/final/:outlineId/dossier', [ProjectModule56Controller, 'finalDossier'])
+    router.get('/final/:outlineId/evaluation-request-docx', [
+      ProjectModule56Controller,
+      'finalEvaluationRequestDocx',
+    ])
+    router.get('/final/:outlineId/bao-cao-tong-ket-docx', [
+      ProjectModule56Controller,
+      'finalBaoCaoTongKetDocx',
+    ])
+    router.put('/final/:outlineId/evaluation-request', [
+      ProjectModule56Controller,
+      'finalEvaluationRequest',
+    ])
     router.post('/final/:outlineId/dossier-review', [ProjectModule56Controller, 'finalPkhDossier'])
     router.put('/final/:outlineId/council', [ProjectModule56Controller, 'finalCouncil'])
     router.post('/final/:outlineId/remind/:userId', [ProjectModule56Controller, 'finalRemind'])

@@ -607,8 +607,8 @@ export default class ProjectAdjustmentService {
       }
       if (map.size !== BUDGET_LINE_CODES.length) throw new Error('BUDGET_LINES_INCOMPLETE')
       const sum = [...map.values()].reduce((s, n) => s + n, 0)
-      const muc09 = map.get('MUC_09') || 0
-      if (muc09 > Math.round(sum * 0.05)) throw new Error('MUC_09_OVER_5_PERCENT')
+      const quanLy = map.get('QUAN_LY') || map.get('MUC_13') || 0
+      if (quanLy > Math.round(sum * 0.05)) throw new Error('MUC_09_OVER_5_PERCENT')
       changes.budgetLines = BUDGET_LINE_CODES.map((code) => ({ code, amount: map.get(code) || 0 }))
     }
     if (Array.isArray(o.progressUpdates || o.progress_updates)) {
