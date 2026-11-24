@@ -248,15 +248,9 @@ export default class AdminContractTemplatesController {
     }
     try {
       const { row, filePath } = await ContractTemplateService.resolveDownloadPath(id)
-      response.header(
-        'Content-Disposition',
-        `attachment; filename="${encodeURIComponent(row.fileName)}"`
-      )
-      response.header(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      )
-      return response.download(filePath)
+      // Dùng attachment — tránh set Content-Disposition trùng với download() (dễ lỗi trên Windows)
+      const safeName = String(row.fileName || 'template.docx').replace(/[^\w.\-() ]+/g, '_')
+      return response.attachment(filePath, safeName)
     } catch (err) {
       return this.mapError(response, err)
     }

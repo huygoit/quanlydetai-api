@@ -297,6 +297,12 @@ export default class ProjectModule56Controller {
     return this.run(response, () => ProjectFinalService.listMyEvalSheets(user.id))
   }
 
+  /** GET — tổng hợp phiếu ĐGCK (PKH / Thư ký) */
+  async finalEvalSheetTracking({ auth, response }: HttpContext) {
+    const user = auth.use('api').user!
+    return this.run(response, () => ProjectFinalService.listEvalSheetTracking(user.id))
+  }
+
   async finalShow({ auth, params, response }: HttpContext) {
     const user = auth.use('api').user!
     return this.run(response, () => ProjectFinalService.show(Number(params.outlineId), user.id))
@@ -336,6 +342,25 @@ export default class ProjectModule56Controller {
     const user = auth.use('api').user!
     try {
       const exported = await ProjectFinalService.exportBaoCaoTongKet(
+        Number(params.outlineId),
+        user.id
+      )
+      response.header(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(exported.fileName)}"`
+      )
+      return response.download(exported.fullPath)
+    } catch (err) {
+      if (mapModule56Error(response, err)) return
+      throw err
+    }
+  }
+
+  /** GET — tải bản giải trình tiếp thu BM-05.07 */
+  async finalBanGiaiTrinhDocx({ auth, params, response }: HttpContext) {
+    const user = auth.use('api').user!
+    try {
+      const exported = await ProjectFinalService.exportBanGiaiTrinh(
         Number(params.outlineId),
         user.id
       )

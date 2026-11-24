@@ -49,8 +49,19 @@ export const EXECUTION_FLOW = [
   'DGCK_DINH_CHI',
   'DGCK_CHO_QUYET_TOAN',
   'DGCK_CHO_THANH_LY',
+  /** Sau chốt biên bản BM-05.06 (xếp loại) */
+  'NT_CHO_QUYETTOAN',
+  'NT_CHINH_SUA',
+  'NT_KHONG_DAT',
   'HOAN_THANH',
 ] as const
+
+/** Trạng thái chờ quyết toán (mới + legacy) */
+export const ST_CHO_QUYET_TOAN = ['NT_CHO_QUYETTOAN', 'DGCK_CHO_QUYET_TOAN'] as const
+/** Chỉnh sửa / hoàn thiện BC sau ĐGCK */
+export const ST_CHINH_SUA = ['NT_CHINH_SUA', 'DGCK_CHINH_SUA'] as const
+/** Không đạt — chờ PKH quyết hướng xử lý */
+export const ST_KHONG_DAT = ['NT_KHONG_DAT', 'DGCK_KHONG_DAT'] as const
 
 export type ExecutionStatus = (typeof EXECUTION_FLOW)[number]
 

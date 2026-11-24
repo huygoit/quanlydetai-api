@@ -34,6 +34,11 @@ const MAP: Record<string, [number, string]> = {
   RECEIVED_DATE_REQUIRED: [422, 'Nhập ngày nhận hàng (mua sắm trực tiếp).'],
   FIELDS_REQUIRED: [422, 'Cần nhập nội dung dự thảo hợp đồng.'],
   FILE_REQUIRED: [422, 'Cần file đính kèm.'],
+  SETTLEMENT_SUMMARY_REQUIRED: [422, 'Cần upload bảng quyết toán tổng hợp (Excel/PDF).'],
+  SETTLEMENT_EVIDENCE_REQUIRED: [
+    422,
+    'Mỗi khoản chi có số tiền khai cần đính kèm ít nhất một chứng từ scan.',
+  ],
   FILE_TOO_LARGE: [422, 'File vượt dung lượng cho phép.'],
   INVALID_FILES: [422, 'Danh sách file không hợp lệ.'],
   VOUCHER_REQUIRED: [422, 'Cần số chứng từ và ngày chứng từ.'],

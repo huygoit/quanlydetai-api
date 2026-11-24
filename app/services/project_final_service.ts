@@ -12,6 +12,7 @@ import ProjectBudgetEntry from '#models/project_budget_entry'
 import ProjectOutlineMember from '#models/project_outline_member'
 import ScientificProfile from '#models/scientific_profile'
 import ContractTemplateService from '#services/contract_template_service'
+import ProjectContractService from '#services/project_contract_service'
 import ProjectOutlineService from '#services/project_outline_service'
 import NotificationService from '#services/notification_service'
 import AuditLogService from '#services/audit_log_service'
@@ -22,6 +23,7 @@ import {
   buildPublicGeneratedContractUrl,
   mergeDocxTemplate,
   resolveGeneratedContractDir,
+  xmlBangTuDuLieu,
 } from '#utils/docx_merge_helper'
 import { buildSanPhamYeuCauOoxml } from '#utils/outline_thuyet_minh_merge'
 import { buildFormDocx } from '#utils/simple_docx'
@@ -32,11 +34,15 @@ import {
   COUNCIL_ROLE_LABEL,
   COUNCIL_ROLES,
   FILE_LIMIT,
+  ST_CHINH_SUA,
+  ST_CHO_QUYET_TOAN,
+  ST_KHONG_DAT,
   type BudgetLineCode,
   type CouncilRole,
   type FinalClassification,
 } from '#constants/module56'
 import { DATETIME_FORMAT } from '#constants/datetime_formats'
+import { formatVndPlain, numberToVietnameseWords } from '#utils/vietnamese_number_words'
 import { buildFinalCouncilInviteEmail } from '#utils/final_council_invite_email'
 import {
   assertCnnv,
@@ -71,15 +77,13 @@ export default class ProjectFinalService {
   }
 
   /**
-   * Danh sách phiếu đánh giá KQCK của user (là thành viên hội đồng).
-   * Dùng menu «Phiếu đánh giá KQCK của tôi».
+   * Hội đồng đánh giá của tôi — thành viên HĐ xem list nhiệm vụ được mời.
    */
   static async listMyEvalSheets(userId: number) {
     const laThanhVien = (c: ProjectFinalCase) =>
       (c.councilMembers || []).some(
         (m) => Number((m as any).userId ?? (m as any).user_id) === Number(userId)
       )
-    // Có trong council_members là đủ (không bắt buộc meeting_at)
     const allCases = await ProjectFinalCase.query().orderBy('id', 'desc').limit(800)
     const mine = allCases.filter(laThanhVien)
     if (!mine.length) return []
@@ -87,23 +91,160 @@ export default class ProjectFinalService {
     const outlineIds = mine.map((c) => c.projectOutlineId)
     const outlines = await ProjectOutline.query().whereIn('id', outlineIds)
     const byOutline = new Map(outlines.map((o) => [o.id, o]))
-    const sheets = await ProjectFinalSheet.query()
-      .whereIn('project_outline_id', outlineIds)
-      .where('user_id', userId)
-    const sheetByOutline = new Map(sheets.map((s) => [s.projectOutlineId, s]))
+    const allSheets = await ProjectFinalSheet.query().whereIn('project_outline_id', outlineIds)
+    const sheetsByOutline = new Map<number, ProjectFinalSheet[]>()
+    for (const s of allSheets) {
+      const arr = sheetsByOutline.get(s.projectOutlineId) || []
+      arr.push(s)
+      sheetsByOutline.set(s.projectOutlineId, arr)
+    }
     const contracts = await ProjectContract.query().whereIn('project_outline_id', outlineIds)
     const contractByOutline = new Map(contracts.map((c) => [c.projectOutlineId, c]))
+
+    const ketLuanNhan = (v: string | null | undefined) => {
+      const x = String(v || '')
+      if (x === 'DAT_YEU_CAU') return 'Đạt'
+      if (x === 'CAN_BO_SUNG') return 'Cần bổ sung'
+      if (x === 'KHONG_DAT') return 'Không đạt'
+      return x || null
+    }
 
     return mine
       .map((c) => {
         const outline = byOutline.get(c.projectOutlineId)
         if (!outline) return null
-        const me = (c.councilMembers || []).find(
+        const membersRaw = c.councilMembers || []
+        const me = membersRaw.find(
           (m) => Number((m as any).userId ?? (m as any).user_id) === Number(userId)
         )
-        const sheet = sheetByOutline.get(c.projectOutlineId)
-        const contract = contractByOutline.get(c.projectOutlineId)
+        const sheetList = sheetsByOutline.get(c.projectOutlineId) || []
+        const sheetByUser = new Map(sheetList.map((s) => [Number(s.userId), s]))
+        const mySheet = sheetByUser.get(Number(userId))
         const role = String((me as any)?.role || '')
+        const members = membersRaw.map((m) => {
+          const uid = Number((m as any).userId ?? (m as any).user_id)
+          const r = String((m as any).role || '')
+          const sh = sheetByUser.get(uid)
+          return {
+            userId: uid,
+            fullName: String((m as any).fullName || (m as any).name || `#${uid}`),
+            role: r || null,
+            roleLabel: r
+              ? COUNCIL_ROLE_LABEL[r as keyof typeof COUNCIL_ROLE_LABEL] || r
+              : null,
+            sheetStatus: sh?.submittedAt ? 'DA_NOP' : 'CHUA_NOP',
+            submittedAt: iso(sh?.submittedAt || null),
+            ketLuan: ketLuanNhan(sh?.reportComment),
+          }
+        })
+        const memberCount = members.length
+        const submittedCount = members.filter((m) => m.sheetStatus === 'DA_NOP').length
+        const pendingCount = memberCount - submittedCount
+        return {
+          outlineId: outline.id,
+          code: outline.code,
+          title: outline.title,
+          ownerName: outline.ownerName,
+          ownerUnit: (outline as any).ownerUnit || null,
+          executionStatus: outline.executionStatus,
+          meetingAt: iso(c.meetingAt),
+          location: c.meetingLocation,
+          role: role || null,
+          roleLabel: role
+            ? COUNCIL_ROLE_LABEL[role as keyof typeof COUNCIL_ROLE_LABEL] || role
+            : null,
+          sheetSubmittedAt: iso(mySheet?.submittedAt || null),
+          minutesLocked: !!c.minutesLocked,
+          contractId: contractByOutline.get(c.projectOutlineId)?.id || null,
+          memberCount,
+          submittedCount,
+          pendingCount,
+          progressPercent: memberCount
+            ? Math.round((submittedCount / memberCount) * 100)
+            : 0,
+          duPhieu: memberCount > 0 && pendingCount === 0,
+          members,
+          formPath: `/projects/final-eval/${outline.id}`,
+          detailPath: `/projects/final-eval/my/${outline.id}`,
+        }
+      })
+      .filter(Boolean)
+  }
+
+  /**
+   * Tổng hợp phiếu ĐGCK — PKH (contract_manage) hoặc Thư ký HĐ.
+   * Menu «Theo dõi phiếu ĐGCK».
+   */
+  static async listEvalSheetTracking(userId: number) {
+    const isPkh = await hasPerm(userId, 'project.contract_manage')
+    const allCases = await ProjectFinalCase.query().orderBy('id', 'desc').limit(800)
+    const visible = allCases.filter((c) => {
+      const members = c.councilMembers || []
+      if (!members.length) return false
+      if (isPkh) return true
+      return members.some(
+        (m) =>
+          Number((m as any).userId ?? (m as any).user_id) === Number(userId) &&
+          String((m as any).role || '') === 'THU_KY'
+      )
+    })
+    if (!visible.length) return []
+
+    const outlineIds = visible.map((c) => c.projectOutlineId)
+    const outlines = await ProjectOutline.query().whereIn('id', outlineIds)
+    const byOutline = new Map(outlines.map((o) => [o.id, o]))
+    const sheets = await ProjectFinalSheet.query().whereIn('project_outline_id', outlineIds)
+    const sheetsByOutline = new Map<number, ProjectFinalSheet[]>()
+    for (const s of sheets) {
+      const arr = sheetsByOutline.get(s.projectOutlineId) || []
+      arr.push(s)
+      sheetsByOutline.set(s.projectOutlineId, arr)
+    }
+    const contracts = await ProjectContract.query().whereIn('project_outline_id', outlineIds)
+    const contractByOutline = new Map(contracts.map((c) => [c.projectOutlineId, c]))
+
+    const ketLuanNhan = (v: string | null | undefined) => {
+      const x = String(v || '')
+      if (x === 'DAT_YEU_CAU') return 'Đạt'
+      if (x === 'CAN_BO_SUNG') return 'Cần bổ sung'
+      if (x === 'KHONG_DAT') return 'Không đạt'
+      return x || null
+    }
+
+    return visible
+      .map((c) => {
+        const outline = byOutline.get(c.projectOutlineId)
+        if (!outline) return null
+        const membersRaw = c.councilMembers || []
+        const sheetList = sheetsByOutline.get(c.projectOutlineId) || []
+        const sheetByUser = new Map(sheetList.map((s) => [Number(s.userId), s]))
+        const members = membersRaw.map((m) => {
+          const uid = Number((m as any).userId ?? (m as any).user_id)
+          const role = String((m as any).role || '')
+          const sheet = sheetByUser.get(uid)
+          const submitted = !!sheet?.submittedAt
+          return {
+            userId: uid,
+            fullName: String((m as any).fullName || (m as any).name || `#${uid}`),
+            email: (m as any).email || null,
+            role: role || null,
+            roleLabel: role
+              ? COUNCIL_ROLE_LABEL[role as keyof typeof COUNCIL_ROLE_LABEL] || role
+              : null,
+            sheetStatus: submitted ? 'DA_NOP' : 'CHUA_NOP',
+            submittedAt: iso(sheet?.submittedAt || null),
+            ketLuan: ketLuanNhan(sheet?.reportComment),
+            ketLuanCode: sheet?.reportComment || null,
+            bcKetQua: sheet?.volumeComment || null,
+          }
+        })
+        const memberCount = members.length
+        const submittedCount = members.filter((m) => m.sheetStatus === 'DA_NOP').length
+        const pendingCount = memberCount - submittedCount
+        const me = membersRaw.find(
+          (m) => Number((m as any).userId ?? (m as any).user_id) === Number(userId)
+        )
+        const myRole = String((me as any)?.role || '') || null
         return {
           outlineId: outline.id,
           code: outline.code,
@@ -112,14 +253,19 @@ export default class ProjectFinalService {
           executionStatus: outline.executionStatus,
           meetingAt: iso(c.meetingAt),
           location: c.meetingLocation,
-          role: role || null,
-          roleLabel: role
-            ? COUNCIL_ROLE_LABEL[role as keyof typeof COUNCIL_ROLE_LABEL] || role
-            : null,
-          sheetSubmittedAt: iso(sheet?.submittedAt || null),
           minutesLocked: !!c.minutesLocked,
-          contractId: contract?.id || null,
-          formPath: `/projects/final-eval/${outline.id}`,
+          contractId: contractByOutline.get(c.projectOutlineId)?.id || null,
+          memberCount,
+          submittedCount,
+          pendingCount,
+          progressPercent: memberCount
+            ? Math.round((submittedCount / memberCount) * 100)
+            : 0,
+          duPhieu: memberCount > 0 && pendingCount === 0,
+          myRole,
+          isPkhViewer: isPkh,
+          members,
+          detailPath: `/projects/final-eval/tracking/${outline.id}`,
         }
       })
       .filter(Boolean)
@@ -313,15 +459,24 @@ export default class ProjectFinalService {
   }
 
   static async remindMember(outlineId: number, userId: number, memberUserId: number) {
-    await assertPerm(userId, 'project.contract_manage')
     const outline = await loadOutline(outlineId)
     const row = await this.ensure(outline.id)
-    const member = (row.councilMembers || []).find((m) => m.userId === memberUserId && m.role === 'PHAN_BIEN')
+    const members = row.councilMembers || []
+    const isPkh = await hasPerm(userId, 'project.contract_manage')
+    const isThuKy = members.some(
+      (m) =>
+        Number((m as any).userId ?? (m as any).user_id) === Number(userId) &&
+        String((m as any).role || '') === 'THU_KY'
+    )
+    if (!isPkh && !isThuKy) throw new Error('FORBIDDEN')
+    const member = members.find(
+      (m) => Number((m as any).userId ?? (m as any).user_id) === Number(memberUserId)
+    )
     if (!member) throw new Error('NOT_FOUND')
-    await NotificationService.push(member.userId, {
+    await NotificationService.push(Number((member as any).userId), {
       type: 'PROJECT_UPDATE',
       title: 'Nhắc nộp phiếu đánh giá KQCK',
-      message: outline.code,
+      message: `${outline.code}: vui lòng hoàn thành phiếu đánh giá kết quả cuối kỳ`,
       link: `/projects/final-eval/${outline.id}`,
     })
     return { reminded: true }
@@ -452,12 +607,18 @@ export default class ProjectFinalService {
   }
 
   static async saveMinutes(outlineId: number, userId: number, body: Record<string, unknown>) {
-    await assertPerm(userId, 'project.contract_manage')
     const outline = await loadOutline(outlineId)
     assertExecution(outline, ['DGCK_HOP_HD'])
     const row = await this.ensure(outline.id)
     if (row.minutesLocked) throw new Error('MINUTES_LOCKED')
     const members = row.councilMembers || []
+    const isPkh = await hasPerm(userId, 'project.contract_manage')
+    const isThuKy = members.some(
+      (m) =>
+        Number((m as any).userId ?? (m as any).user_id) === Number(userId) &&
+        String((m as any).role || '') === 'THU_KY'
+    )
+    if (!isPkh && !isThuKy) throw new Error('FORBIDDEN')
     if (!members.length || !row.meetingAt) throw new Error('COUNCIL_REQUIRED')
     const present = (Array.isArray(body.presentUserIds) ? body.presentUserIds : []).map(Number)
     if (!hasCouncilQuorum(present.length, members.length)) throw new Error('QUORUM')
@@ -472,60 +633,241 @@ export default class ProjectFinalService {
     if (!['DAT_YEU_CAU', 'CAN_BO_SUNG', 'KHONG_DAT'].includes(classification)) {
       throw new Error('INVALID_CLASSIFICATION')
     }
-    const discussion = String(body.discussion || '').trim()
-    const volume = String(body.volume || '').trim()
-    const quality = String(body.quality || '').trim()
-    const recommendation = String(body.recommendation || '').trim()
-    if (!discussion || !volume || !quality || !recommendation) throw new Error('MINUTES_INCOMPLETE')
-    const lines = recommendation.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+    const discussion = String(
+      body.nhanXetChung ?? body.discussion ?? ''
+    ).trim()
+    const clarifyContent = String(
+      body.clarifyContent ?? body.noiDungLamRo ?? body.quality ?? ''
+    ).trim()
+    const ownerExplanation = String(
+      body.ownerExplanation ?? body.giaiTrinhYKien ?? ''
+    ).trim()
+    const noiDungHoanThien = String(
+      body.noiDungHoanThien ?? body.recommendation ?? ''
+    ).trim()
+    const otherRecommendation = String(
+      body.otherRecommendation ?? body.kienNghiKhac ?? ''
+    ).trim()
+    const recommendation = [noiDungHoanThien, otherRecommendation]
+      .filter(Boolean)
+      .join('\n')
+    if (!discussion) throw new Error('MINUTES_INCOMPLETE')
+    const voteDat = Number(body.voteDat ?? body.phieuDat ?? 0)
+    const voteBoSung = Number(body.voteBoSung ?? body.phieuBoSung ?? 0)
+    const voteKhongDat = Number(body.voteKhongDat ?? body.phieuKhongDat ?? 0)
+    const voteEligible = Number(
+      body.voteEligible ?? body.soQuyenBieuQuyet ?? present.length
+    )
+    const volume = `Đạt ${voteDat}; Bổ sung ${voteBoSung}; Không đạt ${voteKhongDat}`
+    const quality = clarifyContent || discussion
+    // Dòng giải trình BM-05.07 lấy từ 2.2 Nội dung cần làm rõ, hoàn thiện
+    const tachDong = (raw: string) =>
+      raw
+        .split(/\r?\n/)
+        .map((s) =>
+          s
+            .replace(/^\s*[-–—•]\s*/, '')
+            .replace(/^\s*\d+[.)]\s*/, '')
+            .trim()
+        )
+        .filter(Boolean)
+    const linesClarify = tachDong(clarifyContent)
+    const lines =
+      linesClarify.length > 0
+        ? linesClarify
+        : tachDong(recommendation)
     const marksIn = Array.isArray(body.productMarks) ? body.productMarks : []
     const productMarks = (outline.expectedProducts || []).map((p) => {
       const hit = (marksIn as { name?: string; met?: boolean }[]).find((m) => m.name === p.name)
       return { name: p.name, met: !!hit?.met }
     })
     const absent = members.map((m) => m.userId).filter((id) => !present.includes(id))
+    const nextAction = String(body.nextAction ?? body.xuLyTiepTheo ?? '').trim()
     const minutes: MinutesBody = {
       discussion,
       volume,
       quality,
-      recommendation,
-      recommendationLines: lines.length ? lines : [recommendation],
+      recommendation: recommendation || discussion,
+      recommendationLines: lines.length ? lines : [recommendation || discussion],
       presentUserIds: present,
       absentUserIds: absent,
       productMarks,
+      qdCouncilNo: String(body.qdCouncilNo ?? body.soQdHd ?? '').trim() || undefined,
+      clarifyContent: clarifyContent || undefined,
+      ownerExplanation: ownerExplanation || undefined,
+      voteDat,
+      voteBoSung,
+      voteKhongDat,
+      voteEligible,
+      completeDeadline: String(body.completeDeadline ?? body.thoiHan ?? '').trim() || undefined,
+      completeChecker:
+        String(body.completeChecker ?? body.nguoiKiemTra ?? '').trim() || undefined,
+      nextAction: nextAction || undefined,
+      otherRecommendation: otherRecommendation || undefined,
     }
-    const docBlocks = this.minuteBlocks(outline, row, minutes, classification, sheets)
-    const buf = buildFormDocx('BIÊN BẢN HỌP HỘI ĐỒNG ĐÁNH GIÁ CUỐI KỲ', docBlocks)
-    const dir = await resolveGeneratedContractDir()
-    const stored = `BM12b_${outline.code}_${Date.now()}.docx`.replace(/[^\w.-]/g, '_')
-    await fs.writeFile(`${dir}/${stored}`, buf)
+
+    const chuTich =
+      members.find((m) => m.role === 'CHU_TICH')?.fullName ||
+      members.find((m) => String((m as any).role) === 'CHU_TICH')?.fullName ||
+      ''
+    const thuKy =
+      members.find((m) => m.role === 'THU_KY')?.fullName ||
+      members.find((m) => String((m as any).role) === 'THU_KY')?.fullName ||
+      ''
+    const meetingAt = row.meetingAt
+      ? row.meetingAt.toFormat(DATETIME_FORMAT)
+      : ''
+    const thoiGianDiaDiem = [meetingAt, row.meetingLocation].filter(Boolean).join(' — ')
+    const ketLuanText =
+      classification === 'DAT_YEU_CAU'
+        ? '☑ Đạt     ☐ Cần bổ sung, hoàn thiện để đủ cơ sở kết luận     ☐ Không đạt'
+        : classification === 'CAN_BO_SUNG'
+          ? '☐ Đạt     ☑ Cần bổ sung, hoàn thiện để đủ cơ sở kết luận     ☐ Không đạt'
+          : '☐ Đạt     ☐ Cần bổ sung, hoàn thiện để đủ cơ sở kết luận     ☑ Không đạt'
+    const xuLyText =
+      nextAction === 'DANH_GIA_LAI'
+        ? '☐ Xác nhận hoàn thiện hồ sơ     ☑ Đề nghị đánh giá lại'
+        : nextAction === 'XAC_NHAN_HOAN_THIEN'
+          ? '☑ Xác nhận hoàn thiện hồ sơ     ☐ Đề nghị đánh giá lại'
+          : '☐ Xác nhận hoàn thiện hồ sơ     ☐ Đề nghị đánh giá lại'
+
+    const hopDong = await ProjectContract.query()
+      .where('project_outline_id', outline.id)
+      .orderBy('id', 'desc')
+      .first()
+    const mergeData: Record<string, string> = {
+      ten_nhiem_vu: outline.title || '',
+      ma_so: outline.code || '',
+      chu_nhiem: outline.ownerName || '',
+      to_chuc_chu_tri: outline.hostUnit || outline.ownerUnit || '',
+      so_qd_hd: minutes.qdCouncilNo || hopDong?.contractNo || '',
+      thoi_gian_dia_diem: thoiGianDiaDiem,
+      chu_tich: chuTich,
+      thu_ky: thuKy,
+      tong_tv: String(members.length),
+      so_tham_du: String(present.length),
+      nhan_xet_chung: discussion,
+      noi_dung_lam_ro: clarifyContent,
+      giai_trinh_y_kien: ownerExplanation,
+      phieu_dat: String(voteDat),
+      phieu_bo_sung: String(voteBoSung),
+      phieu_khong_dat: String(voteKhongDat),
+      so_quyen_bieu_quyet: String(voteEligible),
+      ket_luan: ketLuanText,
+      noi_dung_hoan_thien: noiDungHoanThien,
+      thoi_han: minutes.completeDeadline || '',
+      nguoi_kiem_tra: minutes.completeChecker || '',
+      xu_ly_tiep_theo: xuLyText,
+      kien_nghi_khac: otherRecommendation,
+      dong_trong: '',
+    }
+
+    const safeCode = (outline.code || String(outline.id)).replace(/[^\w.-]/g, '_')
+    let stored = `BM0506_${safeCode}_${Date.now()}.docx`
+    let fileUrl = ''
+    const template = await ContractTemplateService.getDefaultActive('BIEN_BAN_DGCK')
+    if (template) {
+      const templatePath = await findContractTemplateFilePath(template.storedFileName)
+      if (templatePath) {
+        const merged = await mergeDocxTemplate({
+          templatePath,
+          data: mergeData,
+          outputFileName: stored,
+        })
+        stored = merged.storedFileName
+        fileUrl = merged.fileUrl
+      }
+    }
+    if (!fileUrl) {
+      // Fallback nếu chưa seed mẫu
+      const docBlocks = this.minuteBlocks(outline, row, minutes, classification, sheets)
+      const buf = buildFormDocx('BIÊN BẢN ĐÁNH GIÁ KẾT QUẢ THỰC HIỆN NHIỆM VỤ', docBlocks)
+      const dir = await resolveGeneratedContractDir()
+      await fs.writeFile(`${dir}/${stored}`, buf)
+      fileUrl = buildPublicGeneratedContractUrl(stored)
+    }
 
     row.minutes = minutes
     row.minutesLocked = true
     row.classification = classification
-    row.minutesFileName = `BM12b_${outline.code}.docx`
+    row.minutesFileName = `BM-05.06_Bien_ban_${safeCode}.docx`
     row.minutesStoredFileName = stored
-    row.minutesFileUrl = buildPublicGeneratedContractUrl(stored)
+    row.minutesFileUrl = fileUrl
     if (classification === 'DAT_YEU_CAU') {
-      outline.executionStatus = 'DGCK_CHO_QUYET_TOAN'
+      // Đạt yêu cầu, không cần chỉnh sửa → chờ quyết toán
+      outline.executionStatus = 'NT_CHO_QUYETTOAN'
       row.settlementStatus = 'QT_DRAFT'
     } else if (classification === 'CAN_BO_SUNG') {
-      outline.executionStatus = 'DGCK_CHINH_SUA'
+      // Có kiến nghị hoàn thiện BC → chỉnh sửa + thông báo CNNV
+      outline.executionStatus = 'NT_CHINH_SUA'
       row.explanationStartedAt = DateTime.now()
       row.explanationDeadline = DateTime.now().plus({ days: 14 })
       row.explanationStatus = null
       row.remindedDay10 = false
       row.remindedDay13 = false
     } else {
-      outline.executionStatus = 'DGCK_KHONG_DAT'
+      // Không đạt → chờ PKH&HTQT quyết hướng xử lý
+      outline.executionStatus = 'NT_KHONG_DAT'
     }
     await row.save()
     await outline.save()
-    if (outline.ownerId) {
+
+    const ketLuan = CLASSIFICATION_LABEL[classification]
+    if (classification === 'DAT_YEU_CAU' && outline.ownerId) {
+      const linkQt = await this.contractTabPath(outline.id, 'quyettoan')
       await NotificationService.push(outline.ownerId, {
         type: 'PROJECT_UPDATE',
-        title: 'Đã có biên bản đánh giá cuối kỳ',
-        message: `${outline.code}: ${CLASSIFICATION_LABEL[classification]}`,
+        title: 'Đánh giá cuối kỳ: Đạt yêu cầu',
+        message: `${outline.code}: chuyển bước quyết toán`,
+        link: linkQt,
+      })
+    } else if (classification === 'CAN_BO_SUNG' && outline.ownerId) {
+      const linkGt = await this.contractTabPath(outline.id, 'giaitrinh')
+      const noiDung =
+        minutes.recommendation ||
+        minutes.clarifyContent ||
+        minutes.otherRecommendation ||
+        'Vui lòng hoàn thiện báo cáo / hồ sơ theo biên bản hội đồng.'
+      await NotificationService.push(outline.ownerId, {
+        type: 'PROJECT_UPDATE',
+        title: 'Đánh giá cuối kỳ: Cần hoàn thiện báo cáo',
+        message: `${outline.code}: ${noiDung}`,
+        link: linkGt,
+      })
+      await EmailLogService.logStubToUser(
+        outline.ownerId,
+        `[KH&CN] Yêu cầu hoàn thiện sau đánh giá cuối kỳ — ${outline.code}`,
+        [
+          `Kính gửi ${outline.ownerName || 'Quý Thầy/Cô'},`,
+          '',
+          `Hội đồng đánh giá kết quả nhiệm vụ ${outline.code} — ${outline.title || ''}`,
+          `đã kết luận: ${ketLuan}.`,
+          '',
+          'Nội dung cần hoàn thiện:',
+          noiDung,
+          '',
+          'Vui lòng đăng nhập hệ thống để bổ sung / giải trình:',
+          linkGt,
+          '',
+          'Trân trọng,',
+          'Hệ thống Quản lý Khoa học và Công nghệ',
+        ].join('\n'),
+        'project_final_minutes_chinh_sua',
+        row.id
+      )
+    } else if (classification === 'KHONG_DAT') {
+      if (outline.ownerId) {
+        await NotificationService.push(outline.ownerId, {
+          type: 'PROJECT_UPDATE',
+          title: 'Đánh giá cuối kỳ: Không đạt',
+          message: `${outline.code}: chờ Phòng KH&HTQT quyết định hướng xử lý`,
+          link: await this.contractTabPath(outline.id, 'danhgia'),
+        })
+      }
+      await NotificationService.pushToPermission('project.contract_manage', {
+        type: 'PROJECT_UPDATE',
+        title: 'ĐGCK Không đạt — cần PKH quyết định',
+        message: `${outline.code}: chọn cho làm lại hoặc đình chỉ`,
         link: await this.contractTabPath(outline.id, 'danhgia'),
       })
     }
@@ -601,10 +943,10 @@ export default class ProjectFinalService {
   static async decideFail(outlineId: number, userId: number, retry: boolean) {
     await assertPerm(userId, 'project.contract_manage')
     const outline = await loadOutline(outlineId)
-    assertExecution(outline, ['DGCK_KHONG_DAT'])
+    assertExecution(outline, [...ST_KHONG_DAT])
     const row = await this.ensure(outline.id)
     if (retry) {
-      outline.executionStatus = 'DGCK_CHINH_SUA'
+      outline.executionStatus = 'NT_CHINH_SUA'
       row.explanationStartedAt = DateTime.now()
       row.explanationDeadline = DateTime.now().plus({ days: 14 })
       row.remindedDay10 = false
@@ -614,24 +956,56 @@ export default class ProjectFinalService {
     }
     await row.save()
     await outline.save()
+    if (outline.ownerId) {
+      await NotificationService.push(outline.ownerId, {
+        type: 'PROJECT_UPDATE',
+        title: retry
+          ? 'PKH cho phép hoàn thiện sau đánh giá Không đạt'
+          : 'Nhiệm vụ bị đình chỉ sau đánh giá Không đạt',
+        message: outline.code,
+        link: await this.contractTabPath(
+          outline.id,
+          retry ? 'giaitrinh' : 'danhgia'
+        ),
+      })
+    }
     return this.show(outline.id, userId)
   }
 
   static async saveExplanation(outlineId: number, userId: number, body: Record<string, unknown>, submit: boolean) {
     const outline = await loadOutline(outlineId)
     await assertCnnv(userId, outline)
-    assertExecution(outline, ['DGCK_CHINH_SUA'])
+    assertExecution(outline, [...ST_CHINH_SUA])
     const row = await this.ensure(outline.id)
     if (row.explanationStatus && row.explanationStatus !== 'TRA_LAI') throw new Error('BAD_STATUS')
-    const lines = row.minutes?.recommendationLines || []
-    const input = Array.isArray(body.items) ? (body.items as { response?: string }[]) : []
-    if (input.length !== lines.length) throw new Error('EXPLANATION_MISMATCH')
-    const items: ExplanationItem[] = lines.map((recommendation, i) => ({
-      recommendation,
-      response: String(input[i]?.response || '').trim(),
-    }))
-    if (submit && items.some((it) => !it.response)) throw new Error('EXPLANATION_MISMATCH')
+    const input = Array.isArray(body.items)
+      ? (body.items as {
+          recommendation?: string
+          response?: string
+          evidence?: string
+          evidenceFile?: unknown
+          text?: string
+        }[])
+      : []
+    if (!input.length) throw new Error('EXPLANATION_MISMATCH')
+    const items: ExplanationItem[] = input.map((it) => {
+      const evidenceFile = parseOneFile(it.evidenceFile, FILE_LIMIT.summary)
+      return {
+        recommendation: String(it.recommendation || it.text || '').trim(),
+        response: String(it.response || '').trim(),
+        evidence: String(it.evidence || '').trim() || undefined,
+        evidenceFile: evidenceFile || null,
+      }
+    })
+    if (submit && items.some((it) => !it.recommendation || !it.response)) {
+      throw new Error('EXPLANATION_MISMATCH')
+    }
+    // Mỗi dòng cần mô tả minh chứng hoặc file đính kèm
+    if (submit && items.some((it) => !it.evidence?.trim() && !it.evidenceFile)) {
+      throw new Error('EXPLANATION_MISMATCH')
+    }
     row.explanationItems = items
+    // Báo cáo tổng kết đính kèm hồ sơ giải trình
     row.explanationReportFile = parseOneFile(body.reportFile ?? body.report_file, FILE_LIMIT.summary)
     if (submit) {
       if (!row.explanationReportFile) throw new Error('FILE_REQUIRED')
@@ -639,14 +1013,31 @@ export default class ProjectFinalService {
       row.explanationReturnReason = null
       row.secretaryConfirmedAt = null
       row.chairConfirmedAt = null
+      // Thành viên HĐ → link Hội đồng của tôi (không vào menu NT cần quyền PKH)
+      const linkHd = this.councilMyPath(outline.id, 'giaitrinh')
       const secretary = (row.councilMembers || []).find((m) => m.role === 'THU_KY')
-      if (secretary) {
-        await NotificationService.push(secretary.userId, {
+      const chair = (row.councilMembers || []).find((m) => m.role === 'CHU_TICH')
+      // Thông báo Thư ký HĐ + Chủ tịch HĐ ĐGCK
+      for (const tv of [secretary, chair]) {
+        if (!tv) continue
+        const laThuKy = tv.role === 'THU_KY'
+        await NotificationService.push(tv.userId, {
           type: 'PROJECT_UPDATE',
-          title: 'Bản giải trình chờ thư ký',
-          message: outline.code,
-          link: await this.contractTabPath(outline.id, 'giaitrinh'),
+          title: laThuKy
+            ? 'Bản giải trình chờ thư ký xác nhận'
+            : 'CNNV đã nộp bản giải trình — chờ thư ký rồi tới Chủ tịch',
+          message: `${outline.code} — ${outline.title || ''}`.trim(),
+          link: linkHd,
         })
+        await EmailLogService.logStubToUser(
+          tv.userId,
+          laThuKy
+            ? 'Bản giải trình chờ thư ký xác nhận'
+            : 'CNNV đã nộp bản giải trình',
+          `Nhiệm vụ ${outline.code}`,
+          'final_case',
+          outline.id
+        )
       }
     }
     await row.save()
@@ -655,10 +1046,11 @@ export default class ProjectFinalService {
 
   static async confirmExplanation(outlineId: number, userId: number, accept: boolean, reason: string) {
     const outline = await loadOutline(outlineId)
-    assertExecution(outline, ['DGCK_CHINH_SUA'])
+    assertExecution(outline, [...ST_CHINH_SUA])
     const row = await this.ensure(outline.id)
     const secretary = (row.councilMembers || []).find((m) => m.role === 'THU_KY')
     const chair = (row.councilMembers || []).find((m) => m.role === 'CHU_TICH')
+    const linkHd = this.councilMyPath(outline.id, 'giaitrinh')
     if (row.explanationStatus === 'CHO_THU_KY') {
       if (!secretary || secretary.userId !== userId) throw new Error('FORBIDDEN')
       if (!accept) return this.returnExplanation(row, outline, reason, userId)
@@ -668,20 +1060,43 @@ export default class ProjectFinalService {
       if (chair) {
         await NotificationService.push(chair.userId, {
           type: 'PROJECT_UPDATE',
-          title: 'Bản giải trình chờ chủ tịch',
-          message: outline.code,
-          link: await this.contractTabPath(outline.id, 'giaitrinh'),
+          title: 'Bản giải trình chờ Chủ tịch HĐ xác nhận',
+          message: `${outline.code} — Thư ký đã xác nhận, vui lòng xem bảng giải trình và báo cáo tổng kết.`,
+          link: linkHd,
         })
+        await EmailLogService.logStubToUser(
+          chair.userId,
+          'Bản giải trình chờ Chủ tịch HĐ xác nhận',
+          `Nhiệm vụ ${outline.code}`,
+          'final_case',
+          outline.id
+        )
       }
     } else if (row.explanationStatus === 'CHO_CHU_TICH') {
       if (!chair || chair.userId !== userId) throw new Error('FORBIDDEN')
       if (!accept) return this.returnExplanation(row, outline, reason, userId)
       row.chairConfirmedAt = DateTime.now()
       row.explanationStatus = 'XONG'
-      outline.executionStatus = 'DGCK_CHO_QUYET_TOAN'
+      // Chuyển chờ quyết toán (NT_*) — PKH tiếp tục QT/TL
+      outline.executionStatus = 'NT_CHO_QUYETTOAN'
       row.settlementStatus = row.settlementStatus || 'QT_DRAFT'
       await row.save()
       await outline.save()
+      const linkQt = await this.contractTabPath(outline.id, 'quyettoan')
+      await NotificationService.pushToPermission('project.contract_manage', {
+        type: 'PROJECT_UPDATE',
+        title: 'Giải trình đã được Chủ tịch xác nhận — chờ quyết toán',
+        message: `${outline.code} — ${outline.title || ''}`.trim(),
+        link: linkQt,
+      })
+      if (outline.ownerId) {
+        await NotificationService.push(outline.ownerId, {
+          type: 'PROJECT_UPDATE',
+          title: 'Chủ tịch đã xác nhận bản giải trình',
+          message: 'Hồ sơ chuyển sang chờ quyết toán.',
+          link: linkQt,
+        })
+      }
     } else {
       throw new Error('BAD_STATUS')
     }
@@ -691,7 +1106,7 @@ export default class ProjectFinalService {
   static async extendExplanation(outlineId: number, userId: number, deadline: string) {
     await assertPerm(userId, 'project.contract_manage')
     const outline = await loadOutline(outlineId)
-    assertExecution(outline, ['DGCK_CHINH_SUA'])
+    assertExecution(outline, [...ST_CHINH_SUA])
     const row = await this.ensure(outline.id)
     const d = DateTime.fromISO(deadline)
     if (!d.isValid) throw new Error('INVALID_DATE')
@@ -705,27 +1120,62 @@ export default class ProjectFinalService {
   static async saveSettlement(outlineId: number, userId: number, body: Record<string, unknown>, submit: boolean) {
     const outline = await loadOutline(outlineId)
     await assertCnnv(userId, outline)
-    assertExecution(outline, ['DGCK_CHO_QUYET_TOAN'])
+    assertExecution(outline, [...ST_CHO_QUYET_TOAN])
     const row = await this.ensure(outline.id)
     if (row.settlementStatus && !['QT_DRAFT', 'QT_BS'].includes(row.settlementStatus)) {
       throw new Error('BAD_STATUS')
     }
-    const input = Array.isArray(body.lines) ? (body.lines as { code: string; declaredAmount: number }[]) : []
-    const map = new Map<string, number>()
+    const input = Array.isArray(body.lines)
+      ? (body.lines as {
+          code: string
+          declaredAmount?: number
+          declared_amount?: number
+          evidenceFiles?: unknown
+          evidence_files?: unknown
+        }[])
+      : []
+    const map = new Map<string, { amount: number; evidenceFiles: ReturnType<typeof parseFiles> }>()
     for (const line of input) {
       if (!BUDGET_LINE_CODES.includes(line.code as BudgetLineCode)) throw new Error('INVALID_BUDGET_CODE')
-      map.set(line.code, money(line.declaredAmount ?? (line as { declared_amount?: number }).declared_amount))
+      const amount = money(line.declaredAmount ?? line.declared_amount)
+      const evidenceFiles = parseFiles(line.evidenceFiles ?? line.evidence_files ?? [], {
+        required: false,
+      })
+      map.set(line.code, { amount, evidenceFiles })
     }
     if (map.size !== BUDGET_LINE_CODES.length) throw new Error('BUDGET_LINES_INCOMPLETE')
-    row.settlementLines = BUDGET_LINE_CODES.map((code) => ({
-      code,
-      declaredAmount: map.get(code) || 0,
-    }))
-    row.settlementFiles = parseFiles(body.files ?? body.attachments, { required: submit })
+    row.settlementLines = BUDGET_LINE_CODES.map((code) => {
+      const hit = map.get(code)
+      return {
+        code,
+        declaredAmount: hit?.amount || 0,
+        evidenceFiles: hit?.evidenceFiles || [],
+      }
+    })
+    // files = bảng quyết toán tổng hợp (Excel/PDF) — không lẫn chứng từ theo dòng
+    row.settlementFiles = parseFiles(body.files ?? body.attachments, { required: false })
+    if (submit) {
+      if (!row.settlementFiles.length) throw new Error('SETTLEMENT_SUMMARY_REQUIRED')
+      const thieuChungTu = row.settlementLines.some(
+        (l) => Number(l.declaredAmount) > 0 && !(l.evidenceFiles || []).length
+      )
+      if (thieuChungTu) throw new Error('SETTLEMENT_EVIDENCE_REQUIRED')
+    }
     row.varianceAck = false
     row.varianceReason = null
-    if (submit) row.settlementStatus = 'QT_CHO_PKH'
-    else row.settlementStatus = 'QT_DRAFT'
+    if (submit) {
+      row.settlementStatus = 'QT_CHO_PKH'
+      row.settlementReturnReason = null
+      const linkQt = await this.contractTabPath(outline.id, 'quyettoan')
+      await NotificationService.pushToPermission('project.contract_manage', {
+        type: 'PROJECT_UPDATE',
+        title: 'Hồ sơ quyết toán chờ PKH&HTQT kiểm tra',
+        message: `${outline.code} — ${outline.title || ''}`.trim(),
+        link: linkQt,
+      })
+    } else {
+      row.settlementStatus = 'QT_DRAFT'
+    }
     await row.save()
     return this.show(outline.id, userId)
   }
@@ -735,18 +1185,27 @@ export default class ProjectFinalService {
     const outline = await loadOutline(outlineId)
     const row = await this.ensure(outline.id)
     if (row.settlementStatus !== 'QT_CHO_PKH') throw new Error('BAD_STATUS')
+    const linkQt = await this.contractTabPath(outline.id, 'quyettoan')
     if (!accept) {
       if (!note.trim()) throw new Error('REASON_REQUIRED')
       row.settlementStatus = 'QT_BS'
       row.settlementReturnReason = note.trim()
+      if (outline.ownerId) {
+        await NotificationService.push(outline.ownerId, {
+          type: 'PROJECT_UPDATE',
+          title: 'Hồ sơ quyết toán cần bổ sung',
+          message: note.trim(),
+          link: linkQt,
+        })
+      }
     } else {
       row.settlementStatus = 'QT_CHO_TC'
       row.settlementReturnReason = null
       await NotificationService.pushToPermission('project.budget_confirm', {
         type: 'PROJECT_UPDATE',
-        title: 'Quyết toán chờ KH-TC',
-        message: outline.code,
-        link: await this.contractTabPath(outline.id, 'quyettoan'),
+        title: 'Quyết toán chờ KH-TC thẩm định',
+        message: `${outline.code} — ${outline.title || ''}`.trim(),
+        link: linkQt,
       })
     }
     await row.save()
@@ -769,14 +1228,23 @@ export default class ProjectFinalService {
   static async tcSettlement(outlineId: number, userId: number, accept: boolean, date: string, reason: string) {
     await assertPerm(userId, 'project.budget_confirm')
     const outline = await loadOutline(outlineId)
-    assertExecution(outline, ['DGCK_CHO_QUYET_TOAN'])
+    assertExecution(outline, [...ST_CHO_QUYET_TOAN])
     const row = await this.ensure(outline.id)
     if (row.settlementStatus !== 'QT_CHO_TC') throw new Error('BAD_STATUS')
+    const linkQt = await this.contractTabPath(outline.id, 'quyettoan')
     if (!accept) {
       if (!reason.trim()) throw new Error('REASON_REQUIRED')
       row.settlementStatus = 'QT_BS'
       row.settlementReturnReason = reason.trim()
       await row.save()
+      if (outline.ownerId) {
+        await NotificationService.push(outline.ownerId, {
+          type: 'PROJECT_UPDATE',
+          title: 'KH-TC yêu cầu bổ sung hồ sơ quyết toán',
+          message: reason.trim(),
+          link: linkQt,
+        })
+      }
       return this.show(outline.id, userId)
     }
     const snap = await budgetSnapshot(outline.id)
@@ -804,6 +1272,21 @@ export default class ProjectFinalService {
       await row.save()
       await outline.save()
     })
+    const linkTl = await this.contractTabPath(outline.id, 'thanhly')
+    await NotificationService.pushToPermission('project.contract_manage', {
+      type: 'PROJECT_UPDATE',
+      title: 'Đã quyết toán — chờ thanh lý hợp đồng',
+      message: `${outline.code} — ${outline.title || ''}`.trim(),
+      link: linkTl,
+    })
+    if (outline.ownerId) {
+      await NotificationService.push(outline.ownerId, {
+        type: 'PROJECT_UPDATE',
+        title: 'KH-TC đã xác nhận quyết toán',
+        message: 'Hồ sơ chuyển sang chờ thanh lý.',
+        link: linkTl,
+      })
+    }
     return this.show(outline.id, userId)
   }
 
@@ -836,6 +1319,9 @@ export default class ProjectFinalService {
       }
     }
     row.liquidationStatus = 'TL_DRAFT'
+    row.liquidationReturnReason = null
+    // Sinh / cập nhật dự thảo BM-05.10 để PKH xem trước trước khi trình BGH
+    await this.writeLiquidationFile(outline, row)
     await row.save()
     return this.show(outline.id, userId)
   }
@@ -846,13 +1332,20 @@ export default class ProjectFinalService {
     assertExecution(outline, ['DGCK_CHO_THANH_LY'])
     const row = await this.ensure(outline.id)
     if (!row.surplusHandling) throw new Error('SURPLUS_REQUIRED')
+    if (
+      row.liquidationStatus &&
+      !['TL_DRAFT', 'TL_TRA_LAI'].includes(row.liquidationStatus)
+    ) {
+      throw new Error('BAD_STATUS')
+    }
     await this.writeLiquidationFile(outline, row)
     row.liquidationStatus = 'TL_CHO_BGH'
+    row.liquidationReturnReason = null
     await row.save()
     await NotificationService.pushToPermission('project.outline_approve', {
       type: 'PROJECT_UPDATE',
-      title: 'Biên bản thanh lý chờ ký',
-      message: outline.code,
+      title: 'Biên bản thanh lý chờ BGH ký',
+      message: `${outline.code} — ${outline.title || ''}`.trim(),
       link: await this.contractTabPath(outline.id, 'thanhly'),
     })
     return this.show(outline.id, userId)
@@ -863,11 +1356,18 @@ export default class ProjectFinalService {
     const outline = await loadOutline(outlineId)
     const row = await this.ensure(outline.id)
     if (row.liquidationStatus !== 'TL_CHO_BGH') throw new Error('BAD_STATUS')
+    const linkTl = await this.contractTabPath(outline.id, 'thanhly')
     if (!accept) {
       if (!reason.trim()) throw new Error('REASON_REQUIRED')
       row.liquidationStatus = 'TL_DRAFT'
       row.liquidationReturnReason = reason.trim()
       await row.save()
+      await NotificationService.pushToPermission('project.contract_manage', {
+        type: 'PROJECT_UPDATE',
+        title: 'BGH trả lại biên bản thanh lý',
+        message: reason.trim(),
+        link: linkTl,
+      })
       return this.show(outline.id, userId)
     }
     row.liqBghSignedAt = DateTime.now()
@@ -876,9 +1376,9 @@ export default class ProjectFinalService {
     await row.save()
     await NotificationService.pushToPermission('project.contract_publish', {
       type: 'PROJECT_UPDATE',
-      title: 'Thanh lý chờ phát hành',
-      message: outline.code,
-      link: await this.contractTabPath(outline.id, 'thanhly'),
+      title: 'Thanh lý chờ TC-HC phát hành',
+      message: `${outline.code} — ${outline.title || ''}`.trim(),
+      link: linkTl,
     })
     return this.show(outline.id, userId)
   }
@@ -893,11 +1393,13 @@ export default class ProjectFinalService {
     row.liqIssueNo = no
     row.liqPublishedAt = DateTime.now()
     row.liquidationStatus = 'TL_CHO_CNNV'
+    // Cập nhật lại file với số biên bản phát hành
+    await this.writeLiquidationFile(outline, row)
     await row.save()
     if (outline.ownerId) {
       await NotificationService.push(outline.ownerId, {
         type: 'PROJECT_UPDATE',
-        title: 'Biên bản thanh lý chờ xác nhận',
+        title: 'Biên bản thanh lý chờ CNNV xác nhận',
         message: `${outline.code}: số ${no}`,
         link: await this.contractTabPath(outline.id, 'thanhly'),
       })
@@ -928,7 +1430,12 @@ export default class ProjectFinalService {
       const start = row.explanationStartedAt.startOf('day')
       const day = Math.round(today().diff(start, 'days').days) + 1
       const outline = await loadOutline(row.projectOutlineId)
-      if (outline.executionStatus !== 'DGCK_CHINH_SUA' || !outline.ownerId) continue
+      if (
+        !ST_CHINH_SUA.includes(outline.executionStatus as (typeof ST_CHINH_SUA)[number]) ||
+        !outline.ownerId
+      ) {
+        continue
+      }
       if (day === 10 && !row.remindedDay10) {
         await this.remindExplanation(outline.ownerId, outline.id, 10)
         row.remindedDay10 = true
@@ -969,13 +1476,21 @@ export default class ProjectFinalService {
     row.secretaryConfirmedAt = null
     row.chairConfirmedAt = null
     await row.save()
+    const linkGt = await this.contractTabPath(outline.id, 'giaitrinh')
     if (outline.ownerId) {
       await NotificationService.push(outline.ownerId, {
         type: 'PROJECT_UPDATE',
-        title: 'Giải trình cần sửa',
+        title: 'Bản giải trình chưa đạt — cần chỉnh sửa thêm',
         message: reason.trim(),
-        link: await this.contractTabPath(outline.id, 'giaitrinh'),
+        link: linkGt,
       })
+      await EmailLogService.logStubToUser(
+        outline.ownerId,
+        'Bản giải trình chưa đạt — cần chỉnh sửa thêm',
+        reason.trim(),
+        'final_case',
+        outline.id
+      )
     }
     return this.show(outline.id, actorId)
   }
@@ -1014,13 +1529,34 @@ export default class ProjectFinalService {
     return row
   }
 
-  /** Link FE chi tiết HĐ + tab (ưu tiên hồ sơ đề nghị đánh giá). */
+  /** Link FE — tab nghiệm thu/thanh lý sang menu mới; còn lại giữ HĐ. */
   private static async contractTabPath(outlineId: number, tab = 'denghi') {
     const contract = await ProjectContract.query().where('project_outline_id', outlineId).first()
     if (contract) {
+      const ntTabs = new Set([
+        'denghi',
+        'hoidong',
+        'danhgia',
+        'giaitrinh',
+        'quyettoan',
+        'thanhly',
+      ])
+      // Tab cũ «nghiemthu» → đề nghị ĐGKQNV
+      const tabNt = tab === 'nghiemthu' ? 'denghi' : tab
+      if (ntTabs.has(tabNt)) {
+        return `/projects/nghiem-thu-thanh-ly/${contract.id}?tab=${tabNt}`
+      }
       return `/projects/contracts/${contract.id}?tab=${tab}`
     }
     return `/projects/execution/${outlineId}`
+  }
+
+  /**
+   * Link dành thành viên HĐ (Thư ký / Chủ tịch…) —
+   * họ không có quyền menu Nghiệm thu/thanh lý, vào «Hội đồng đánh giá của tôi».
+   */
+  private static councilMyPath(outlineId: number, focus = 'giaitrinh') {
+    return `/projects/final-eval/my/${outlineId}?focus=${encodeURIComponent(focus)}`
   }
 
   private static async assertSee(userId: number, outline: Awaited<ReturnType<typeof loadOutline>>) {
@@ -1060,12 +1596,13 @@ export default class ProjectFinalService {
       projectOutlineId: outline.id,
       code: outline.code,
       title: outline.title,
+      ownerName: outline.ownerName || null,
       executionStatus: outline.executionStatus,
       /** Dùng form phiếu đánh giá KQCK (thành viên HĐ không gọi được getOutline) */
       expectedResults: outline.expectedResults || null,
       overdueExplanation: !!(
         row.explanationDeadline &&
-        outline.executionStatus === 'DGCK_CHINH_SUA' &&
+        ST_CHINH_SUA.includes(outline.executionStatus as (typeof ST_CHINH_SUA)[number]) &&
         today() > row.explanationDeadline.startOf('day')
       ),
       dossier: {
@@ -1126,6 +1663,7 @@ export default class ProjectFinalService {
         bghSignedAt: iso(row.liqBghSignedAt),
         publishedAt: iso(row.liqPublishedAt),
         cnnvSignedAt: iso(row.liqCnnvSignedAt),
+        returnReason: row.liquidationReturnReason,
       },
       finance: { advanced, spent, settled, lines: finance },
       assets: assets.map((a) => ({
@@ -1196,17 +1734,97 @@ export default class ProjectFinalService {
     row: ProjectFinalCase
   ) {
     const finance = await budgetSnapshot(outline.id)
+    const planned = finance.reduce((s, l) => s + l.planned, 0)
     const advanced = finance.reduce((s, l) => s + l.advanced, 0)
     const spent = finance.reduce((s, l) => s + l.spent, 0)
     const settled = finance.reduce((s, l) => s + l.settled, 0)
+    const ton = Math.max(0, advanced - settled)
+    const soThanhToanBs = Math.max(0, settled - advanced)
+    // Chọn hoàn trả → ghi số tồn; không phát sinh → 0
+    const soHoanTra = row.surplusHandling === 'HOAN_TRA' ? ton : 0
     const assets = await ProjectAsset.query().where('project_outline_id', outline.id)
+    const hopDong = await ProjectContract.query()
+      .where('project_outline_id', outline.id)
+      .orderBy('id', 'desc')
+      .first()
+    const mp = hopDong?.mergePayload || {}
+    const contact = await ProjectContractService.resolveOwnerContact(outline)
+    const now = DateTime.now()
+    const ngayLap = `ngày ${now.toFormat('dd')} tháng ${now.toFormat('MM')} năm ${now.toFormat('yyyy')}`
+    const start = outline.startDate
+    const end = outline.endDate
+    let months = ''
+    if (start && end) {
+      months = String(Math.max(1, Math.round(end.diff(start, 'months').months)))
+    }
+    const kpTheoHd = Number(outline.approvedBudget ?? outline.confirmedBudget ?? planned) || planned
+    const xepLoai = row.classification ? CLASSIFICATION_LABEL[row.classification] : ''
+    const ngayHopHd = row.meetingAt?.toFormat('dd/MM/yyyy') || ''
+
     const data: Record<string, string> = {
-      ten_nhiem_vu: outline.title,
-      ma_nhiem_vu: outline.code,
-      xep_loai: row.classification ? CLASSIFICATION_LABEL[row.classification] : '',
-      kinh_phi_da_cap: String(advanced + spent),
-      kinh_phi_quyet_toan: String(settled),
-      ton: String(advanced + spent - settled),
+      ngay_ap_dung: now.toFormat('dd/MM/yyyy'),
+      loai_hinh: outline.level || mp.loai_hinh || '',
+      so_bien_ban: row.liqIssueNo || '',
+      ngay_lap: ngayLap,
+
+      so_hop_dong: hopDong?.contractNo || mp.so_hop_dong || '',
+      ngay_ky_hd:
+        hopDong?.effectiveAt?.toFormat('dd/MM/yyyy') ||
+        hopDong?.publishedAt?.toFormat('dd/MM/yyyy') ||
+        mp.ngay_ky ||
+        '',
+      so_qd_cong_nhan: mp.so_qd_cong_nhan || '',
+      ngay_qd_cong_nhan: mp.ngay_qd_cong_nhan || '',
+      ngay_hop_hd: ngayHopHd,
+      ngay_bb_xac_nhan: ngayHopHd,
+
+      dia_chi_ben_b: mp.dia_chi_ben_b || contact.address || outline.hostUnit || '',
+      dien_thoai_ben_b: mp.dien_thoai_ben_b || contact.phone || '',
+      email_ben_b: mp.email_ben_b || contact.email || '',
+      tai_khoan_ben_b: mp.tai_khoan_ben_b || '',
+      ngan_hang_ben_b: mp.ngan_hang_ben_b || '',
+      dai_dien_ben_b: mp.dai_dien_ben_b || outline.ownerName || '',
+      chuc_vu_ben_b: mp.chuc_vu_ben_b || 'Chủ nhiệm nhiệm vụ',
+      uy_quyen_ben_b: mp.uy_quyen_ben_b || '',
+
+      chu_nhiem: outline.ownerName || mp.chu_nhiem || '',
+      chuc_vu_chu_nhiem: mp.chuc_vu_chu_nhiem || 'Chủ nhiệm nhiệm vụ',
+      don_vi_chu_nhiem: outline.ownerUnit || mp.don_vi_chu_nhiem || '',
+      dien_thoai_chu_nhiem: contact.phone || mp.dien_thoai_chu_nhiem || '',
+      email_chu_nhiem: contact.email || outline.ownerEmail || mp.email_chu_nhiem || '',
+
+      ten_nhiem_vu: outline.title || '',
+      ma_nhiem_vu: outline.code || '',
+      cap_quan_ly: outline.level || '',
+      thoi_gian_tu: start?.toFormat('dd/MM/yyyy') || '',
+      thoi_gian_den: end?.toFormat('dd/MM/yyyy') || '',
+      thoi_gian_thang: months,
+      gia_han_den: Number(outline.extensionCount || 0) > 0 ? end?.toFormat('dd/MM/yyyy') || '' : '',
+      so_qd_gia_han: Number(outline.extensionCount || 0) > 0 ? String(outline.extensionCount) : '',
+      xep_loai: xepLoai,
+
+      kp_theo_hd: formatVndPlain(kpTheoHd),
+      kp_giao_khoan: formatVndPlain(kpTheoHd),
+      kp_khong_khoan: formatVndPlain(0),
+      nguon_truong: formatVndPlain(kpTheoHd),
+      nguon_doi_ung: formatVndPlain(0),
+      tong_nguon: formatVndPlain(kpTheoHd),
+      tam_ung_dot_1: formatVndPlain(advanced),
+      tam_ung_dot_2: formatVndPlain(0),
+      tam_ung_luy_ke: formatVndPlain(advanced),
+      gia_tri_quyet_toan: formatVndPlain(settled),
+      thanh_toan_bo_sung: formatVndPlain(soThanhToanBs),
+      thanh_toan_bo_sung_chu: soThanhToanBs
+        ? numberToVietnameseWords(soThanhToanBs)
+        : 'Không phát sinh',
+      hoan_tra: formatVndPlain(soHoanTra),
+      hoan_tra_chu: soHoanTra ? numberToVietnameseWords(soHoanTra) : 'Không phát sinh',
+      han_thanh_toan: '',
+
+      // Alias mẫu cũ
+      kinh_phi_da_cap: formatVndPlain(advanced + spent),
+      kinh_phi_quyet_toan: formatVndPlain(settled),
+      ton: formatVndPlain(ton),
       xu_ly_ton: row.surplusHandling === 'HOAN_TRA' ? 'Hoàn trả' : 'Không phát sinh',
       ngay_quyet_toan: row.settlementDate?.toFormat('dd/MM/yyyy') || '',
       tai_san: assets.map((a) => `${a.name} (${a.quantity || ''})`).join('; '),
@@ -1216,10 +1834,11 @@ export default class ProjectFinalService {
       const templatePath = await findContractTemplateFilePath(template.storedFileName)
       if (templatePath) {
         try {
+          const safeCode = (outline.code || String(outline.id)).replace(/[^\w.-]/g, '_')
           const merged = await mergeDocxTemplate({
             templatePath,
             data,
-            outputFileName: `BM14_${outline.code}_${Date.now()}.docx`.replace(/[^\w.-]/g, '_'),
+            outputFileName: `BM0510_${safeCode}_${Date.now()}.docx`,
           })
           row.liquidationFileName = merged.storedFileName
           row.liquidationStoredFileName = merged.storedFileName
@@ -1230,7 +1849,7 @@ export default class ProjectFinalService {
         }
       }
     }
-    const buf = buildFormDocx('BIÊN BẢN THANH LÝ HỢP ĐỒNG', [
+    const buf = buildFormDocx('BIÊN BẢN NGHIỆM THU VÀ THANH LÝ HỢP ĐỒNG', [
       { heading: 'Điều 1. Xếp loại', lines: [data.xep_loai || '(chưa xếp)'] },
       {
         heading: 'Điều 2. Kinh phí',
@@ -1245,7 +1864,7 @@ export default class ProjectFinalService {
       { heading: 'Điều 3. Tài sản', lines: [data.tai_san || '(không)'] },
     ])
     const dir = await resolveGeneratedContractDir()
-    const stored = `BM14_${outline.code}_${Date.now()}.docx`.replace(/[^\w.-]/g, '_')
+    const stored = `BM0510_${outline.code}_${Date.now()}.docx`.replace(/[^\w.-]/g, '_')
     await fs.writeFile(`${dir}/${stored}`, buf)
     row.liquidationFileName = stored
     row.liquidationStoredFileName = stored
@@ -1402,6 +2021,109 @@ export default class ProjectFinalService {
     })
     return {
       fileName: `BM-05.02_Bao_cao_tong_ket_${safeCode}.docx`,
+      fullPath: merged.fullPath,
+      fileUrl: merged.fileUrl,
+    }
+  }
+
+  /**
+   * Xuất DOCX bản giải trình tiếp thu (BM-05.07) từ mẫu BAN_GIAI_TRINH.
+   */
+  static async exportBanGiaiTrinh(outlineId: number, userId: number) {
+    const outline = await loadOutline(outlineId)
+    await this.assertSee(userId, outline)
+    const template = await ContractTemplateService.getDefaultActive('BAN_GIAI_TRINH')
+    if (!template) throw new Error('NO_DEFAULT_TEMPLATE')
+    const templatePath = await findContractTemplateFilePath(template.storedFileName)
+    if (!templatePath) throw new Error('TEMPLATE_FILE_MISSING')
+
+    const row = await this.ensure(outline.id)
+    const now = DateTime.now()
+    const ngayLap = `ngày ${now.toFormat('dd')} tháng ${now.toFormat('MM')} năm ${now.toFormat('yyyy')}`
+    const ngayDanhGia = row.meetingAt
+      ? row.meetingAt.toFormat('dd/MM/yyyy')
+      : ''
+    const chuTich = (row.councilMembers || []).find((m) => m.role === 'CHU_TICH')
+    const tenHoiDong =
+      chuTich?.fullName
+        ? `Hội đồng đánh giá (Chủ tịch: ${chuTich.fullName})`
+        : 'Hội đồng đánh giá kết quả nhiệm vụ'
+
+    const saved = row.explanationItems || []
+    const tachDong = (raw: string) =>
+      raw
+        .split(/\r?\n/)
+        .map((s) =>
+          s
+            .replace(/^\s*[-–—•]\s*/, '')
+            .replace(/^\s*\d+[.)]\s*/, '')
+            .trim()
+        )
+        .filter(Boolean)
+    // Giống màn xem biên bản: clarifyContent || quality
+    const nguonYKien =
+      row.minutes?.clarifyContent ||
+      row.minutes?.quality ||
+      (row.minutes?.recommendationLines || []).join('\n') ||
+      row.minutes?.recommendation ||
+      ''
+    const lines =
+      saved.some((it) => (it.recommendation || '').trim() || (it.response || '').trim())
+        ? saved.map((it) => ({
+            yKien: it.recommendation || '',
+            tiepThu: it.response || '',
+            minhChung: [it.evidence, it.evidenceFile?.fileName]
+              .filter(Boolean)
+              .join(' — '),
+          }))
+        : tachDong(nguonYKien).map((t) => ({
+            yKien: t,
+            tiepThu: '',
+            minhChung: '',
+          }))
+
+    const bangNoiDung = xmlBangTuDuLieu({
+      headers: [
+        'STT',
+        'Ý kiến/yêu cầu đánh giá',
+        'Nội dung tiếp thu, giải trình hoặc hoàn thiện',
+        'Vị trí/tài liệu minh chứng',
+      ],
+      rows: lines.length
+        ? lines.map((it, i) => [
+            String(i + 1),
+            it.yKien,
+            it.tiepThu,
+            it.minhChung,
+          ])
+        : [],
+      colWidths: [700, 2800, 3800, 2200],
+      emptyText: 'Chưa có nội dung giải trình.',
+      centerCols: [0],
+      coChu: 24,
+    })
+
+    const data: Record<string, string> = {
+      ngay_lap: ngayLap,
+      ten_nhiem_vu: outline.title || '',
+      ma_so: outline.code || '',
+      chu_nhiem: outline.ownerName || '',
+      ngay_danh_gia: ngayDanhGia,
+      ten_hoi_dong: tenHoiDong,
+      bang_noi_dung: '',
+    }
+
+    const safeCode = (outline.code || String(outline.id)).replace(/[^\w.-]/g, '_')
+    const merged = await mergeDocxTemplate({
+      templatePath,
+      data,
+      tableBlocks: {
+        bang_noi_dung: bangNoiDung,
+      },
+      outputFileName: `BM0507_${safeCode}_${Date.now()}.docx`,
+    })
+    return {
+      fileName: `BM-05.07_Ban_giai_trinh_${safeCode}.docx`,
       fullPath: merged.fullPath,
       fileUrl: merged.fileUrl,
     }

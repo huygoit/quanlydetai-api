@@ -15,6 +15,8 @@ import {
 } from '#constants/quyet_dinh_template_variables'
 import { DON_DE_NGHI_TEMPLATE_VARIABLES } from '#constants/don_de_nghi_template_variables'
 import { BAO_CAO_TONG_KET_TEMPLATE_VARIABLES } from '#constants/bao_cao_tong_ket_template_variables'
+import { BIEN_BAN_DGCK_TEMPLATE_VARIABLES } from '#constants/bien_ban_dgck_template_variables'
+import { BAN_GIAI_TRINH_TEMPLATE_VARIABLES } from '#constants/ban_giai_trinh_template_variables'
 import {
   DOC_TEMPLATE_TYPES,
   getDocTemplateType,
@@ -27,6 +29,7 @@ import {
   resolveContractTemplateDir,
 } from '#utils/contract_template_storage'
 import type { MultipartFile } from '@adonisjs/core/bodyparser'
+import app from '@adonisjs/core/services/app'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -90,6 +93,8 @@ function knownVariablesForType(templateType: string) {
   if (templateType === 'QUYET_DINH') return QUYET_DINH_TEMPLATE_VARIABLES
   if (templateType === 'DON_DE_NGHI') return DON_DE_NGHI_TEMPLATE_VARIABLES
   if (templateType === 'BAO_CAO_TONG_KET') return BAO_CAO_TONG_KET_TEMPLATE_VARIABLES
+  if (templateType === 'BIEN_BAN_DGCK') return BIEN_BAN_DGCK_TEMPLATE_VARIABLES
+  if (templateType === 'BAN_GIAI_TRINH') return BAN_GIAI_TRINH_TEMPLATE_VARIABLES
   return []
 }
 
@@ -413,7 +418,26 @@ export default class ContractTemplateService {
 
   static async resolveDownloadPath(id: number) {
     const row = await this.findById(id)
-    const filePath = await findContractTemplateFilePath(row.storedFileName)
+    let filePath = await findContractTemplateFilePath(row.storedFileName)
+    // Fallback: mẫu seed còn file nguồn trong resources/ (tránh 404 khi storage lệch cwd)
+    if (!filePath) {
+      const fallbacks: Record<string, string> = {
+        BM0510_DEFAULT: 'resources/thanh-ly/BM-05.10_Bien_ban_nghiem_thu_thanh_ly_co_bien.docx',
+        BM0507_DEFAULT: 'resources/ban-giai-trinh/BM-05.07_Ban_giai_trinh_tiep_thu_co_bien.docx',
+        BM0506_DEFAULT:
+          'resources/bien-ban-dgck/BM-05.06_Bien_ban_danh_gia_ket_qua_co_bien.docx',
+      }
+      const rel = fallbacks[row.code]
+      if (rel) {
+        const cand = app.makePath(rel)
+        try {
+          await fs.access(cand)
+          filePath = cand
+        } catch {
+          // bỏ qua
+        }
+      }
+    }
     if (!filePath) throw new Error('FILE_NOT_FOUND')
     return { row, filePath }
   }

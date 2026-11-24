@@ -1,0 +1,72 @@
+Mã biểu mẫu: BM-05.10 | Phiên bản: 1.0 | Ngày áp dụng: {{ngay_ap_dung}}
+[BẢNG 2 dòng]
+  R0:           ĐẠI HỌC ĐÀ NẴNGTRƯỜNG ĐẠI HỌC SƯ PHẠM |   CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM               Độc lập - Tự do - Hạnh phúc
+  R1:  |  |  | 
+BIÊN BẢN NGHIỆM THU VÀ THANH LÝ
+HỢP ĐỒNG GIAO THỰC HIỆN NHIỆM VỤ KHOA HỌC, CÔNG NGHỆ VÀ ĐỔI MỚI SÁNG TẠO
+(Loại hình nhiệm vụ/cụm nhiệm vụ/chuỗi nhiệm vụ: {{loai_hinh}})
+Số: {{so_bien_ban}}/TL-KHCNĐMST/ĐHSP
+Căn cứ Bộ luật Dân sự số 91/2015/QH13 ngày 24/11/2015;
+Căn cứ Luật Khoa học, công nghệ và đổi mới sáng tạo năm 2025;
+Căn cứ Luật Sở hữu trí tuệ số 50/2005/QH11 (đã được sửa đổi, bổ sung bởi Luật số 07/2022/QH15 và các Luật sửa đổi năm 2025);
+Căn cứ Nghị định số 267/2025/NĐ-CP ngày 14/10/2025 của Chính phủ Quy định chi tiết và hướng dẫn một số điều của Luật Khoa học, công nghệ và đổi mới sáng tạo về chương trình, nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo và một số quy định về thúc đẩy hoạt động nghiên cứu khoa học, phát triển công nghệ và đổi mới sáng tạo;
+Căn cứ Thông tư số 36/TT-BKHCN ngày 26/11/2025 của Bộ trưởng Bộ Khoa học và Công nghệ Quy định khung về trình tự, thủ tục xây dựng, thẩm định, ban hành, quản lý, tổ chức thực hiện chương trình khoa học, công nghệ và đổi mới sáng tạo và quy định về tình tự, thủ tục xét tài trợ, đặt hàng, ký hợp đồng, tổ chức thực hiện, chấm dứt thực hiện, thanh lý hợp đồng giao nhiệm vụ và đánh giá đối với nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo;
+Căn cứ Quy định về quản lý nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo của Trường Đại học Sư phạm - Đại học Đà Nẵng;
+Căn cứ Quy định về quản lý tài sản trí tuệ, định giá, khai thác, thương mại hóa và chuyển giao kết quả khoa học, công nghệ và đổi mới sáng tạo của Trường Đại học Sư phạm - Đại học Đà Nẵng;
+Căn cứ Hợp đồng giao thực hiện nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo số: {{so_hop_dong}} ký ngày {{ngay_ky_hd}} giữa Trường Đại học Sư phạm - Đại học Đà Nẵng và Bên B;
+Căn cứ Quyết định số {{so_qd_cong_nhan}} ngày {{ngay_qd_cong_nhan}} của Hiệu trưởng Trường Đại học Sư phạm - Đại học Đà Nẵng về việc công nhận kết quả đánh giá, nghiệm thu nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo (hoặc Biên bản họp Hội đồng tư vấn đánh giá cuối kỳ nghiệm thu nhiệm vụ ngày {{ngay_hop_hd}});
+Căn cứ Biên bản xác nhận kết quả ngày {{ngay_bb_xac_nhan}};
+Hôm nay, {{ngay_lap}}, tại Trường Đại học Sư phạm - Đại học Đà Nẵng, chúng tôi gồm có:
+BÊN A: TRƯỜNG ĐẠI HỌC SƯ PHẠM, ĐẠI HỌC ĐÀ NẴNG
+Địa chỉ: 459 Tôn Đức Thắng, phường Hòa Khánh, thành phố Đà Nẵng, Việt Nam
+Điện thoại: 84-236-3841323
+Mã số thuế: 0400560327
+Tài khoản: 5600044499 tại Ngân hàng Đầu tư và Phát triển Việt Nam, Chi nhánh Hải Vân
+Đại diện: Ông PGS.TS. Nguyễn Văn HiếuChức vụ: Phó Hiệu trưởng
+(Ủy quyền theo Quyết định số 996/QĐ-ĐHSP ngày 21/7/2026)
+BÊN B: (TỔ CHỨC HOẶC CÁ NHÂN ĐƯỢC GIAO THỰC HIỆN NHIỆM VỤ)
+Địa chỉ: {{dia_chi_ben_b}}
+Điện thoại: {{dien_thoai_ben_b}}
+Email: {{email_ben_b}}
+Tài khoản: {{tai_khoan_ben_b}} tại ngân hàng {{ngan_hang_ben_b}}
+Đại diện: {{dai_dien_ben_b}} Chức vụ: {{chuc_vu_ben_b}}
+(Ủy quyền theo Quyết định số {{uy_quyen_ben_b}})
+Chủ nhiệm nhiệm vụ: {{chu_nhiem}}
+Chức vụ/chức danh: {{chuc_vu_chu_nhiem}}
+Đơn vị công tác chuyên môn: {{don_vi_chu_nhiem}}
+Điện thoại: {{dien_thoai_chu_nhiem}}
+Email: {{email_chu_nhiem}}
+Hai bên cùng thỏa thuận, thống nhất ký kết Biên bản thanh lý Hợp đồng giao thực hiện nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo với các điều khoản chi tiết như sau:
+II. NỘI DUNG THANH LÝ
+1. Tình hình triển khai và đánh giá hoàn thành nhiệm vụ
+- Tên nhiệm vụ: "{{ten_nhiem_vu}}"
+- Mã số nhiệm vụ: {{ma_nhiem_vu}}  Cấp quản lý: {{cap_quan_ly}}
+- Thời gian thực hiện theo HĐ: Từ ngày {{thoi_gian_tu}} đến ngày {{thoi_gian_den}} (Thời gian: {{thoi_gian_thang}} tháng)
+- (Thời gian gia hạn/điều chỉnh: Đến ngày {{gia_han_den}} theo Quyết định số: {{so_qd_gia_han}})
+- Đánh giá mức độ hoàn thành: Bên B đã triển khai đầy đủ các nội dung nghiên cứu theo đúng Thuyết minh được phê duyệt và Hợp đồng số: {{so_hop_dong}}; Hội đồng đánh giá cuối kỳ họp ngày {{ngay_hop_hd}} đã nghiệm thu, xếp loại mức: {{xep_loai}}
+2. Bàn giao sản phẩm khoa học, tài sản và hồ sơ minh chứng
+- Giao nộp đầy đủ sản phẩm khoa học: Báo cáo tổng kết khoa học, báo cáo tóm tắt; các sản phẩm dạng 1, dạng 2, dạng 3 (mô hình, mẫu maket, thuật toán/phần mềm, tài liệu dự báo, bộ dữ liệu) theo cam kết tại Điều 1 của Hợp đồng.
+- Hồ sơ minh chứng kết quả công bố & đào tạo: Đã nộp bản sao/minh chứng bài báo khoa học xuất bản theo đúng yêu cầu; danh sách và tài liệu học viên cao học/nghiên cứu sinh tham gia nhiệm vụ đã bảo vệ thành công.
+- Bàn giao tài sản, trang thiết bị: Các trang thiết bị, máy móc mua sắm phục vụ nhiệm vụ từ nguồn kinh phí không giao khoán (nếu có) đã được kiểm kê, bàn giao đầy đủ cho đơn vị chức năng quản lý tài sản của Nhà trường quản lý theo quy định hiện hành.
+3. Quyết toán kinh phí và nghĩa vụ tài chính
+[BẢNG 7 dòng]
+  R0: STT | Nội dung xác nhận tài chính | Số tiền (đồng)
+  R1: 1 | Tổng kinh phí thực hiện theo Hợp đồng (Giá trị hợp đồng): - Kinh phí giao khoán chi: {{kp_giao_khoan | {{kp_theo_hd}}
+  R2: 2 | Nguồn kinh phí bố trí: - Nguồn kinh phí từ Trường Đại học Sư phạm: {{nguon_truong}} đồng - Nguồn kin | {{tong_nguon}}
+  R3: 3 | Tổng kinh phí Bên A đã tạm ứng/cấp cho Bên B lũy kế: - Đợt 1 (Tạm ứng ban đầu): {{tam_ung_dot_1}} đồ | {{tam_ung_luy_ke}}
+  R4: 4 | Giá trị khối lượng đủ điều kiện nghiệm thu, quyết toán: (Căn cứ Báo cáo quyết toán tài chính) | {{gia_tri_quyet_toan}}
+  R5: 5 | Số kinh phí Bên A tiếp tục thanh toán bổ sung cho Bên B: (Bằng chữ: {{thanh_toan_bo_sung_chu}}) | {{thanh_toan_bo_sung}}
+  R6: 6 | Số kinh phí Bên B có nghĩa vụ hoàn trả về Trường / NSNN: (Bằng chữ: {{hoan_tra_chu}}) | {{hoan_tra}}
+- Bên có nghĩa vụ cam kết thanh toán dứt điểm/hoàn trả số kinh phí chênh lệch tại Mục 5 hoặc Mục 6 trước ngày {{han_thanh_toan}}.
+- Phương thức thực hiện: Chuyển khoản vào tài khoản số 5600044499 của Trường Đại học Sư phạm - Đại học Đà Nẵng tại BIDV Chi nhánh Hải Vân (hoặc tài khoản Bên B cung cấp theo Hợp đồng).
+- Việc xác định nghĩa vụ tài chính căn cứ vào cơ cấu nguồn kinh phí, phương thức khoán chi theo Nghị định 265/2025/NĐ-CP và Quy chế chi tiêu nội bộ của Trường Đại học Sư phạm - ĐHĐN.
+4. Quyền sở hữu trí tuệ, khai thác kết quả và bảo mật thông tin
+- Toàn bộ quyền sở hữu trí tuệ đối với các kết quả, sáng chế, giải pháp hữu ích, kiểu dáng, phần mềm và các sản phẩm khoa học phát sinh từ nhiệm vụ thuộc về Trường Đại học Sư phạm - Đại học Đà Nẵng (hoặc đồng sở hữu theo thỏa thuận tài trợ với đối tác ngoài ngân sách) theo đúng quy định tại Điều 5 của Hợp đồng.
+- Chủ nhiệm nhiệm vụ và nhóm nghiên cứu được bảo đảm đầy đủ quyền nhân thân của tác giả theo Luật Sở hữu trí tuệ; được phân chia lợi nhuận từ hoạt động chuyển giao công nghệ, thương mại hóa theo Quy định của Nhà trường.
+- Nghĩa vụ bảo mật đối với các bí quyết công nghệ, số liệu nghiên cứu chuyên sâu tiếp tục có hiệu lực vô thời hạn sau khi Biên bản thanh lý này được ký kết.
+III. ĐIỀU KHOẢN THI HÀNH
+1. Hai bên xác nhận đã thực hiện đầy đủ, nghiêm túc toàn bộ các điều khoản đã cam kết trong Hợp đồng giao thực hiện nhiệm vụ KH,CN&ĐMST số: {{so_hop_dong}} ký ngày {{ngay_ky_hd}} và không còn bất kỳ khiếu nại, khiếu kiện nào khác.
+2. Hợp đồng số: {{so_hop_dong}} chính thức chấm dứt và hết hiệu lực thi hành kể từ ngày Biên bản thanh lý này được các bên ký tên, đóng dấu hợp lệ.
+3. Biên bản thanh lý này có hiệu lực kể từ ngày ký, được lập thành 04 (bốn) bản có giá trị pháp lý như nhau; Bên A giữ 03 bản, Bên B giữ 01 bản để thực hiện./.
+[BẢNG 1 dòng]
+  R0: ĐẠI DIỆN BÊN A KT. HIỆU TRƯỞNG PHÓ HIỆU TRƯỞNG(Ký, ghi rõ họ tên, chức vụ và đóng dấu)  PGS.TS. Nguy | CHỦ NHIỆM NHIỆM VỤ (Ký xác nhận trách nhiệm chuyên môn, ghi rõ họ tên) {{chu_nhiem}} | ĐẠI DIỆN BÊN B THỦ TRƯỞNG ĐƠN VỊ CHỦ TRÌ (Ký, ghi rõ họ tên, chức vụ và đóng dấu) {{dai_dien_ben_b}}

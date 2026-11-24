@@ -9,6 +9,8 @@ export type DocTemplateTypeCode =
   | 'THUYET_MINH'
   | 'DON_DE_NGHI'
   | 'BAO_CAO_TONG_KET'
+  | 'BIEN_BAN_DGCK'
+  | 'BAN_GIAI_TRINH'
 
 export type DocTemplateTypeDef = {
   code: DocTemplateTypeCode
@@ -33,9 +35,9 @@ export const DOC_TEMPLATE_TYPES: DocTemplateTypeDef[] = [
   },
   {
     code: 'THANH_LY',
-    label: 'Biên bản thanh lý hợp đồng',
-    defaultFormCode: null,
-    description: 'Biên bản thanh lý sau khi kết thúc nhiệm vụ',
+    label: 'Biên bản nghiệm thu và thanh lý hợp đồng',
+    defaultFormCode: 'BM0510',
+    description: 'Biên bản nghiệm thu và thanh lý HĐ giao nhiệm vụ (BM-05.10)',
   },
   {
     code: 'THONG_BAO',
@@ -61,6 +63,19 @@ export const DOC_TEMPLATE_TYPES: DocTemplateTypeDef[] = [
     defaultFormCode: 'BM0502',
     description: 'Báo cáo tổng kết kết quả thực hiện nhiệm vụ KHCN&ĐMST (BM-05.02)',
   },
+  {
+    code: 'BIEN_BAN_DGCK',
+    label: 'Biên bản đánh giá kết quả nhiệm vụ',
+    defaultFormCode: 'BM0506',
+    description: 'Biên bản đánh giá kết quả thực hiện nhiệm vụ KHCN&ĐMST (BM-05.06)',
+  },
+  {
+    code: 'BAN_GIAI_TRINH',
+    label: 'Bản giải trình tiếp thu, hoàn thiện hồ sơ sau đánh giá',
+    defaultFormCode: 'BM0507',
+    description:
+      'Bản giải trình tiếp thu, hoàn thiện hồ sơ sau đánh giá kết quả nhiệm vụ (BM-05.07)',
+  },
 ]
 
 export const DOC_TEMPLATE_TYPE_CODES = DOC_TEMPLATE_TYPES.map((t) => t.code) as [
@@ -81,7 +96,15 @@ export function mapLegacyFormCodeToTemplateType(formCode: string | null | undefi
   const c = (formCode || '').toUpperCase()
   if (c === 'BM0202' || c === 'BM-02.02' || c === 'THUYET_MINH' || c === 'TM') return 'THUYET_MINH'
   if (c === 'BM06' || c === 'HOP_DONG') return 'HOP_DONG'
-  if (c === 'THANH_LY' || c === 'BBTL') return 'THANH_LY'
+  if (
+    c === 'THANH_LY' ||
+    c === 'BBTL' ||
+    c === 'BM0510' ||
+    c === 'BM-05.10' ||
+    c === 'BM05.10'
+  ) {
+    return 'THANH_LY'
+  }
   if (c === 'THONG_BAO' || c === 'TB') return 'THONG_BAO'
   if (c === 'QUYET_DINH' || c === 'QD' || c === 'QD_HDD') return 'QUYET_DINH'
   if (
@@ -99,6 +122,22 @@ export function mapLegacyFormCodeToTemplateType(formCode: string | null | undefi
     c === 'BM05.02'
   ) {
     return 'BAO_CAO_TONG_KET'
+  }
+  if (
+    c === 'BIEN_BAN_DGCK' ||
+    c === 'BM0506' ||
+    c === 'BM-05.06' ||
+    c === 'BM05.06'
+  ) {
+    return 'BIEN_BAN_DGCK'
+  }
+  if (
+    c === 'BAN_GIAI_TRINH' ||
+    c === 'BM0507' ||
+    c === 'BM-05.07' ||
+    c === 'BM05.07'
+  ) {
+    return 'BAN_GIAI_TRINH'
   }
   return 'HOP_DONG'
 }

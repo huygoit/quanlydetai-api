@@ -7,7 +7,7 @@ import re
 import zipfile
 from pathlib import Path
 
-SRC = Path(r"c:\quanlydetai\tailieu\bieu-mau-chung\bm-don-de-nghi.docx")
+SRC = Path(r"c:\quanlydetai\tailieu\bieu-mau-chung\bm-don-de-nghi-danh-gia-ket-qua.docx")
 OUT_DIR = Path(__file__).resolve().parent
 OUT = OUT_DIR / "BM-05.01_Don_de_nghi_danh_gia_ket_qua_co_bien.docx"
 

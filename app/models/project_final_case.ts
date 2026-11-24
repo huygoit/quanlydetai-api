@@ -26,10 +26,39 @@ export type MinutesBody = {
   presentUserIds: number[]
   absentUserIds: number[]
   productMarks: { name: string; met: boolean }[]
+  /** BM-05.06 — nội dung cần làm rõ / hoàn thiện */
+  clarifyContent?: string
+  /** Giải trình CNNV / ý kiến khác biệt */
+  ownerExplanation?: string
+  /** Kết quả biểu quyết */
+  voteDat?: number
+  voteBoSung?: number
+  voteKhongDat?: number
+  voteEligible?: number
+  completeDeadline?: string
+  completeChecker?: string
+  /** XAC_NHAN_HOAN_THIEN | DANH_GIA_LAI */
+  nextAction?: string
+  otherRecommendation?: string
+  qdCouncilNo?: string
 }
 
-export type ExplanationItem = { recommendation: string; response: string }
-export type SettlementLine = { code: string; declaredAmount: number }
+/** Một dòng BM-05.07 — ý kiến HĐ / nội dung tiếp thu / minh chứng */
+export type ExplanationItem = {
+  recommendation: string
+  response: string
+  /** Mô tả vị trí / tài liệu minh chứng */
+  evidence?: string
+  /** File minh chứng đính kèm theo dòng */
+  evidenceFile?: StoredFile | null
+}
+/** Dòng quyết toán: số tiền khai + chứng từ scan theo từng khoản chi */
+export type SettlementLine = {
+  code: string
+  declaredAmount: number
+  /** Chứng từ gốc (scan) gắn theo khoản chi */
+  evidenceFiles?: StoredFile[]
+}
 
 /**
  * Hồ sơ đánh giá cuối kỳ của một nhiệm vụ.

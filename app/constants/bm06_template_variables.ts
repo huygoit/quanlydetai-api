@@ -122,15 +122,69 @@ export const BM06_TEMPLATE_VARIABLES: Bm06VariableDef[] = [
 
 export const BM06_TEMPLATE_VARIABLE_KEYS = BM06_TEMPLATE_VARIABLES.map((v) => v.key)
 
-/** Biến đổ mẫu BM.14 khi admin đã upload mẫu THANH_LY. */
+/**
+ * Biến đổ mẫu BM-05.10 (Biên bản nghiệm thu & thanh lý) — loại THANH_LY.
+ * Khớp file BM-05.10_Bien_ban_nghiem_thu_thanh_ly_co_bien.docx.
+ */
 export const BM14_TEMPLATE_VARIABLES: Bm06VariableDef[] = [
-  { key: 'ten_nhiem_vu', label: 'Tên nhiệm vụ', group: 'Thanh lý' },
-  { key: 'ma_nhiem_vu', label: 'Mã nhiệm vụ', group: 'Thanh lý' },
-  { key: 'xep_loai', label: 'Xếp loại', group: 'Thanh lý' },
-  { key: 'kinh_phi_da_cap', label: 'Kinh phí đã cấp', group: 'Kinh phí' },
-  { key: 'kinh_phi_quyet_toan', label: 'Kinh phí quyết toán', group: 'Kinh phí' },
-  { key: 'ton', label: 'Số tồn', group: 'Kinh phí' },
-  { key: 'xu_ly_ton', label: 'Cách xử lý tồn', group: 'Kinh phí' },
-  { key: 'ngay_quyet_toan', label: 'Ngày quyết toán', group: 'Kinh phí' },
-  { key: 'tai_san', label: 'Danh sách tài sản', group: 'Tài sản' },
+  { key: 'ngay_ap_dung', label: 'Ngày áp dụng biểu mẫu', group: 'Văn bản' },
+  { key: 'loai_hinh', label: 'Loại hình nhiệm vụ', group: 'Văn bản' },
+  { key: 'so_bien_ban', label: 'Số biên bản thanh lý', group: 'Văn bản' },
+  { key: 'ngay_lap', label: 'Ngày lập (vd: ngày 24 tháng 11 năm 2026)', group: 'Văn bản' },
+
+  { key: 'so_hop_dong', label: 'Số hợp đồng', group: 'Căn cứ' },
+  { key: 'ngay_ky_hd', label: 'Ngày ký hợp đồng', group: 'Căn cứ' },
+  { key: 'so_qd_cong_nhan', label: 'Số QĐ công nhận kết quả', group: 'Căn cứ' },
+  { key: 'ngay_qd_cong_nhan', label: 'Ngày QĐ công nhận', group: 'Căn cứ' },
+  { key: 'ngay_hop_hd', label: 'Ngày họp hội đồng đánh giá', group: 'Căn cứ' },
+  { key: 'ngay_bb_xac_nhan', label: 'Ngày biên bản xác nhận kết quả', group: 'Căn cứ' },
+
+  { key: 'dia_chi_ben_b', label: 'Địa chỉ Bên B', group: 'Bên B' },
+  { key: 'dien_thoai_ben_b', label: 'Điện thoại Bên B', group: 'Bên B' },
+  { key: 'email_ben_b', label: 'Email Bên B', group: 'Bên B' },
+  { key: 'tai_khoan_ben_b', label: 'Tài khoản Bên B', group: 'Bên B' },
+  { key: 'ngan_hang_ben_b', label: 'Ngân hàng Bên B', group: 'Bên B' },
+  { key: 'dai_dien_ben_b', label: 'Đại diện Bên B', group: 'Bên B' },
+  { key: 'chuc_vu_ben_b', label: 'Chức vụ đại diện Bên B', group: 'Bên B' },
+  { key: 'uy_quyen_ben_b', label: 'Ủy quyền Bên B', group: 'Bên B' },
+
+  { key: 'chu_nhiem', label: 'Chủ nhiệm nhiệm vụ', group: 'Chủ nhiệm' },
+  { key: 'chuc_vu_chu_nhiem', label: 'Chức vụ/chức danh CNNV', group: 'Chủ nhiệm' },
+  { key: 'don_vi_chu_nhiem', label: 'Đơn vị công tác CNNV', group: 'Chủ nhiệm' },
+  { key: 'dien_thoai_chu_nhiem', label: 'Điện thoại CNNV', group: 'Chủ nhiệm' },
+  { key: 'email_chu_nhiem', label: 'Email CNNV', group: 'Chủ nhiệm' },
+
+  { key: 'ten_nhiem_vu', label: 'Tên nhiệm vụ', group: 'Nội dung' },
+  { key: 'ma_nhiem_vu', label: 'Mã nhiệm vụ', group: 'Nội dung' },
+  { key: 'cap_quan_ly', label: 'Cấp quản lý', group: 'Nội dung' },
+  { key: 'thoi_gian_tu', label: 'Thời gian HĐ từ', group: 'Nội dung' },
+  { key: 'thoi_gian_den', label: 'Thời gian HĐ đến', group: 'Nội dung' },
+  { key: 'thoi_gian_thang', label: 'Số tháng thực hiện', group: 'Nội dung' },
+  { key: 'gia_han_den', label: 'Gia hạn đến ngày', group: 'Nội dung' },
+  { key: 'so_qd_gia_han', label: 'Số QĐ gia hạn', group: 'Nội dung' },
+  { key: 'xep_loai', label: 'Xếp loại nghiệm thu', group: 'Nội dung' },
+
+  { key: 'kp_theo_hd', label: 'Tổng KP theo HĐ', group: 'Kinh phí' },
+  { key: 'kp_giao_khoan', label: 'KP giao khoán chi', group: 'Kinh phí' },
+  { key: 'kp_khong_khoan', label: 'KP không giao khoán', group: 'Kinh phí' },
+  { key: 'nguon_truong', label: 'Nguồn từ Trường', group: 'Kinh phí' },
+  { key: 'nguon_doi_ung', label: 'Nguồn đối ứng / ngoài', group: 'Kinh phí' },
+  { key: 'tong_nguon', label: 'Tổng nguồn bố trí', group: 'Kinh phí' },
+  { key: 'tam_ung_dot_1', label: 'Tạm ứng đợt 1', group: 'Kinh phí' },
+  { key: 'tam_ung_dot_2', label: 'Tạm ứng / cấp đợt 2', group: 'Kinh phí' },
+  { key: 'tam_ung_luy_ke', label: 'Tạm ứng lũy kế', group: 'Kinh phí' },
+  { key: 'gia_tri_quyet_toan', label: 'Giá trị quyết toán', group: 'Kinh phí' },
+  { key: 'thanh_toan_bo_sung', label: 'Thanh toán bổ sung', group: 'Kinh phí' },
+  { key: 'thanh_toan_bo_sung_chu', label: 'Thanh toán bổ sung (bằng chữ)', group: 'Kinh phí' },
+  { key: 'hoan_tra', label: 'Số hoàn trả', group: 'Kinh phí' },
+  { key: 'hoan_tra_chu', label: 'Số hoàn trả (bằng chữ)', group: 'Kinh phí' },
+  { key: 'han_thanh_toan', label: 'Hạn thanh toán / hoàn trả', group: 'Kinh phí' },
+
+  // Alias cũ (fallback / mẫu cũ)
+  { key: 'kinh_phi_da_cap', label: 'Kinh phí đã cấp (alias)', group: 'Alias' },
+  { key: 'kinh_phi_quyet_toan', label: 'Kinh phí quyết toán (alias)', group: 'Alias' },
+  { key: 'ton', label: 'Số tồn (alias)', group: 'Alias' },
+  { key: 'xu_ly_ton', label: 'Cách xử lý tồn (alias)', group: 'Alias' },
+  { key: 'ngay_quyet_toan', label: 'Ngày quyết toán (alias)', group: 'Alias' },
+  { key: 'tai_san', label: 'Danh sách tài sản (alias)', group: 'Alias' },
 ]

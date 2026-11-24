@@ -69,6 +69,7 @@ import path from 'node:path'
 import { access } from 'node:fs/promises'
 import app from '@adonisjs/core/services/app'
 import { findAttachmentFilePath } from '#utils/upload_storage_helper'
+import { findContractTemplateFilePath } from '#utils/contract_template_storage'
 import { findGeneratedContractFilePath } from '#utils/docx_merge_helper'
 
 // --- Auth (login, register không cần token)
@@ -90,6 +91,30 @@ router.get('/storage/profile-attachments/:filename', async ({ params, response }
 
     response.header('Content-Disposition', `inline; filename="${filename}"`)
     return response.download(foundPath)
+  } catch {
+    return response.notFound({ success: false, message: 'Không tìm thấy file.' })
+  }
+})
+
+// --- Public: mẫu DOCX admin (hợp đồng / thanh lý / …) theo file_url
+router.get('/storage/contract-templates/:filename', async ({ params, response }) => {
+  const filename = String(params.filename || '')
+  if (!filename || filename !== path.basename(filename)) {
+    return response.badRequest({ success: false, message: 'Tên file không hợp lệ.' })
+  }
+  try {
+    const foundPath = await findContractTemplateFilePath(filename)
+    if (!foundPath) {
+      return response.notFound({ success: false, message: 'Không tìm thấy file.' })
+    }
+    const lower = filename.toLowerCase()
+    if (lower.endsWith('.docx')) {
+      response.header(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      )
+    }
+    return response.attachment(foundPath, filename)
   } catch {
     return response.notFound({ success: false, message: 'Không tìm thấy file.' })
   }
@@ -1047,6 +1072,7 @@ router
     router.post('/adjustments/:id/bgh', [ProjectModule56Controller, 'adjustmentBgh'])
     router.get('/achievements', [ProjectModule56Controller, 'achievements'])
     router.get('/final/my-eval-sheets', [ProjectModule56Controller, 'finalMyEvalSheets'])
+    router.get('/final/eval-sheet-tracking', [ProjectModule56Controller, 'finalEvalSheetTracking'])
     router.get('/final/:outlineId', [ProjectModule56Controller, 'finalShow'])
     router.post('/final/:outlineId/notify', [ProjectModule56Controller, 'finalNotify'])
     router.put('/final/:outlineId/dossier', [ProjectModule56Controller, 'finalDossier'])
@@ -1057,6 +1083,10 @@ router
     router.get('/final/:outlineId/bao-cao-tong-ket-docx', [
       ProjectModule56Controller,
       'finalBaoCaoTongKetDocx',
+    ])
+    router.get('/final/:outlineId/ban-giai-trinh-docx', [
+      ProjectModule56Controller,
+      'finalBanGiaiTrinhDocx',
     ])
     router.put('/final/:outlineId/evaluation-request', [
       ProjectModule56Controller,

@@ -1,0 +1,34 @@
+Mã biểu mẫu: BM-05.06 | Phiên bản: 1.0 | Ngày áp dụng: …/…/2026
+ĐẠI HỌC ĐÀ NẴNGTRƯỜNG ĐẠI HỌC SƯ PHẠM
+CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM            Độc lập – Tự do – Hạnh phúc
+BIÊN BẢN ĐÁNH GIÁ KẾT QUẢ THỰC HIỆN NHIỆM VỤ KH,CN&ĐMST
+1. THÔNG TIN CHUNG
+Tên nhiệm vụ: {{ten_nhiem_vu}}
+Mã số: {{ma_so}} Chủ nhiệm nhiệm vụ: {{chu_nhiem}}
+Tổ chức/đơn vị chủ trì: {{to_chuc_chu_tri}}
+Quyết định thành lập Hội đồng/Tổ chuyên gia số: {{so_qd_hd}}
+Thời gian, địa điểm/hình thức họp: {{thoi_gian_dia_diem}}
+Chủ tịch/Tổ trưởng: {{chu_tich}} Thư ký: {{thu_ky}}
+Tổng số thành viên: {{tong_tv}}; số tham dự hợp lệ: {{so_tham_du}}
+Điều kiện tiến hành cuộc họp và cam kết xung đột lợi ích, bảo mật được xác nhận theo quy định.
+2. KẾT QUẢ ĐÁNH GIÁ
+2.1. Nhận xét chung
+{{nhan_xet_chung}}
+2.2. Nội dung cần làm rõ, hoàn thiện (nếu có)
+{{noi_dung_lam_ro}}
+2.3. Giải trình của Chủ nhiệm nhiệm vụ và ý kiến khác biệt (nếu có)
+{{giai_trinh_y_kien}}
+3. KẾT LUẬN VÀ KIẾN NGHỊ
+Kết quả biểu quyết: Đạt {{phieu_dat}} phiếu; Cần bổ sung, hoàn thiện {{phieu_bo_sung}} phiếu; Không đạt {{phieu_khong_dat}} phiếu.
+Số thành viên có quyền biểu quyết: {{so_quyen_bieu_quyet}}; điều kiện thông qua thực hiện theo Phụ lục 01.
+Kết luận: {{ket_luan}}
+Trường hợp chưa đủ điều kiện thông qua kết luận, ghi rõ ý kiến khác nhau và kiến nghị cấp có thẩm quyền xem xét.
+Nội dung cần hoàn thiện (nếu có): {{noi_dung_hoan_thien}}
+Thời hạn: {{thoi_han}} Người kiểm tra, xác nhận: {{nguoi_kiem_tra}}
+Xử lý tiếp theo: {{xu_ly_tiep_theo}}
+Kiến nghị khác, gồm xử lý rủi ro nghiên cứu hoặc khai thác kết quả (nếu có): {{kien_nghi_khac}}
+Biên bản được thông qua tại cuộc họp và lưu trong hồ sơ đánh giá nhiệm vụ.
+THƯ KÝ
+CHỦ TỊCH HỘI ĐỒNG/TỔ TRƯỞNG
+(Ký, ghi rõ họ tên)
+(Ký, ghi rõ họ tên)

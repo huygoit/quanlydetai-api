@@ -132,8 +132,23 @@ export function canReopenFinalMinutes(input: {
   if (input.settlementLineCount > 0 || input.settlementFileCount > 0) return false
   if (input.explanationStatus) return false
   if (input.settlementStatus && input.settlementStatus !== 'QT_DRAFT') return false
-  if (input.executionStatus === 'DGCK_CHO_QUYET_TOAN') return true
-  if (input.executionStatus === 'DGCK_CHINH_SUA') return true
-  if (input.executionStatus === 'DGCK_KHONG_DAT') return true
+  if (
+    input.executionStatus === 'DGCK_CHO_QUYET_TOAN' ||
+    input.executionStatus === 'NT_CHO_QUYETTOAN'
+  ) {
+    return true
+  }
+  if (
+    input.executionStatus === 'DGCK_CHINH_SUA' ||
+    input.executionStatus === 'NT_CHINH_SUA'
+  ) {
+    return true
+  }
+  if (
+    input.executionStatus === 'DGCK_KHONG_DAT' ||
+    input.executionStatus === 'NT_KHONG_DAT'
+  ) {
+    return true
+  }
   return false
 }

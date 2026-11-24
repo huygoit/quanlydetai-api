@@ -10,6 +10,8 @@ export type ContractTemplateType =
   | 'THUYET_MINH'
   | 'DON_DE_NGHI'
   | 'BAO_CAO_TONG_KET'
+  | 'BIEN_BAN_DGCK'
+  | 'BAN_GIAI_TRINH'
 
 /** Giá trị cố định của một mẫu thông báo, điền vào {{biến}} khi xuất file. */
 export type ThongBaoMergeConfig = {

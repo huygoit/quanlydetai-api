@@ -125,6 +125,48 @@ export default class extends BaseSeeder {
       ),
       forceUpdate: true,
     })
+
+    await this.seedFile({
+      code: 'BM0506_DEFAULT',
+      name: 'Biên bản đánh giá kết quả nhiệm vụ (BM-05.06)',
+      description:
+        'Mẫu chuẩn BM-05.06 — biên bản họp HĐ đánh giá kết quả thực hiện nhiệm vụ.',
+      templateType: 'BIEN_BAN_DGCK',
+      formCode: 'BM0506',
+      fileName: 'BM-05.06_Bien_ban_danh_gia_ket_qua_co_bien.docx',
+      source: app.makePath(
+        'resources/bien-ban-dgck/BM-05.06_Bien_ban_danh_gia_ket_qua_co_bien.docx'
+      ),
+      forceUpdate: true,
+    })
+
+    await this.seedFile({
+      code: 'BM0507_DEFAULT',
+      name: 'Bản giải trình tiếp thu, hoàn thiện hồ sơ sau đánh giá (BM-05.07)',
+      description:
+        'Mẫu chuẩn BM-05.07 — bản giải trình tiếp thu ý kiến sau đánh giá kết quả nhiệm vụ.',
+      templateType: 'BAN_GIAI_TRINH',
+      formCode: 'BM0507',
+      fileName: 'BM-05.07_Ban_giai_trinh_tiep_thu_co_bien.docx',
+      source: app.makePath(
+        'resources/ban-giai-trinh/BM-05.07_Ban_giai_trinh_tiep_thu_co_bien.docx'
+      ),
+      forceUpdate: true,
+    })
+
+    await this.seedFile({
+      code: 'BM0510_DEFAULT',
+      name: 'Biên bản nghiệm thu và thanh lý hợp đồng (BM-05.10)',
+      description:
+        'Mẫu chuẩn BM-05.10 — biên bản nghiệm thu và thanh lý HĐ giao nhiệm vụ KHCN&ĐMST.',
+      templateType: 'THANH_LY',
+      formCode: 'BM0510',
+      fileName: 'BM-05.10_Bien_ban_nghiem_thu_thanh_ly_co_bien.docx',
+      source: app.makePath(
+        'resources/thanh-ly/BM-05.10_Bien_ban_nghiem_thu_thanh_ly_co_bien.docx'
+      ),
+      forceUpdate: true,
+    })
   }
 
   private async seedFile(input: {
@@ -139,6 +181,8 @@ export default class extends BaseSeeder {
       | 'THUYET_MINH'
       | 'DON_DE_NGHI'
       | 'BAO_CAO_TONG_KET'
+      | 'BIEN_BAN_DGCK'
+      | 'BAN_GIAI_TRINH'
     formCode: string
     fileName: string
     source: string
@@ -195,7 +239,10 @@ export default class extends BaseSeeder {
         input.templateType === 'HOP_DONG' ||
         input.templateType === 'THUYET_MINH' ||
         input.templateType === 'DON_DE_NGHI' ||
-        input.templateType === 'BAO_CAO_TONG_KET'
+        input.templateType === 'BAO_CAO_TONG_KET' ||
+        input.templateType === 'BIEN_BAN_DGCK' ||
+        input.templateType === 'BAN_GIAI_TRINH' ||
+        input.templateType === 'THANH_LY'
       ) {
         await ContractTemplate.query()
           .where('template_type', input.templateType)

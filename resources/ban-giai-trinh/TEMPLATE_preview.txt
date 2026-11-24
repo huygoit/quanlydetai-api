@@ -1,0 +1,16 @@
+Mã biểu mẫu: BM-05.07 | Phiên bản: 1.0 | Ngày áp dụng: …/…/2026
+[BẢNG 1 dòng]
+  R0: ĐẠI HỌC ĐÀ NẴNGTRƯỜNG ĐẠI HỌC SƯ PHẠM | CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM            Độc lập – Tự do – Hạnh phúc
+Đà Nẵng, {{ngay_lap}}
+BẢN GIẢI TRÌNH TIẾP THU, HOÀN THIỆN HỒ SƠ SAU ĐÁNH GIÁ
+1. Thông tin nhiệm vụ
+Tên nhiệm vụ: {{ten_nhiem_vu}}
+Mã số: {{ma_so}} Chủ nhiệm nhiệm vụ: {{chu_nhiem}}
+Ngày đánh giá: {{ngay_danh_gia}} Hội đồng/Tổ chuyên gia/chuyên gia: {{ten_hoi_dong}}
+2. Nội dung tiếp thu, hoàn thiện
+{{bang_noi_dung}}
+3. Xác nhận hoàn thiện
+Chủ nhiệm nhiệm vụ chịu trách nhiệm về tính chính xác, trung thực của nội dung giải trình và hồ sơ đã hoàn thiện. Người được phân công xác nhận theo kết luận đánh giá hoặc quyết định của cấp có thẩm quyền.
+[BẢNG 2 dòng]
+  R0: CHỦ NHIỆM NHIỆM VỤ | Chủ tịch Hội đồng 
+  R1: (Ký, ghi rõ họ tên) |                      (Ký, ghi rõ họ tên)
