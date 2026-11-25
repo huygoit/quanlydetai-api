@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Sinh BM-05.10 Biên bản nghiệm thu và thanh lý HĐ có biến {{...}} từ mẫu giấy gốc.
+Sinh BM-05.10 Biên bản nghiệm thu & thanh lý có biến {{...}} từ mẫu giấy gốc.
+Mỗi đoạn / ô chỉ còn 1 <w:t> chứa placeholder — khớp docxtemplater delimiters {{ }}.
 """
 from __future__ import annotations
 
@@ -47,6 +48,7 @@ def first_rPr(p_xml: str) -> str:
 
 
 def rebuild_p(p_xml: str, new_text: str) -> str:
+    """Giữ pPr + rPr đầu; 1 run / 1 w:t — tránh tách {{ }}."""
     p_pr = get_pPr(p_xml)
     r_pr = first_rPr(p_xml)
     return (
@@ -59,10 +61,13 @@ def compact(t: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-def rewrite_para(text: str) -> str | None:
-    """Trả về text mới nếu cần thay; None nếu giữ nguyên."""
-    t = text
-    c = compact(t)
+def has_blank(t: str) -> bool:
+    return ("…" in t) or (".." in t) or ("…" in t) or ("...." in t)
+
+
+# --- Thay đoạn văn theo nội dung ---
+def rewrite_para_text(text: str) -> str | None:
+    c = compact(text)
 
     if c.startswith("Mã biểu mẫu:"):
         return "Mã biểu mẫu: BM-05.10 | Phiên bản: 1.0 | Ngày áp dụng: {{ngay_ap_dung}}"
@@ -73,14 +78,14 @@ def rewrite_para(text: str) -> str | None:
     if c.startswith("Số:") and "TL-KHCN" in c:
         return "Số: {{so_bien_ban}}/TL-KHCNĐMST/ĐHSP"
 
-    if "Hợp đồng giao thực hiện nhiệm vụ" in c and "ký ngày" in c and c.startswith("Căn cứ"):
+    if c.startswith("Căn cứ Hợp đồng giao thực hiện") and "ký ngày" in c:
         return (
             "Căn cứ Hợp đồng giao thực hiện nhiệm vụ khoa học, công nghệ và đổi mới sáng tạo số: "
             "{{so_hop_dong}} ký ngày {{ngay_ky_hd}} giữa Trường Đại học Sư phạm - Đại học Đà Nẵng và Bên B;"
         )
 
     if "về việc công nhận kết quả đánh giá" in c or (
-        "Quyết định số" in c and "nghiệm thu nhiệm vụ" in c
+        c.startswith("Căn cứ Quyết định số") and "nghiệm thu nhiệm vụ" in c
     ):
         return (
             "Căn cứ Quyết định số {{so_qd_cong_nhan}} ngày {{ngay_qd_cong_nhan}} của Hiệu trưởng "
@@ -98,23 +103,10 @@ def rewrite_para(text: str) -> str | None:
             "chúng tôi gồm có:"
         )
 
-    # Bên B
-    if c.startswith("Địa chỉ:") and "…" in t:
-        return "Địa chỉ: {{dia_chi_ben_b}}"
-    if c.startswith("Điện thoại:") and "…" in t and "Email" not in c:
-        # Có thể là Bên B hoặc CNNV — phân biệt bằng context khó; dùng biến riêng qua thứ tự
-        return None  # xử lý theo thứ tự bên dưới bằng counter nếu cần
-    if c.startswith("Email:") and "…" in t:
-        return None
-    if (
-        c.startswith("Tài khoản:")
-        and "ngân hàng" in c.lower()
-        and ("…" in t or ".." in t or "…" in t)
-    ):
-        return "Tài khoản: {{tai_khoan_ben_b}} tại ngân hàng {{ngan_hang_ben_b}}"
-    if c.startswith("Đại diện:") and "Chức vụ" in c and ("…" in t or ".." in t):
+    if c.startswith("Đại diện:") and "Chức vụ" in c and has_blank(text):
         return "Đại diện: {{dai_dien_ben_b}} Chức vụ: {{chuc_vu_ben_b}}"
-    if c.startswith("(Ủy quyền theo Quyết định số") and ("…" in t or ".." in t):
+
+    if c.startswith("(Ủy quyền theo Quyết định số") and has_blank(text):
         return "(Ủy quyền theo Quyết định số {{uy_quyen_ben_b}})"
 
     if c.startswith("Chủ nhiệm nhiệm vụ:"):
@@ -123,12 +115,7 @@ def rewrite_para(text: str) -> str | None:
         return "Chức vụ/chức danh: {{chuc_vu_chu_nhiem}}"
     if c.startswith("Đơn vị công tác chuyên môn:"):
         return "Đơn vị công tác chuyên môn: {{don_vi_chu_nhiem}}"
-    if c.startswith("Điện thoại:") and "…" in t:
-        return "Điện thoại: {{dien_thoai_lien_he}}"
-    if c.startswith("Email:") and ("…" in t or ".." in t):
-        return "Email: {{email_lien_he}}"
 
-    # Mục 1
     if c.startswith("- Tên nhiệm vụ:"):
         return '- Tên nhiệm vụ: "{{ten_nhiem_vu}}"'
     if c.startswith("- Mã số nhiệm vụ:"):
@@ -156,7 +143,6 @@ def rewrite_para(text: str) -> str | None:
             "hoặc Mục 6 trước ngày {{han_thanh_toan}}."
         )
 
-    # Điều khoản thi hành — số HĐ
     if "không còn bất kỳ khiếu nại" in c:
         return (
             "1. Hai bên xác nhận đã thực hiện đầy đủ, nghiêm túc toàn bộ các điều khoản đã cam kết "
@@ -172,27 +158,7 @@ def rewrite_para(text: str) -> str | None:
     return None
 
 
-# Thứ tự các dòng Điện thoại / Email / Địa chỉ Bên B vs CNNV
-PHONE_EMAIL_SEQ = [
-    ("Điện thoại:", "dien_thoai_ben_b"),
-    ("Email:", "email_ben_b"),
-    ("Điện thoại:", "dien_thoai_chu_nhiem"),
-    ("Email:", "email_chu_nhiem"),
-]
-
-
-def is_finance_table(tbl_xml: str) -> bool:
-    text = norm(get_text(tbl_xml)).lower()
-    return "nội dung xác nhận tài chính" in text and "số tiền" in text
-
-
-def is_sign_table(tbl_xml: str) -> bool:
-    text = norm(get_text(tbl_xml)).lower()
-    return "đại diện bên a" in text and "chủ nhiệm nhiệm vụ" in text
-
-
 FINANCE_CELL_MAP = {
-    # row, col -> new text
     (1, 1): (
         "Tổng kinh phí thực hiện theo Hợp đồng (Giá trị hợp đồng): "
         "- Kinh phí giao khoán chi: {{kp_giao_khoan}} đồng "
@@ -229,133 +195,134 @@ FINANCE_CELL_MAP = {
 }
 
 
-def rebuild_cell_paras(tc_xml: str, new_text: str) -> str:
-    """Thay toàn bộ nội dung đoạn trong ô bằng 1 đoạn text mới, giữ pPr/rPr đầu."""
-    paras = list(re.finditer(r"<w:p[\s>][\s\S]*?</w:p>", tc_xml))
-    if not paras:
-        # chèn trước </w:tc>
-        return tc_xml.replace(
-            "</w:tc>",
-            f'<w:p><w:r><w:t xml:space="preserve">{esc(new_text)}</w:t></w:r></w:p></w:tc>',
-            1,
-        )
-    first = paras[0].group(0)
-    new_p = rebuild_p(first, new_text)
-    # Xóa hết paragraph cũ, chèn 1 cái mới sau tcPr nếu có
-    without_p = re.sub(r"<w:p[\s>][\s\S]*?</w:p>", "", tc_xml)
-    if "</w:tcPr>" in without_p:
-        return without_p.replace("</w:tcPr>", f"</w:tcPr>{new_p}", 1)
-    return without_p.replace("<w:tc>", f"<w:tc>{new_p}", 1)
+def is_finance_table(tbl_xml: str) -> bool:
+    text = norm(get_text(tbl_xml)).lower()
+    return "nội dung xác nhận tài chính" in text and "số tiền" in text
+
+
+def is_sign_table(tbl_xml: str) -> bool:
+    text = norm(get_text(tbl_xml)).lower()
+    return "đại diện bên a" in text and "chủ nhiệm nhiệm vụ" in text
+
+
+def rewrite_cell_text(tc_xml: str, new_text: str) -> str:
+    """
+    Giữ <w:tcPr>, thay toàn bộ đoạn trong ô bằng 1 đoạn text.
+    Không xóa tcPr — tránh DOCX hỏng khi mở Word.
+    """
+    tc_pr = ""
+    m = re.search(r"<w:tcPr>.*?</w:tcPr>", tc_xml, re.DOTALL)
+    if m:
+        tc_pr = m.group(0)
+
+    # Lấy style từ đoạn đầu (nếu có)
+    first_p = re.search(r"<w:p[\s>][\s\S]*?</w:p>", tc_xml)
+    style_from = first_p.group(0) if first_p else "<w:p></w:p>"
+    new_p = rebuild_p(style_from, new_text)
+    return f"<w:tc>{tc_pr}{new_p}</w:tc>"
 
 
 def rewrite_finance_table(tbl_xml: str) -> str:
-    def repl_row(ri: int, row_xml: str) -> str:
-        cells = list(re.finditer(r"<w:tc[\s>][\s\S]*?</w:tc>", row_xml))
-        out = row_xml
-        # thay từ cuối để không lệch offset — rebuild toàn row
-        parts: list[str] = []
-        last = 0
-        # giữ phần trước cell đầu
+    rows = list(re.finditer(r"<w:tr[\s>][\s\S]*?</w:tr>", tbl_xml))
+    if not rows:
+        return tbl_xml
+    parts: list[str] = [tbl_xml[: rows[0].start()]]
+    last = 0
+    for ri, rm in enumerate(rows):
+        if ri > 0:
+            parts.append(tbl_xml[last : rm.start()])
+        elif last == 0:
+            parts[0] = tbl_xml[: rm.start()]
+        row = rm.group(0)
+        cells = list(re.finditer(r"<w:tc[\s>][\s\S]*?</w:tc>", row))
         if not cells:
-            return row_xml
-        parts.append(row_xml[: cells[0].start()])
+            parts.append(row)
+            last = rm.end()
+            continue
+        rparts = [row[: cells[0].start()]]
         for ci, cm in enumerate(cells):
             tc = cm.group(0)
             key = (ri, ci)
             if key in FINANCE_CELL_MAP:
-                tc = rebuild_cell_paras(tc, FINANCE_CELL_MAP[key])
-            parts.append(tc)
-            last = cm.end()
-        parts.append(row_xml[last:])
-        return "".join(parts)
-
-    rows = list(re.finditer(r"<w:tr[\s>][\s\S]*?</w:tr>", tbl_xml))
-    parts: list[str] = []
-    last = 0
-    parts.append(tbl_xml[: rows[0].start()] if rows else tbl_xml)
-    for ri, rm in enumerate(rows):
-        if ri == 0:
-            parts.append(tbl_xml[last : rm.start()] if ri == 0 and last == 0 else "")
-            if not parts[-1] and ri == 0:
-                parts[-1] = tbl_xml[: rm.start()]
-        else:
-            parts.append(tbl_xml[last : rm.start()])
-        parts.append(repl_row(ri, rm.group(0)))
+                tc = rewrite_cell_text(tc, FINANCE_CELL_MAP[key])
+            rparts.append(tc)
+        rparts.append(row[cells[-1].end() :])
+        parts.append("".join(rparts))
         last = rm.end()
     parts.append(tbl_xml[last:])
     return "".join(parts)
 
 
 def rewrite_sign_table(tbl_xml: str) -> str:
-    """Chèn tên CNNV / đại diện Bên B vào cột ký."""
-
-    def cell_text(ci: int, old: str) -> str | None:
-        if ci == 1:
-            return (
-                "CHỦ NHIỆM NHIỆM VỤ (Ký xác nhận trách nhiệm chuyên môn, ghi rõ họ tên) "
-                "{{chu_nhiem}}"
-            )
-        if ci == 2:
-            return (
-                "ĐẠI DIỆN BÊN B THỦ TRƯỞNG ĐƠN VỊ CHỦ TRÌ "
-                "(Ký, ghi rõ họ tên, chức vụ và đóng dấu) {{dai_dien_ben_b}}"
-            )
-        return None
-
     rows = list(re.finditer(r"<w:tr[\s>][\s\S]*?</w:tr>", tbl_xml))
     if not rows:
         return tbl_xml
     row = rows[0].group(0)
     cells = list(re.finditer(r"<w:tc[\s>][\s\S]*?</w:tc>", row))
-    parts = [row[: cells[0].start()]] if cells else [row]
-    last = 0
-    new_cells: list[str] = []
+    if len(cells) < 3:
+        return tbl_xml
+    maps = {
+        1: "CHỦ NHIỆM NHIỆM VỤ (Ký xác nhận trách nhiệm chuyên môn, ghi rõ họ tên) {{chu_nhiem}}",
+        2: (
+            "ĐẠI DIỆN BÊN B THỦ TRƯỞNG ĐƠN VỊ CHỦ TRÌ "
+            "(Ký, ghi rõ họ tên, chức vụ và đóng dấu) {{dai_dien_ben_b}}"
+        ),
+    }
+    rparts = [row[: cells[0].start()]]
     for ci, cm in enumerate(cells):
         tc = cm.group(0)
-        nt = cell_text(ci, norm(get_text(tc)))
-        if nt:
-            tc = rebuild_cell_paras(tc, nt)
-        new_cells.append(tc)
-        last = cm.end()
-    new_row = row[: cells[0].start()] + "".join(new_cells) + row[last:]
+        if ci in maps:
+            tc = rewrite_cell_text(tc, maps[ci])
+        rparts.append(tc)
+    rparts.append(row[cells[-1].end() :])
+    new_row = "".join(rparts)
     return tbl_xml[: rows[0].start()] + new_row + tbl_xml[rows[0].end() :]
 
 
 def main() -> None:
+    if not SRC.exists():
+        raise SystemExit(f"Thiếu file nguồn: {SRC}")
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(SRC) as zin:
         xml = zin.read("word/document.xml").decode("utf-8")
 
-        pe_idx = 0
+        # Thứ tự Điện thoại/Email: Bên B rồi CNNV
+        pe_idx = {"phone": 0, "email": 0}
 
         def repl_para(m: re.Match[str]) -> str:
-            nonlocal pe_idx
             p = m.group(0)
             text = norm(get_text(p))
             if not text.strip():
                 return p
-
-            # Điện thoại / Email theo thứ tự xuất hiện (Bên B rồi CNNV)
             c = compact(text)
-            if c.startswith("Điện thoại:") and ("…" in text or ".." in text):
-                if pe_idx == 0:
-                    pe_idx += 1
-                    return rebuild_p(p, "Điện thoại: {{dien_thoai_ben_b}}")
-                if pe_idx == 2:
-                    pe_idx += 1
-                    return rebuild_p(p, "Điện thoại: {{dien_thoai_chu_nhiem}}")
-            if c.startswith("Email:") and ("…" in text or ".." in text):
-                if pe_idx == 1:
-                    pe_idx += 1
-                    return rebuild_p(p, "Email: {{email_ben_b}}")
-                if pe_idx >= 2:
-                    pe_idx += 1
-                    return rebuild_p(p, "Email: {{email_chu_nhiem}}")
 
-            if c.startswith("Địa chỉ:") and ("…" in text or ".." in text):
+            # Tài khoản Bên B (có chỗ trống) — không đụng tài khoản Bên A cố định
+            if (
+                c.startswith("Tài khoản:")
+                and "ngân hàng" in c.lower()
+                and has_blank(text)
+            ):
+                return rebuild_p(
+                    p, "Tài khoản: {{tai_khoan_ben_b}} tại ngân hàng {{ngan_hang_ben_b}}"
+                )
+
+            if c.startswith("Địa chỉ:") and has_blank(text):
                 return rebuild_p(p, "Địa chỉ: {{dia_chi_ben_b}}")
 
-            new = rewrite_para(text)
+            if c.startswith("Điện thoại:") and has_blank(text):
+                pe_idx["phone"] += 1
+                if pe_idx["phone"] == 1:
+                    return rebuild_p(p, "Điện thoại: {{dien_thoai_ben_b}}")
+                return rebuild_p(p, "Điện thoại: {{dien_thoai_chu_nhiem}}")
+
+            if c.startswith("Email:") and has_blank(text):
+                pe_idx["email"] += 1
+                if pe_idx["email"] == 1:
+                    return rebuild_p(p, "Email: {{email_ben_b}}")
+                return rebuild_p(p, "Email: {{email_chu_nhiem}}")
+
+            new = rewrite_para_text(text)
             if new is not None:
                 return rebuild_p(p, new)
             return p
@@ -372,7 +339,7 @@ def main() -> None:
 
         new_xml = re.sub(r"<w:tbl[\s>][\s\S]*?</w:tbl>", repl_tbl, new_xml)
 
-        # Preview
+        # Preview + biến
         lines: list[str] = []
         body = re.search(r"<w:body>([\s\S]*)</w:body>", new_xml)
         if body:
@@ -385,15 +352,24 @@ def main() -> None:
                     lines.append(f"[BẢNG {len(rows)} dòng]")
                     for ri, r in enumerate(rows):
                         cells = re.findall(r"<w:tc[\s>][\s\S]*?</w:tc>", r)
-                        vals = [norm(get_text(c))[:100] for c in cells]
+                        vals = [norm(get_text(c))[:120] for c in cells]
                         lines.append(f"  R{ri}: " + " | ".join(vals))
                 else:
-                    t = norm(get_text(chunk))
-                    if t.strip():
-                        lines.append(t.strip())
+                    t = norm(get_text(chunk)).strip()
+                    if t:
+                        lines.append(t)
 
         preview = OUT_DIR / "TEMPLATE_preview.txt"
         preview.write_text("\n".join(lines), encoding="utf-8")
+
+        vars_found = sorted(set(re.findall(r"\{\{(\w+)\}\}", new_xml)))
+        # Đảm bảo không còn {{ tách run
+        bad = 0
+        for m in re.finditer(r"<w:t[^>]*>([^<]*)</w:t>", new_xml):
+            t = m.group(1)
+            if ("{{" in t and "}}" not in t) or ("}}" in t and "{{" not in t):
+                bad += 1
+                print("SPLIT_TAG", repr(t[:80]))
 
         tmp = OUT.with_suffix(".tmp.docx")
         with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
@@ -404,10 +380,9 @@ def main() -> None:
                 zout.writestr(item, data)
         os.replace(tmp, OUT)
         print("wrote", str(OUT), OUT.stat().st_size)
-        print("preview", str(preview))
-        # liệt kê biến
-        vars_found = sorted(set(re.findall(r"\{\{(\w+)\}\}", new_xml)))
         print("vars", len(vars_found), ",".join(vars_found))
+        print("split_tags", bad)
+        print("preview", str(preview))
 
 
 if __name__ == "__main__":

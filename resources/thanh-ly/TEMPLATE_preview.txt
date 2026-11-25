@@ -51,9 +51,9 @@ II. NỘI DUNG THANH LÝ
 3. Quyết toán kinh phí và nghĩa vụ tài chính
 [BẢNG 7 dòng]
   R0: STT | Nội dung xác nhận tài chính | Số tiền (đồng)
-  R1: 1 | Tổng kinh phí thực hiện theo Hợp đồng (Giá trị hợp đồng): - Kinh phí giao khoán chi: {{kp_giao_khoan | {{kp_theo_hd}}
-  R2: 2 | Nguồn kinh phí bố trí: - Nguồn kinh phí từ Trường Đại học Sư phạm: {{nguon_truong}} đồng - Nguồn kin | {{tong_nguon}}
-  R3: 3 | Tổng kinh phí Bên A đã tạm ứng/cấp cho Bên B lũy kế: - Đợt 1 (Tạm ứng ban đầu): {{tam_ung_dot_1}} đồ | {{tam_ung_luy_ke}}
+  R1: 1 | Tổng kinh phí thực hiện theo Hợp đồng (Giá trị hợp đồng): - Kinh phí giao khoán chi: {{kp_giao_khoan}} đồng - Kinh phí k | {{kp_theo_hd}}
+  R2: 2 | Nguồn kinh phí bố trí: - Nguồn kinh phí từ Trường Đại học Sư phạm: {{nguon_truong}} đồng - Nguồn kinh phí từ bên ngoài / | {{tong_nguon}}
+  R3: 3 | Tổng kinh phí Bên A đã tạm ứng/cấp cho Bên B lũy kế: - Đợt 1 (Tạm ứng ban đầu): {{tam_ung_dot_1}} đồng - Đợt 2 (Cấp sau  | {{tam_ung_luy_ke}}
   R4: 4 | Giá trị khối lượng đủ điều kiện nghiệm thu, quyết toán: (Căn cứ Báo cáo quyết toán tài chính) | {{gia_tri_quyet_toan}}
   R5: 5 | Số kinh phí Bên A tiếp tục thanh toán bổ sung cho Bên B: (Bằng chữ: {{thanh_toan_bo_sung_chu}}) | {{thanh_toan_bo_sung}}
   R6: 6 | Số kinh phí Bên B có nghĩa vụ hoàn trả về Trường / NSNN: (Bằng chữ: {{hoan_tra_chu}}) | {{hoan_tra}}
@@ -69,4 +69,4 @@ III. ĐIỀU KHOẢN THI HÀNH
 2. Hợp đồng số: {{so_hop_dong}} chính thức chấm dứt và hết hiệu lực thi hành kể từ ngày Biên bản thanh lý này được các bên ký tên, đóng dấu hợp lệ.
 3. Biên bản thanh lý này có hiệu lực kể từ ngày ký, được lập thành 04 (bốn) bản có giá trị pháp lý như nhau; Bên A giữ 03 bản, Bên B giữ 01 bản để thực hiện./.
 [BẢNG 1 dòng]
-  R0: ĐẠI DIỆN BÊN A KT. HIỆU TRƯỞNG PHÓ HIỆU TRƯỞNG(Ký, ghi rõ họ tên, chức vụ và đóng dấu)  PGS.TS. Nguy | CHỦ NHIỆM NHIỆM VỤ (Ký xác nhận trách nhiệm chuyên môn, ghi rõ họ tên) {{chu_nhiem}} | ĐẠI DIỆN BÊN B THỦ TRƯỞNG ĐƠN VỊ CHỦ TRÌ (Ký, ghi rõ họ tên, chức vụ và đóng dấu) {{dai_dien_ben_b}}
+  R0: ĐẠI DIỆN BÊN A KT. HIỆU TRƯỞNG PHÓ HIỆU TRƯỞNG(Ký, ghi rõ họ tên, chức vụ và đóng dấu)  PGS.TS. Nguyễn Văn Hiếu  | CHỦ NHIỆM NHIỆM VỤ (Ký xác nhận trách nhiệm chuyên môn, ghi rõ họ tên) {{chu_nhiem}} | ĐẠI DIỆN BÊN B THỦ TRƯỞNG ĐƠN VỊ CHỦ TRÌ (Ký, ghi rõ họ tên, chức vụ và đóng dấu) {{dai_dien_ben_b}}
